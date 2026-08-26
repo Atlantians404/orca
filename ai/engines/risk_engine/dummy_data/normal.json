@@ -1,0 +1,27 @@
+{
+    "request": {
+        "request_id": "REQ001",
+        "requires_route": false,
+        "forecast_hours": 24
+    },
+    "marine": {
+        "sea_state": "calm",
+        "current_speed": 0.8,
+        "marine_warning": "NONE"
+    },
+    "weather": {
+        "wind_speed": 12,
+        "wind_direction": 180,
+        "wave_height": 1.0,
+        "visibility": 10.0,
+        "precipitation": 5,
+        "lightning": false,
+        "condition": "clear"
+    },
+    "geo": {
+        "latitude": 13.05,
+        "longitude": 80.28,
+        "restricted_area": false,
+        "protected_area": false
+    }
+}
