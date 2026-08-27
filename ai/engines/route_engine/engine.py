@@ -1,39 +1,39 @@
-import math 
+import math
+
+from .validator import validate_coordinates
+
+
 class RouteEngine:
 
-    @staticmethod
-    def validate_coordinates(
-        latitude: float,
-        longitude: float
-    ) -> bool:
-        """
-        Validate latitude and longitude.
-
-        Latitude: -90 to 90
-        Longitude: -180 to 180
-        """
-
-        return (
-            -90 <= latitude <= 90
-            and
-            -180 <= longitude <= 180
-        )
-
-    
     @staticmethod
     def calculate_distance(
         point_a: tuple[float, float],
         point_b: tuple[float, float]
     ) -> float:
+        """
+        Calculate distance between two coordinates
+        using the Haversine formula.
+
+        Coordinates are provided as:
+
+            (latitude, longitude)
+
+        Returns:
+            Distance in kilometers.
+        """
 
         lat1, lon1 = point_a
         lat2, lon2 = point_b
 
-        if not RouteEngine.validate_coordinates(lat1, lon1):
-            raise ValueError("Invalid coordinates for point A")
+        if not validate_coordinates(lat1, lon1):
+            raise ValueError(
+                "Invalid coordinates for point A"
+            )
 
-        if not RouteEngine.validate_coordinates(lat2, lon2):
-            raise ValueError("Invalid coordinates for point B")
+        if not validate_coordinates(lat2, lon2):
+            raise ValueError(
+                "Invalid coordinates for point B"
+            )
 
         earth_radius_km = 6371.0
 
