@@ -1,5 +1,6 @@
 import math
-
+import json
+from pathlib import Path
 from .validator import validate_coordinates
 
 
@@ -56,3 +57,56 @@ class RouteEngine:
         )
 
         return earth_radius_km * c
+    
+    @staticmethod
+    def load_marine_data() -> dict:
+        """
+        Load dummy marine data from JSON.
+        """
+
+        data_path = (
+            Path(__file__).parent
+            / "dummy_data"
+            / "marine_data.json"
+        )
+
+        with open(data_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    
+    @staticmethod
+    def find_nearest_pfz(
+        latitude: float,
+        longitude: float
+    ) -> dict:
+
+        if not validate_coordinates(
+            latitude,
+            longitude
+        ):
+            raise ValueError("Invalid coordinates")
+
+        data = RouteEngine.load_marine_data()
+
+        pfz_locations = data["pfz_locations"]
+
+        nearest_pfz = None
+        shortest_distance = float("inf")
+
+        for pfz in pfz_locations:
+
+            distance = RouteEngine.calculate_distance(
+                (latitude, longitude),
+                (
+                    pfz["latitude"],
+                    pfz["longitude"]
+                )
+            )
+
+            if distance < shortest_distance:
+                shortest_distance = distance
+                nearest_pfz = pfz
+
+        return {
+            "pfz": nearest_pfz,
+            "distance_km": shortest_distance
+        }
