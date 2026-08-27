@@ -66,3 +66,4 @@ def scalar():
         title="Scalar API"
     )
 
+
