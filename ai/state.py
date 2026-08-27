@@ -1,7 +1,10 @@
-from typing import TypedDict
-from backend.schemas.location import Location
-from backend.schemas.time_context import TimeContext
-from backend.schemas.response import AgentResponse
+from typing import TypedDict, Any
+
+from schemas.location import Location
+from schemas.time import TimeContext
+from schemas.agent_response import AgentResponse
+
+
 class AgentState(TypedDict):
     prompt: str
     conversation_summary: str | None
@@ -12,9 +15,9 @@ class AgentState(TypedDict):
     selected_agents: list[str]
     selected_engines: list[str]
 
-    agent_data: dict
+    agent_data: dict[str, Any]
 
-    risk_result: dict | None
-    route_result: dict | None
+    risk_result: dict[str, Any] | None
+    route_result: dict[str, Any] | None
 
     response: AgentResponse | None
