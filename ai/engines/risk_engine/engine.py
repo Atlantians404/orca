@@ -1,29 +1,36 @@
-from .schemas import RiskInput, RiskResult
+from .scoring import score_weather
 
 
 class RiskEngine:
     """
-    Deterministic risk engine.
+    ORCA Risk Engine.
 
-    The engine receives validated risk inputs and produces
-    a stable RiskResult.
+    Current responsibility:
+        - Receive validated provider data
+        - Calculate individual risk-factor scores
+        - Return derived risk information only
+
+    Overall risk aggregation will be implemented later.
     """
 
-    def calculate(self, risk_input: RiskInput) -> RiskResult:
+    def process(self, data: dict) -> dict:
         """
-        Calculate the overall risk.
+        Process validated ORCA input.
 
-        The detailed deterministic scoring rules will be added
-        after the input/output pipeline is verified.
+        Returns only the calculated risk information.
         """
 
-        return RiskResult(
-            request_id=risk_input.request.request_id,
-            score=0.0,
-            level="LOW",
-            reasons=["Risk calculation rules are not implemented yet."],
-            recommendation=None,
-            route_required=risk_input.request.requires_route,
-        )
-if __name__ == "__main__":
-    print("Risk Engine module is working.")
+        result = {
+            "request_id": data["request"]["request_id"]
+        }
+
+        # -------------------------------------------------
+        # WEATHER
+        # -------------------------------------------------
+
+        if "weather" in data:
+            result["weather"] = score_weather(
+                data["weather"]
+            )
+
+        return result
