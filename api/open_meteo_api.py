@@ -6,6 +6,7 @@ MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
 
 def get_weather_condition(weather_code):
+    
     conditions = {
         0: "Clear sky",
         1: "Mainly clear",
@@ -41,10 +42,12 @@ def get_weather_condition(weather_code):
 
 
 def is_thunderstorm(weather_code):
+
     return weather_code in [95, 96, 99]
 
 
 def get_location_time(latitude, longitude):
+    
     params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -69,7 +72,7 @@ def get_location_time(latitude, longitude):
 
 
 def get_open_meteo_data(latitude, longitude, time=None):
-
+    
     if time is None:
         time, timezone = get_location_time(
             latitude,
@@ -80,7 +83,6 @@ def get_open_meteo_data(latitude, longitude, time=None):
             latitude,
             longitude
         )
-
 
     weather_params = {
         "latitude": latitude,
@@ -116,7 +118,6 @@ def get_open_meteo_data(latitude, longitude, time=None):
         [None]
     )[0]
 
-
     marine_params = {
         "latitude": latitude,
         "longitude": longitude,
@@ -129,7 +130,8 @@ def get_open_meteo_data(latitude, longitude, time=None):
             "swell_wave_period",
             "ocean_current_velocity",
             "ocean_current_direction",
-            "sea_surface_temperature"
+            "sea_surface_temperature",
+            "sea_level_height_msl"
         ],
         "timezone": "auto",
         "start_hour": time,
@@ -148,7 +150,6 @@ def get_open_meteo_data(latitude, longitude, time=None):
     marine_data = marine_response.json()
 
     marine_hourly = marine_data.get("hourly", {})
-
 
     return {
         "location": {
@@ -253,6 +254,11 @@ def get_open_meteo_data(latitude, longitude, time=None):
 
             "sea_surface_temperature": marine_hourly.get(
                 "sea_surface_temperature",
+                [None]
+            )[0],
+
+            "sea_level_height_msl": marine_hourly.get(
+                "sea_level_height_msl",
                 [None]
             )[0]
         }
