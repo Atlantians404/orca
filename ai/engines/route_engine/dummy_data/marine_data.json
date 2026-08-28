@@ -51,6 +51,18 @@
       "depth_m": 35.0
     }
   ],
-  "restricted_zones": [],
+  "restricted_zones": [
+  {
+    "id": "ZONE001",
+    "name": "Restricted Zone A",
+    "coordinates": [
+      [12.95, 80.32],
+      [12.95, 80.42],
+      [13.05, 80.42],
+      [13.05, 80.32],
+      [12.95, 80.32]
+    ]
+  }
+],
   "protected_areas": []
 }
