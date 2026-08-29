@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from .engine import RouteEngine
+from .geometry import create_linestring, route_intersects_polygon
 
 
 @dataclass
@@ -169,4 +170,44 @@ def connect_grid(
                 )
 
     return graph
+def apply_zone_constraints(
+    graph: MarineGraph,
+    restricted_polygon
+) -> MarineGraph:
+    """
+    Remove graph edges that intersect
+    a restricted polygon.
+    """
 
+    for source_id in list(graph.edges.keys()):
+
+        valid_edges = []
+
+        source_node = graph.nodes[source_id]
+
+        for edge in graph.edges[source_id]:
+
+            target_node = graph.nodes[edge.target]
+
+            route_segment = create_linestring(
+                [
+                    (
+                        source_node.latitude,
+                        source_node.longitude
+                    ),
+                    (
+                        target_node.latitude,
+                        target_node.longitude
+                    )
+                ]
+            )
+
+            if not route_intersects_polygon(
+                route_segment,
+                restricted_polygon
+            ):
+                valid_edges.append(edge)
+
+        graph.edges[source_id] = valid_edges
+
+    return graph

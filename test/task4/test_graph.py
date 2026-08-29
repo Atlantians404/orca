@@ -1,5 +1,6 @@
 from ai.engines.route_engine.graph import create_grid
 from ai.engines.route_engine.graph import connect_grid
+from ai.engines.route_engine.geometry import create_polygon
 
 from ai.engines.route_engine.graph import (
     Node,
@@ -176,3 +177,49 @@ def test_center_node_neighbors():
         "N6",
         "N8"
     }
+from ai.engines.route_engine.graph import (
+    create_grid,
+    connect_grid,
+    apply_zone_constraints,
+)
+
+def test_restricted_zone_blocks_edge():
+
+    graph = create_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        rows=3,
+        columns=3,
+        latitude_step=0.05,
+        longitude_step=0.05
+    )
+
+    connect_grid(
+        graph,
+        rows=3,
+        columns=3
+    )
+
+    restricted_zone = create_polygon(
+        [
+            (12.99, 80.32),
+            (12.99, 80.38),
+            (13.01, 80.38),
+            (13.01, 80.32),
+            (12.99, 80.32)
+        ]
+    )
+
+    apply_zone_constraints(
+        graph,
+        restricted_zone
+    )
+
+    neighbors = graph.get_neighbors("N8")
+
+    neighbor_ids = {
+        edge.target
+        for edge in neighbors
+    }
+
+    assert "N9" not in neighbor_ids
