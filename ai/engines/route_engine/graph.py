@@ -211,3 +211,32 @@ def apply_zone_constraints(
         graph.edges[source_id] = valid_edges
 
     return graph
+
+def path_to_coordinates(
+    graph: MarineGraph,
+    path: list[str]
+) -> list[tuple[float, float]]:
+    """
+    Convert a list of node IDs into
+    (latitude, longitude) coordinates.
+    """
+
+    coordinates = []
+
+    for node_id in path:
+
+        if node_id not in graph.nodes:
+            raise ValueError(
+                f"Unknown node: {node_id}"
+            )
+
+        node = graph.nodes[node_id]
+
+        coordinates.append(
+            (
+                node.latitude,
+                node.longitude
+            )
+        )
+
+    return coordinates

@@ -86,3 +86,23 @@ def zone_to_polygon(zone: dict) -> Polygon:
             for coordinate in zone["coordinates"]
         ]
     )
+
+def validate_route(
+    route: LineString,
+    restricted_polygons: list[Polygon]
+) -> bool:
+    """
+    Validate that a route does not intersect
+    any restricted polygon.
+
+    Returns:
+        True  -> route is safe
+        False -> route intersects a restricted area
+    """
+
+    for polygon in restricted_polygons:
+
+        if route.intersects(polygon):
+            return False
+
+    return True
