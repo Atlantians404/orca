@@ -2,7 +2,23 @@ import math
 import json
 from pathlib import Path
 from .validator import validate_coordinates
+from .graph import find_nearest_node
+from .schemas import RouteRequest, RouteResult, Waypoint
 
+from .graph import (
+    create_grid,
+    connect_grid,
+    apply_zone_constraints,
+    path_to_coordinates,
+)
+
+from .geometry import (
+    create_linestring,
+    zone_to_polygon,
+    validate_route,
+)
+
+from .pathfinding import astar
 
 class RouteEngine:
 
@@ -110,3 +126,180 @@ class RouteEngine:
             "pfz": nearest_pfz,
             "distance_km": shortest_distance
         }
+    @staticmethod
+    def find_route(
+        request: RouteRequest | None = None,
+        *,
+        start_latitude: float | None = None,
+        start_longitude: float | None = None,
+        goal_latitude: float | None = None,
+        goal_longitude: float | None = None,
+        restricted_zones: list | None = None
+    ) -> RouteResult | dict:
+
+        if request is None:
+            if not validate_coordinates(start_latitude, start_longitude):
+                raise ValueError("Invalid start coordinates")
+            if not validate_coordinates(goal_latitude, goal_longitude):
+                raise ValueError("Invalid goal coordinates")
+
+            graph = create_grid(
+                start_latitude=start_latitude,
+                start_longitude=start_longitude,
+                rows=3,
+                columns=3,
+                latitude_step=0.05,
+                longitude_step=0.05
+            )
+
+            connect_grid(graph, rows=3, columns=3)
+
+            start_node = find_nearest_node(graph, start_latitude, start_longitude)
+            goal_node = find_nearest_node(graph, goal_latitude, goal_longitude)
+
+            polygons = []
+            if restricted_zones:
+                for zone in restricted_zones:
+                    polygon = zone_to_polygon(zone)
+                    polygons.append(polygon)
+                    apply_zone_constraints(graph, polygon)
+
+            path, distance = astar(graph, start_node, goal_node)
+            coordinates = path_to_coordinates(graph, path)
+            route = create_linestring(coordinates)
+
+            if not validate_route(route, polygons):
+                raise ValueError("Generated route intersects a restricted zone")
+
+            return {
+                "path": path,
+                "distance_km": distance,
+                "coordinates": coordinates,
+                "geojson": {
+                    "type": "Feature",
+                    "geometry": {
+                        "type": "LineString",
+                        "coordinates": [
+                            [longitude, latitude]
+                            for latitude, longitude in coordinates
+                        ]
+                    },
+                    "properties": {}
+                }
+            }
+
+        start = request.start
+        destination = request.destination
+
+        # Create demo grid
+        graph = create_grid(
+            start_latitude=start.latitude,
+            start_longitude=start.longitude,
+            rows=3,
+            columns=3,
+            latitude_step=0.05,
+            longitude_step=0.05
+        )
+
+        # Connect nodes
+        connect_grid(
+            graph,
+            rows=3,
+            columns=3
+        )
+
+        # Find nearest graph nodes
+        start_node = find_nearest_node(
+            graph,
+            start.latitude,
+            start.longitude
+        )
+
+        goal_node = find_nearest_node(
+            graph,
+            destination.latitude,
+            destination.longitude
+        )
+
+        # Apply restricted zones
+        polygons = []
+
+        if request.constraints.avoid_restricted_zones:
+            if hasattr(request.constraints, 'restricted_zones'):
+                for zone in request.constraints.restricted_zones:
+                    polygon = zone_to_polygon(zone)
+                    polygons.append(polygon)
+
+                    apply_zone_constraints(
+                        graph,
+                        polygon
+                    )
+
+        # Run A*
+        path, distance = astar(
+            graph,
+            start_node,
+            goal_node
+        )
+
+        # Convert node IDs → coordinates
+        coordinates = path_to_coordinates(
+            graph,
+            path
+        )
+
+        # Convert to Shapely LineString
+        route = create_linestring(
+            coordinates
+        )
+
+        # Final validation
+        if not validate_route(
+            route,
+            polygons
+        ):
+            raise ValueError(
+                "Generated route intersects "
+                "a restricted zone"
+            )
+
+        # Convert coordinates into waypoints
+        waypoints = [
+            Waypoint(
+                latitude=latitude,
+                longitude=longitude
+            )
+            for latitude, longitude in coordinates[1:-1]
+        ]
+
+        return RouteResult(
+            pfz_id=destination.pfz_id,
+
+            start=start,
+
+            destination=Waypoint(
+                latitude=destination.latitude,
+                longitude=destination.longitude
+            ),
+
+            waypoints=waypoints,
+
+            distance_km=distance,
+
+            geojson={
+                "type": "Feature",
+                "geometry": {
+                    "type": "LineString",
+                    "coordinates": [
+                        [
+                            longitude,
+                            latitude
+                        ]
+                        for latitude, longitude in coordinates
+                    ]
+                },
+                "properties": {
+                    "pfz_id": destination.pfz_id
+                }
+            }
+        )

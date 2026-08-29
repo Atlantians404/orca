@@ -2,7 +2,6 @@ import heapq
 
 
 from .graph import MarineGraph
-from .engine import RouteEngine
 
 
 def dijkstra(
@@ -84,6 +83,8 @@ def astar(
     start: str,
     goal: str
 ) -> tuple[list[str], float]:
+
+    from .engine import RouteEngine
 
     distances = {
         node_id: float("inf")

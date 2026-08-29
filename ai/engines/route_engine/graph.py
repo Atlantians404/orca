@@ -1,6 +1,9 @@
 from dataclasses import dataclass
-from .engine import RouteEngine
-from .geometry import create_linestring, route_intersects_polygon
+
+from .geometry import (
+    create_linestring,
+    route_intersects_polygon,
+)
 
 
 @dataclass
@@ -15,6 +18,7 @@ class Edge:
     source: str
     target: str
     weight: float
+
 
 class MarineGraph:
 
@@ -33,6 +37,7 @@ class MarineGraph:
     def get_neighbors(self, node_id: str) -> list[Edge]:
         return self.edges.get(node_id, [])
 
+
 def create_grid(
     start_latitude: float,
     start_longitude: float,
@@ -44,7 +49,8 @@ def create_grid(
     """
     Create a geographic grid of nodes.
 
-    Each node represents a location in the marine area.
+    Each node represents a location
+    in the marine area.
     """
 
     graph = MarineGraph()
@@ -53,7 +59,9 @@ def create_grid(
 
         for column in range(columns):
 
-            node_id = f"N{row * columns + column + 1}"
+            node_id = (
+                f"N{row * columns + column + 1}"
+            )
 
             latitude = round(
                 start_latitude
@@ -77,99 +85,137 @@ def create_grid(
 
     return graph
 
+
 def connect_grid(
     graph: MarineGraph,
     rows: int,
     columns: int
 ) -> MarineGraph:
     """
-    Connect horizontally and vertically adjacent
-    nodes in the grid.
+    Connect adjacent nodes in the grid.
+
+    Connections:
+        - horizontal
+        - vertical
+        - diagonal
 
     Edge weight = Haversine distance in km.
     """
+
+    from .engine import RouteEngine
+
+    def add_connection(
+        source_id: str,
+        target_id: str
+    ):
+        source_node = graph.nodes[source_id]
+        target_node = graph.nodes[target_id]
+
+        distance = RouteEngine.calculate_distance(
+            (
+                source_node.latitude,
+                source_node.longitude
+            ),
+            (
+                target_node.latitude,
+                target_node.longitude
+            )
+        )
+
+        # Forward edge
+        graph.add_edge(
+            Edge(
+                source=source_id,
+                target=target_id,
+                weight=distance
+            )
+        )
+
+        # Reverse edge
+        graph.add_edge(
+            Edge(
+                source=target_id,
+                target=source_id,
+                weight=distance
+            )
+        )
 
     for row in range(rows):
 
         for column in range(columns):
 
-            current_id = f"N{row * columns + column + 1}"
+            current_id = (
+                f"N{row * columns + column + 1}"
+            )
 
-            current_node = graph.nodes[current_id]
+            # ------------------------------------------
+            # Right
+            # ------------------------------------------
 
-            # Connect to the node on the right
             if column < columns - 1:
 
                 right_id = (
                     f"N{row * columns + column + 2}"
                 )
 
-                right_node = graph.nodes[right_id]
-
-                distance = RouteEngine.calculate_distance(
-                    (
-                        current_node.latitude,
-                        current_node.longitude
-                    ),
-                    (
-                        right_node.latitude,
-                        right_node.longitude
-                    )
+                add_connection(
+                    current_id,
+                    right_id
                 )
 
-                graph.add_edge(
-                    Edge(
-                        source=current_id,
-                        target=right_id,
-                        weight=distance
-                    )
-                )
+            # ------------------------------------------
+            # Below
+            # ------------------------------------------
 
-                graph.add_edge(
-                    Edge(
-                        source=right_id,
-                        target=current_id,
-                        weight=distance
-                    )
-                )
-
-            # Connect to the node below
             if row < rows - 1:
 
                 below_id = (
                     f"N{(row + 1) * columns + column + 1}"
                 )
 
-                below_node = graph.nodes[below_id]
-
-                distance = RouteEngine.calculate_distance(
-                    (
-                        current_node.latitude,
-                        current_node.longitude
-                    ),
-                    (
-                        below_node.latitude,
-                        below_node.longitude
-                    )
+                add_connection(
+                    current_id,
+                    below_id
                 )
 
-                graph.add_edge(
-                    Edge(
-                        source=current_id,
-                        target=below_id,
-                        weight=distance
-                    )
+            # ------------------------------------------
+            # Diagonal down-right
+            # ------------------------------------------
+
+            if (
+                row < rows - 1
+                and column < columns - 1
+            ):
+
+                diagonal_id = (
+                    f"N{(row + 1) * columns + column + 2}"
                 )
 
-                graph.add_edge(
-                    Edge(
-                        source=below_id,
-                        target=current_id,
-                        weight=distance
-                    )
+                add_connection(
+                    current_id,
+                    diagonal_id
+                )
+
+            # ------------------------------------------
+            # Diagonal down-left
+            # ------------------------------------------
+
+            if (
+                row < rows - 1
+                and column > 0
+            ):
+
+                diagonal_id = (
+                    f"N{(row + 1) * columns + column}"
+                )
+
+                add_connection(
+                    current_id,
+                    diagonal_id
                 )
 
     return graph
+
 def apply_zone_constraints(
     graph: MarineGraph,
     restricted_polygon
@@ -212,6 +258,7 @@ def apply_zone_constraints(
 
     return graph
 
+
 def path_to_coordinates(
     graph: MarineGraph,
     path: list[str]
@@ -240,3 +287,112 @@ def path_to_coordinates(
         )
 
     return coordinates
+
+
+def find_nearest_node(
+    graph: MarineGraph,
+    latitude: float,
+    longitude: float
+) -> str:
+    """
+    Find the graph node closest to
+    a geographic coordinate.
+    """
+
+    if not graph.nodes:
+        raise ValueError(
+            "Graph contains no nodes"
+        )
+
+    nearest_node_id = None
+    shortest_distance = float("inf")
+
+    from .engine import RouteEngine
+
+    for node_id, node in graph.nodes.items():
+
+        distance = RouteEngine.calculate_distance(
+            (latitude, longitude),
+            (
+                node.latitude,
+                node.longitude
+            )
+        )
+
+        if distance < shortest_distance:
+
+            shortest_distance = distance
+            nearest_node_id = node_id
+
+    return nearest_node_id
+
+
+def create_route_grid(
+    start_latitude: float,
+    start_longitude: float,
+    goal_latitude: float,
+    goal_longitude: float,
+    rows: int = 10,
+    columns: int = 10,
+) -> MarineGraph:
+    """
+    Create a geographic grid covering the area
+    between the start and destination.
+    """
+
+    if rows < 2:
+        raise ValueError(
+            "rows must be at least 2"
+        )
+
+    if columns < 2:
+        raise ValueError(
+            "columns must be at least 2"
+        )
+
+    min_lat = min(
+        start_latitude,
+        goal_latitude
+    )
+
+    max_lat = max(
+        start_latitude,
+        goal_latitude
+    )
+
+    min_lon = min(
+        start_longitude,
+        goal_longitude
+    )
+
+    max_lon = max(
+        start_longitude,
+        goal_longitude
+    )
+
+    latitude_range = max_lat - min_lat
+    longitude_range = max_lon - min_lon
+
+    # Prevent zero-size grids
+    if latitude_range == 0:
+        latitude_range = 0.01
+
+    if longitude_range == 0:
+        longitude_range = 0.01
+
+    latitude_step = (
+        latitude_range / (rows - 1)
+    )
+
+    longitude_step = (
+        longitude_range / (columns - 1)
+    )
+
+    return create_grid(
+        start_latitude=min_lat,
+        start_longitude=min_lon,
+        rows=rows,
+        columns=columns,
+        latitude_step=latitude_step,
+        longitude_step=longitude_step,
+    )

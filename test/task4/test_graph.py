@@ -1,9 +1,11 @@
 import pytest
+
+from ai.engines.route_engine import RouteEngine
 from ai.engines.route_engine.pathfinding import astar
 from ai.engines.route_engine.graph import create_grid
 from ai.engines.route_engine.graph import connect_grid
 from ai.engines.route_engine.geometry import create_polygon
-
+from ai.engines.route_engine.graph import create_route_grid
 from ai.engines.route_engine.graph import (
     Node,
     Edge,
@@ -120,14 +122,18 @@ def test_connect_grid():
 
     neighbors = graph.get_neighbors("N1")
 
-    assert len(neighbors) == 2
+    assert len(neighbors) == 3
 
     neighbor_ids = {
         edge.target
         for edge in neighbors
     }
 
-    assert neighbor_ids == {"N2", "N4"}
+    assert neighbor_ids == {
+        "N2",
+        "N4",
+        "N5"
+    }
 def test_edge_weight():
 
     graph = create_grid(
@@ -174,11 +180,17 @@ def test_center_node_neighbors():
     }
 
     assert neighbor_ids == {
+        "N1",
         "N2",
+        "N3",
         "N4",
         "N6",
-        "N8"
+        "N7",
+        "N8",
+        "N9"
     }
+
+    assert len(neighbor_ids) == 8
 from ai.engines.route_engine.graph import (
     create_grid,
     connect_grid,
@@ -367,6 +379,7 @@ def test_validate_route_multiple_zones():
 
 from ai.engines.route_engine.graph import (
     path_to_coordinates,
+    find_nearest_node,
 )
 def test_path_to_coordinates():
 
@@ -416,4 +429,123 @@ def test_path_to_coordinates_invalid_node():
             graph,
             ["N1", "N99"]
         )
-
+
+def test_find_nearest_node():
+
+    graph = create_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        rows=3,
+        columns=3,
+        latitude_step=0.05,
+        longitude_step=0.05
+    )
+
+    nearest = find_nearest_node(
+        graph,
+        12.91,
+        80.31
+    )
+
+    assert nearest == "N1"
+
+def test_find_nearest_node_center():
+
+    graph = create_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        rows=3,
+        columns=3,
+        latitude_step=0.05,
+        longitude_step=0.05
+    )
+
+    nearest = find_nearest_node(
+        graph,
+        12.951,
+        80.351
+    )
+
+    assert nearest == "N5"
+
+def test_create_route_grid():
+
+    graph = create_route_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        goal_latitude=13.00,
+        goal_longitude=80.40,
+        rows=5,
+        columns=5,
+    )
+
+    assert len(graph.nodes) == 25
+
+    assert graph.nodes["N1"].latitude == pytest.approx(12.90)
+    assert graph.nodes["N1"].longitude == pytest.approx(80.30)
+
+    assert graph.nodes["N25"].latitude == pytest.approx(13.00)
+    assert graph.nodes["N25"].longitude == pytest.approx(80.40)
+def test_diagonal_connection():
+
+    graph = create_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        rows=3,
+        columns=3,
+        latitude_step=0.05,
+        longitude_step=0.05
+    )
+
+    connect_grid(
+        graph,
+        rows=3,
+        columns=3
+    )
+
+    neighbors = graph.get_neighbors("N1")
+
+    neighbor_ids = {
+        edge.target
+        for edge in neighbors
+    }
+
+    assert "N2" in neighbor_ids
+    assert "N4" in neighbor_ids
+
+    # Diagonal
+    assert "N5" in neighbor_ids
+def test_diagonal_edge_weight():
+
+    graph = create_grid(
+        start_latitude=12.90,
+        start_longitude=80.30,
+        rows=3,
+        columns=3,
+        latitude_step=0.05,
+        longitude_step=0.05
+    )
+
+    connect_grid(
+        graph,
+        rows=3,
+        columns=3
+    )
+
+    neighbors = graph.get_neighbors("N1")
+
+    diagonal_edge = next(
+        edge
+        for edge in neighbors
+        if edge.target == "N5"
+    )
+
+    expected_distance = RouteEngine.calculate_distance(
+        (12.90, 80.30),
+        (12.95, 80.35)
+    )
+
+    assert diagonal_edge.weight == pytest.approx(
+        expected_distance,
+        abs=0.001
+    )
