@@ -5,19 +5,28 @@ from schemas.time import TimeContext
 from schemas.agent_response import AgentResponse
 
 
-class AgentState(TypedDict):
+class AgentState(TypedDict, total=False):
+
+    thread_id: str
     prompt: str
     conversation_summary: str | None
 
     location: Location | None
     time_context: TimeContext | None
+    distance_km: float | None
 
-    selected_agents: list[str]
-    selected_engines: list[str]
+    query_type: str | None
+
+    pfz_candidates: list[dict]
+    selected_pfz: dict | None
 
     agent_data: dict[str, Any]
-
     risk_result: dict[str, Any] | None
+
+    route_required: bool
     route_result: dict[str, Any] | None
 
     response: AgentResponse | None
+
+    pending_action: str | None
+    workflow_status: str
