@@ -5,16 +5,7 @@ NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 
 def get_coordinates(place: str) -> dict:
-    """
-    Convert a place name into geographic coordinates.
-
-    Parameters:
-        place (str): Place name, city, district, landmark, etc.
-
-    Returns:
-        dict: Location information containing latitude,
-              longitude and display name.
-    """
+   
 
     if not place or not place.strip():
         raise ValueError("Place name cannot be empty.")
