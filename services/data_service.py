@@ -1,4 +1,4 @@
-from api.open_meteo_api import get_open_meteo_data
+from api.weather.weather import get_open_meteo_data
 
 # weather tools
 def get_temperature(
