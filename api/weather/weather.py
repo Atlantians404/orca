@@ -5,7 +5,6 @@ WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
 
 def get_weather_condition(weather_code):
-    """Convert WMO weather code into a readable weather condition."""
 
     conditions = {
         0: "Clear sky",
@@ -42,16 +41,11 @@ def get_weather_condition(weather_code):
 
 
 def is_thunderstorm(weather_code):
-    """Return True if the weather code indicates a thunderstorm."""
 
     return weather_code in [95, 96, 99]
 
 
 def get_location_time(latitude, longitude):
-    """
-    Get the current local time and timezone
-    for the given coordinates.
-    """
 
     params = {
         "latitude": latitude,
@@ -77,22 +71,7 @@ def get_location_time(latitude, longitude):
 
 
 def get_open_meteo_data(latitude, longitude, time=None):
-    """
-    Fetch weather data from Open-Meteo.
-
-    Parameters:
-        latitude (float): Location latitude.
-        longitude (float): Location longitude.
-        time (str, optional): Local time in
-                              'YYYY-MM-DDTHH:MM' format.
-                              If not provided, the current
-                              local time is used.
-
-    Returns:
-        dict: Weather data for the requested location and time.
-    """
-
-    # Get local time automatically if not provided
+  
     if time is None:
         time, timezone = get_location_time(
             latitude,
