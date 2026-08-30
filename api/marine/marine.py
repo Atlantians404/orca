@@ -2,8 +2,6 @@ import requests
 import json
 from datetime import datetime
 
-
-
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
 
@@ -12,18 +10,6 @@ def get_marine_data(
     longitude: float,
     time: str
 ) -> dict:
-    """
-    Fetch marine data from Open-Meteo Marine API.
-
-    Parameters:
-        latitude (float): Location latitude.
-        longitude (float): Location longitude.
-        time (str): Local time in YYYY-MM-DDTHH:MM format.
-
-    Returns:
-        dict: Marine data for the requested location and time.
-    """
-
     params = {
         "latitude": latitude,
         "longitude": longitude,
