@@ -1,8 +1,12 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+
+class TimeSlot(BaseModel):
+    date: str
+    start_time: str
+    end_time: str | None = None
 
 
 class TimeContext(BaseModel):
-    date: str | None = None
-    start_time: str | None = None
-    end_time: str | None = None
+    slots: list[TimeSlot] = Field(default_factory=list)
     timezone: str = "Asia/Kolkata"
