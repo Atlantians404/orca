@@ -17,11 +17,11 @@ def create_point(
 
 def create_linestring(
     coordinates: list[tuple[float, float]]
-) -> LineString:
-    """
-    Create a LineString from
-    (latitude, longitude) coordinates.
-    """
+):
+    if len(coordinates) < 2:
+        raise ValueError(
+            "A LineString requires at least two points"
+        )
 
     return LineString(
         [
@@ -75,17 +75,14 @@ def pfz_to_point(pfz: dict) -> Point:
         pfz["latitude"],
         pfz["longitude"]
     )
-def zone_to_polygon(zone: dict) -> Polygon:
-    """
-    Convert a zone dictionary into a Shapely Polygon.
-    """
+def zone_to_polygon(zone) -> Polygon:
 
-    return create_polygon(
-        [
-            tuple(coordinate)
-            for coordinate in zone["coordinates"]
-        ]
-    )
+    if hasattr(zone, "coordinates"):
+        coordinates = zone.coordinates
+    else:
+        coordinates = zone["coordinates"]
+
+    return create_polygon(coordinates)
 
 def validate_route(
     route: LineString,

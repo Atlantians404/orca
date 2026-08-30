@@ -122,7 +122,6 @@ def connect_grid(
             )
         )
 
-        # Forward edge
         graph.add_edge(
             Edge(
                 source=source_id,
@@ -131,7 +130,6 @@ def connect_grid(
             )
         )
 
-        # Reverse edge
         graph.add_edge(
             Edge(
                 source=target_id,
@@ -149,7 +147,7 @@ def connect_grid(
             )
 
             # ------------------------------------------
-            # Right
+            # Horizontal: right
             # ------------------------------------------
 
             if column < columns - 1:
@@ -164,7 +162,7 @@ def connect_grid(
                 )
 
             # ------------------------------------------
-            # Below
+            # Vertical: below
             # ------------------------------------------
 
             if row < rows - 1:
@@ -179,7 +177,7 @@ def connect_grid(
                 )
 
             # ------------------------------------------
-            # Diagonal down-right
+            # Diagonal: down-right
             # ------------------------------------------
 
             if (
@@ -197,7 +195,7 @@ def connect_grid(
                 )
 
             # ------------------------------------------
-            # Diagonal down-left
+            # Diagonal: down-left
             # ------------------------------------------
 
             if (
@@ -215,6 +213,7 @@ def connect_grid(
                 )
 
     return graph
+
 
 def apply_zone_constraints(
     graph: MarineGraph,
