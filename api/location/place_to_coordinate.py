@@ -55,4 +55,3 @@ def get_coordinates(place: str) -> dict:
         "longitude": float(location["lon"]),
         "display_name": location.get("display_name")
     }
-print(get_coordinates("Chennai"))
