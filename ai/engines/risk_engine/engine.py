@@ -1,36 +1,36 @@
-from .scoring import score_weather
+from .scoring import (
+    score_weather,
+    score_marine,
+    score_geography,
+    calculate_final_risk_score
+)
 
 
 class RiskEngine:
-    """
-    ORCA Risk Engine.
 
-    Current responsibility:
-        - Receive validated provider data
-        - Calculate individual risk-factor scores
-        - Return derived risk information only
+    def process(self, data):
 
-    Overall risk aggregation will be implemented later.
-    """
+        weather_scores = score_weather(
+            data.weather.model_dump()
+        )
 
-    def process(self, data: dict) -> dict:
-        """
-        Process validated ORCA input.
+        marine_scores = score_marine(
+            data.marine.model_dump()
+        )
 
-        Returns only the calculated risk information.
-        """
+        geo_scores = score_geography(
+            data.geo.model_dump()
+        )
 
-        result = {
-            "request_id": data["request"]["request_id"]
+        risk_result = calculate_final_risk_score(
+            weather_scores,
+            marine_scores,
+            geo_scores
+        )
+
+        return {
+            "weather": weather_scores,
+            "marine": marine_scores,
+            "geo": geo_scores,
+            "risk": risk_result
         }
-
-        # -------------------------------------------------
-        # WEATHER
-        # -------------------------------------------------
-
-        if "weather" in data:
-            result["weather"] = score_weather(
-                data["weather"]
-            )
-
-        return result
