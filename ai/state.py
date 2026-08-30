@@ -17,6 +17,8 @@ class AgentState(TypedDict):
 
     agent_data: dict[str, Any]
 
+    pfz_candidates: list[dict[str, Any]]
+
     risk_result: dict[str, Any] | None
     route_result: dict[str, Any] | None
 
