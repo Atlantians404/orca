@@ -1,0 +1,35 @@
+{
+  "request": {
+    "request_id": "TEST007",
+    "requires_route": false,
+    "forecast_hours": 24
+  },
+  "marine": {
+    "wave_height": 5.0,
+    "wave_period": 16,
+    "wave_direction": 180,
+    "swell_wave_height": 4.5,
+    "swell_wave_period": 16,
+    "swell_wave_direction": 180,
+    "ocean_current_velocity": 8.0,
+    "ocean_current_direction": 90,
+    "sea_surface_temperature": 28,
+    "sea_level_height_msl": 0.6,
+    "marine_warning": "WARNING"
+  },
+  "weather": {
+    "wind_speed": 20,
+    "wind_direction": 180,
+    "wave_height": 2.0,
+    "visibility": 5,
+    "precipitation": 30,
+    "lightning": false,
+    "condition": "rain"
+  },
+  "geo": {
+    "latitude": 13.05,
+    "longitude": 80.25,
+    "restricted_area": false,
+    "protected_area": false
+  }
+}

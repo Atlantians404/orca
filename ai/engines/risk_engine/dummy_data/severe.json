@@ -1,0 +1,52 @@
+{
+    "request": {
+        "request_id": "REQ002",
+        "requires_route": false,
+        "forecast_hours": 24
+    },
+
+    "marine": {
+        "wave_height": 2.0,
+        "wave_period": 7.0,
+        "wave_direction": 180,
+        "sea_state": "rough",
+
+        "swell": {
+            "height": 1.0,
+            "period": 9.0,
+            "direction": 180
+        },
+
+        "current": {
+            "velocity": 1.2,
+            "direction": 90
+        },
+
+        "marine_warning": "NONE"
+    },
+
+    "weather": {
+        "latitude": 13.05,
+        "longitude": 80.28,
+        "time": "2026-08-27T18:00",
+
+        "temperature": 30.5,
+        "wind_speed": 50.0,
+        "wind_direction": 220,
+        "wind_gust": 75.0,
+
+        "visibility": 1500.0,
+        "precipitation": 10.0,
+
+        "weather_code": 80,
+        "weather_condition": "Rain showers",
+        "thunderstorm": false
+    },
+
+    "geo": {
+        "latitude": 13.05,
+        "longitude": 80.28,
+        "restricted_area": false,
+        "protected_area": false
+    }
+}
