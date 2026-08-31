@@ -11,6 +11,7 @@ import time
 
 from routes.auth import router as auth_router
 from routes.session import router as session_router
+from routes.chat import router as chat_router
 
 
 @asynccontextmanager
@@ -72,3 +73,5 @@ def scalar():
 app.include_router(auth_router)
 
 app.include_router(session_router)
+
+app.include_router(chat_router)
