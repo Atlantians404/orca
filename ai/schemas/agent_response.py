@@ -1,18 +1,8 @@
-from pydantic import BaseModel
-
-
-class Visualization(BaseModel):
-    type: str
-    x_axis: dict | None = None
-    y_axis: dict | None = None
-    data: list[dict] = []
-
+from pydantic import BaseModel, Field
 
 class MapData(BaseModel):
-    coordinates: list[list[float]] = []
-
+    coordinates: list[list[float]] = Field(default_factory=list)
 
 class AgentResponse(BaseModel):
     message: str
-    visualization: Visualization | None = None
     map: MapData | None = None
