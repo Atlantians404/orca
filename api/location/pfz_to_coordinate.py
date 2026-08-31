@@ -4,7 +4,7 @@ from pymongo import MongoClient
 
 def get_pfz_coordinates(pfz_name: str) -> dict:
 
-    mongo_uri = "mongodb+srv://jananivenkatesh81_db_user:d8UsyP5KAR8pWJFb@orca-cluster.tznvnez.mongodb.net/?appName=ORCA-Cluster"
+    mongo_uri ="MONGO_URI"
 
     if not mongo_uri:
         raise ValueError("MONGO_URI not found.")
