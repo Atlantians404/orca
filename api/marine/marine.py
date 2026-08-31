@@ -34,7 +34,7 @@ def get_marine_data(
     response = requests.get(
         MARINE_URL,
         params=params,
-        timeout=10
+        timeout=30
     )
 
     response.raise_for_status()

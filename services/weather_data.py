@@ -79,3 +79,4 @@ def get_thunderstorm(
 ) -> bool:
     data = get_open_meteo_data(latitude, longitude, time)
     return data["thunderstorm"]
+
