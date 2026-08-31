@@ -7,8 +7,7 @@ def get_temperature(
     time: str
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["temperature_2m"]
-
+    return data["temperature"]
 
 def get_wind_speed(
     latitude: float,
@@ -16,7 +15,7 @@ def get_wind_speed(
     time: str
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["wind_speed_10m"]
+    return data["wind_speed"]
 
 
 def get_wind_direction(
@@ -25,7 +24,7 @@ def get_wind_direction(
     time: str
 ) -> int:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["wind_direction_10m"]
+    return data["wind_direction"]
 
 
 def get_wind_gust(
@@ -34,7 +33,7 @@ def get_wind_gust(
     time: str
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["wind_gusts_10m"]
+    return data["wind_gust"]
 
 
 def get_visibility(
@@ -43,7 +42,7 @@ def get_visibility(
     time: str
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["visibility"]
+    return data["visibility"]
 
 
 def get_precipitation(
@@ -52,7 +51,7 @@ def get_precipitation(
     time: str
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["precipitation"]
+    return data["precipitation"]
 
 
 def get_weather_code(
@@ -61,7 +60,7 @@ def get_weather_code(
     time: str
 ) -> int:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["weather_code"]
+    return data["weather_code"]
 
 
 def get_weather_condition(
@@ -70,7 +69,7 @@ def get_weather_condition(
     time: str
 ) -> str:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["weather_condition"]
+    return data["weather_condition"]
 
 
 def get_thunderstorm(
@@ -79,4 +78,4 @@ def get_thunderstorm(
     time: str
 ) -> bool:
     data = get_open_meteo_data(latitude, longitude, time)
-    return data["weather"]["thunderstorm"]
+    return data["thunderstorm"]
