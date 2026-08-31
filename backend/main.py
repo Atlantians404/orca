@@ -9,6 +9,7 @@ from database.database import init_db
 
 import time
 
+from routes.auth import router as auth_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,4 +67,4 @@ def scalar():
         title="Scalar API"
     )
 
-
+app.include_router(auth_router)
