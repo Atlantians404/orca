@@ -11,6 +11,7 @@ from services.auth_service import (
     register_user,
     login_user,
 )
+from config.logging import logger
 
 
 router = APIRouter(
@@ -27,7 +28,11 @@ async def register(
     data: RegisterRequest,
     db: AsyncSession = Depends(get_db)
 ):
+    logger.info("Registration attempt for email: %s", data.email)
+
     user = await register_user(data, db)
+
+    logger.info("User registered successfully: %s", user.id)
 
     return {
         "message": "User registered successfully",
@@ -43,9 +48,12 @@ async def login(
     data: LoginRequest,
     db: AsyncSession = Depends(get_db)
 ):
+    logger.info("Login attempt for email: %s", data.email)
+
     token = await login_user(data, db)
+
+    logger.info("User logged in successfully: %s", data.email)
 
     return TokenResponse(
         access_token=token
     )
-
