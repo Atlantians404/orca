@@ -18,6 +18,7 @@ class AgentState(TypedDict, total=False):
     query_type: str | None
 
     pfz_candidates: list[dict[str, Any]]
+    selected_pfz_id: str | None
     selected_pfz: dict | None
 
     agent_data: dict[str, Any]

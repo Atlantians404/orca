@@ -1,7 +1,7 @@
 import json
 import math
 from pathlib import Path
-
+from typing import Any
 
 # Location of the PFZ JSON file
 PFZ_FILE = Path(__file__).resolve().parents[2] / "data" / "pfz" / "pfz.json"
@@ -148,3 +148,15 @@ def get_pfz_candidates(
         "source": pfz_data.get("source"),
         "forecast_validity": forecast_validity
     }
+def select_pfz(
+    pfz_candidates: list[dict[str, Any]],
+    pfz_id: str
+) -> dict | None:
+
+    pfz_id = pfz_id.upper().strip()
+
+    for pfz in pfz_candidates:
+        if pfz.get("id") == pfz_id:
+            return pfz
+
+    return None
