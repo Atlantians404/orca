@@ -154,4 +154,3 @@ def get_high_wave_warning_color(
 
     return None
 
-print(get_wave_height(12.9716, 77.5946, "2024-06-01T12:00:00Z"))
