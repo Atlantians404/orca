@@ -1,0 +1,75 @@
+from typing import Any
+
+from ai.tools.marine_tools import (
+    get_pfz_candidates,
+    select_pfz
+)
+
+
+def run_marine_agent(
+    state: dict[str, Any]
+) -> dict[str, Any]:
+    """
+    Run the Marine Agent and update AgentState
+    with PFZ candidate information.
+    """
+
+    location = state.get("location")
+    time_context = state.get("time_context")
+
+    if location is None:
+        return {
+            **state,
+            "pfz_candidates": [],
+            "selected_pfz": None
+        }
+
+    if location.latitude is None or location.longitude is None:
+        return {
+            **state,
+            "pfz_candidates": [],
+            "selected_pfz": None
+        }
+
+    if time_context is None or not time_context.slots:
+        return {
+            **state,
+            "pfz_candidates": [],
+            "selected_pfz": None
+        }
+
+    # Use the first requested time slot
+    time_slot = time_context.slots[0]
+
+    requested_time = time_slot.date
+
+    if time_slot.start_time:
+        requested_time += f"T{time_slot.start_time}:00"
+
+    # Get PFZ candidates
+    result = get_pfz_candidates(
+        latitude=location.latitude,
+        longitude=location.longitude,
+        time=requested_time
+    )
+
+    # Extract candidates
+    pfz_candidates = result.get("pfz_candidates", [])
+
+    # Select a specific PFZ if requested
+    selected_pfz = None
+
+    requested_pfz_id = state.get("selected_pfz_id")
+
+    if requested_pfz_id:
+        selected_pfz = select_pfz(
+            pfz_candidates,
+            requested_pfz_id
+        )
+
+    # Update AgentState
+    return {
+        **state,
+        "pfz_candidates": pfz_candidates,
+        "selected_pfz": selected_pfz
+    }

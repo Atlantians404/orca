@@ -1,0 +1,188 @@
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\KESAVAN SEKAR\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\KESAVAN SEKAR\OneDrive\Desktop\orca\orca
+configfile: pytest.ini
+plugins: anyio-4.10.0, Faker-37.11.0, langsmith-0.9.5
+collected 103 items                                                                                                         
+
+test/task4/test_geojson.py::test_linestring_to_geojson PASSED                                                         [  0%]
+test/task4/test_geometry.py::test_create_linestring PASSED                                                            [  1%] 
+test/task4/test_geometry.py::test_create_linestring_requires_two_points PASSED                                        [  2%] 
+test/task4/test_geometry.py::test_zone_to_polygon PASSED                                                              [  3%] 
+test/task4/test_geometry.py::test_route_intersects_polygon PASSED                                                     [  4%] 
+test/task4/test_geometry.py::test_route_does_not_intersect_polygon PASSED                                             [  5%] 
+test/task4/test_geometry.py::test_validate_safe_route PASSED                                                          [  6%]
+test/task4/test_geometry.py::test_validate_unsafe_route PASSED                                                        [  7%] 
+test/task4/test_geometry.py::test_validate_route_multiple_zones PASSED                                                [  8%] 
+test/task4/test_graph.py::test_add_node PASSED                                                                        [  9%] 
+test/task4/test_graph.py::test_add_edge PASSED                                                                        [ 10%] 
+test/task4/test_graph.py::test_create_grid PASSED                                                                     [ 11%] 
+test/task4/test_graph.py::test_grid_coordinates PASSED                                                                [ 12%] 
+test/task4/test_graph.py::test_connect_grid PASSED                                                                    [ 13%] 
+test/task4/test_graph.py::test_edge_weight PASSED                                                                     [ 14%] 
+test/task4/test_graph.py::test_center_node_neighbors PASSED                                                           [ 15%] 
+test/task4/test_graph.py::test_diagonal_connection PASSED                                                             [ 16%] 
+test/task4/test_graph.py::test_diagonal_edge_weight PASSED                                                            [ 17%] 
+test/task4/test_graph.py::test_restricted_zone_blocks_edge PASSED                                                     [ 18%] 
+test/task4/test_graph.py::test_path_to_coordinates PASSED                                                             [ 19%] 
+test/task4/test_graph.py::test_path_to_coordinates_invalid_node PASSED                                                [ 20%] 
+test/task4/test_graph.py::test_find_nearest_node PASSED                                                               [ 21%] 
+test/task4/test_graph.py::test_find_nearest_node_center PASSED                                                        [ 22%] 
+test/task4/test_graph.py::test_empty_graph_nearest_node PASSED                                                        [ 23%] 
+test/task4/test_graph.py::test_create_route_grid PASSED                                                               [ 24%] 
+test/task4/test_graph.py::test_create_route_grid_invalid_rows PASSED                                                  [ 25%]
+test/task4/test_graph.py::test_create_route_grid_invalid_columns PASSED                                               [ 26%] 
+test/task4/test_pathfinding.py::test_dijkstra PASSED                                                                  [ 27%] 
+test/task4/test_pathfinding.py::test_dijkstra_invalid_start PASSED                                                    [ 28%] 
+test/task4/test_pathfinding.py::test_dijkstra_invalid_goal PASSED                                                     [ 29%] 
+test/task4/test_pathfinding.py::test_astar PASSED                                                                     [ 30%] 
+test/task4/test_pathfinding.py::test_astar_invalid_start PASSED                                                       [ 31%] 
+test/task4/test_pathfinding.py::test_astar_invalid_goal PASSED                                                        [ 32%] 
+test/task4/test_pathfinding.py::test_astar_distance_positive PASSED                                                   [ 33%] 
+test/task4/test_pathfinding.py::test_calculate_path_distance PASSED                                                   [ 33%] 
+test/task4/test_pathfinding.py::test_calculate_empty_path_distance PASSED                                             [ 34%] 
+test/task4/test_pathfinding.py::test_calculate_single_node_distance PASSED                                            [ 35%] 
+test/task4/test_pathfinding.py::test_calculate_invalid_edge_distance PASSED                                           [ 36%] 
+test/task4/test_pathfinding.py::test_generate_candidate_paths PASSED                                                  [ 37%] 
+test/task4/test_pathfinding.py::test_candidate_paths_start_and_end_correctly PASSED                                   [ 38%] 
+test/task4/test_pathfinding.py::test_candidate_paths_are_unique PASSED                                                [ 39%] 
+test/task4/test_pathfinding.py::test_candidate_paths_have_valid_distances PASSED                                      [ 40%]
+test/task4/test_pathfinding.py::test_candidate_paths_invalid_start PASSED                                             [ 41%] 
+test/task4/test_pathfinding.py::test_candidate_paths_invalid_goal PASSED                                              [ 42%] 
+test/task4/test_pathfinding.py::test_candidate_paths_invalid_max_routes PASSED                                        [ 43%] 
+test/task4/test_route_engine.py::test_same_point_distance PASSED                                                      [ 44%] 
+test/task4/test_route_engine.py::test_distance_positive PASSED                                                        [ 45%] 
+test/task4/test_route_engine.py::test_distance_symmetric PASSED                                                       [ 46%] 
+test/task4/test_route_engine.py::test_invalid_point_a PASSED                                                          [ 47%] 
+test/task4/test_route_engine.py::test_invalid_point_b PASSED                                                          [ 48%] 
+test/task4/test_route_engine.py::test_load_marine_data PASSED                                                         [ 49%] 
+test/task4/test_route_engine.py::test_find_nearest_pfz PASSED                                                         [ 50%] 
+test/task4/test_route_engine.py::test_find_nearest_pfz_invalid_coordinates PASSED                                     [ 51%] 
+test/task4/test_route_engine.py::test_find_route PASSED                                                               [ 52%] 
+test/task4/test_route_engine.py::test_find_route_has_waypoints PASSED                                                 [ 53%] 
+test/task4/test_route_engine.py::test_find_route_geojson PASSED                                                       [ 54%] 
+test/task4/test_route_engine.py::test_find_route_invalid_start PASSED                                                 [ 55%]
+test/task4/test_route_engine.py::test_find_route_invalid_destination PASSED                                           [ 56%] 
+test/task4/test_route_engine.py::test_find_routes_returns_candidate_routes PASSED                                     [ 57%] 
+test/task4/test_route_engine.py::test_find_routes_generates_multiple_routes PASSED                                    [ 58%] 
+test/task4/test_route_engine.py::test_candidate_routes_have_unique_route_ids PASSED                                   [ 59%]
+test/task4/test_route_engine.py::test_candidate_routes_have_valid_distances PASSED                                    [ 60%] 
+test/task4/test_route_engine.py::test_candidate_routes_have_waypoints PASSED                                          [ 61%]
+test/task4/test_route_engine.py::test_candidate_routes_have_geojson PASSED                                            [ 62%] 
+test/task4/test_route_engine.py::test_candidate_routes_are_different PASSED                                           [ 63%] 
+test/task4/test_route_engine.py::test_max_routes_must_be_at_least_two PASSED                                          [ 64%]
+test/task4/test_route_engine.py::test_two_candidate_routes PASSED                                                     [ 65%] 
+test/task4/test_route_engine.py::test_find_route_with_restricted_zone PASSED                                          [ 66%] 
+test/task4/test_route_engine.py::test_candidate_routes_with_restricted_zone PASSED                                    [ 66%]
+test/task4/test_route_integration.py::test_route_integration PASSED                                                   [ 67%]
+test/task4/test_route_integration.py::test_candidate_route_integration PASSED                                         [ 68%] 
+test/task4/test_route_integration.py::test_candidate_routes_are_distinct PASSED                                       [ 69%] 
+test/task4/test_route_integration.py::test_candidate_routes_have_waypoints PASSED                                     [ 70%]
+test/task4/test_route_integration.py::test_route_with_restricted_zone PASSED                                          [ 71%]
+test/task4/test_schema.py::test_coordinate PASSED                                                                     [ 72%] 
+test/task4/test_schema.py::test_pfz PASSED                                                                            [ 73%]
+test/task4/test_schema.py::test_pfz_optional_depth PASSED                                                             [ 74%] 
+test/task4/test_schema.py::test_route_destination PASSED                                                              [ 75%] 
+test/task4/test_schema.py::test_restricted_zone PASSED                                                                [ 76%] 
+test/task4/test_schema.py::test_route_constraints_defaults PASSED                                                     [ 77%] 
+test/task4/test_schema.py::test_route_request PASSED                                                                  [ 78%] 
+test/task4/test_schema.py::test_route_request_with_time PASSED                                                        [ 79%] 
+test/task4/test_schema.py::test_waypoint PASSED                                                                       [ 80%]
+test/task4/test_schema.py::test_route_result PASSED                                                                   [ 81%] 
+test/task4/test_schema.py::test_route_result_route_id_optional PASSED                                                 [ 82%] 
+test/task4/test_schema.py::test_candidate_routes PASSED                                                               [ 83%] 
+test/task4/test_validator.py::test_valid_coordinates PASSED                                                           [ 84%] 
+test/task4/test_validator.py::test_invalid_latitude PASSED                                                            [ 85%] 
+test/task4/test_validator.py::test_invalid_longitude PASSED                                                           [ 86%] 
+test/task4/test_validator.py::test_boundary_coordinates PASSED                                                        [ 87%]
+test/task4/test_waypoints.py::test_generate_waypoints PASSED                                                          [ 88%] 
+test/task4/test_waypoints.py::test_generate_waypoints_excludes_start_and_destination PASSED                           [ 89%] 
+test/task4/test_waypoints.py::test_generate_waypoints_two_node_path PASSED                                            [ 90%] 
+test/task4/test_waypoints.py::test_generate_waypoints_empty_path PASSED                                               [ 91%]
+test/task4/test_waypoints.py::test_generate_waypoints_invalid_node PASSED                                             [ 92%] 
+test/task4/test_waypoints.py::test_generate_waypoints_from_coordinates PASSED                                         [ 93%] 
+test/task4/test_waypoints.py::test_generate_multiple_waypoints_from_coordinates PASSED                                [ 94%] 
+test/task4/test_waypoints.py::test_generate_waypoints_from_coordinates_empty PASSED                                   [ 95%]
+test/task4/test_waypoints.py::test_generate_waypoints_from_coordinates_two_points PASSED                              [ 96%] 
+test/task4/test_waypoints.py::test_validate_waypoints PASSED                                                          [ 97%] 
+test/task4/test_waypoints.py::test_validate_waypoints_empty PASSED                                                    [ 98%] 
+test/task4/test_waypoints.py::test_validate_waypoints_invalid_latitude PASSED                                         [ 99%] 
+test/task4/test_waypoints.py::test_validate_waypoints_invalid_longitude PASSED                                        [100%] 
+
+=================================================== 103 passed in 0.66s ===================================================
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+PS C:\Users\KESAVAN SEKAR\OneDrive\Desktop\orca\orca> pytest test/task4/test_route_engine_e2e.py -v -s
+=================================================== test session starts ====================================================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\KESAVAN SEKAR\AppData\Local\Programs\Python\Python313\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\KESAVAN SEKAR\OneDrive\Desktop\orca\orca
+configfile: pytest.ini
+plugins: anyio-4.10.0, Faker-37.11.0, langsmith-0.9.5
+collected 1 item                                                                                                            
+
+test/task4/test_route_engine_e2e.py::test_complete_route_engine
+
+============================================================
+          ORCA ROUTE ENGINE TEST
+============================================================
+
+SOURCE
+Latitude  : 12.9
+Longitude : 80.3
+
+SELECTED PFZ
+PFZ ID    : PFZ001
+Latitude  : 13.0
+Longitude : 80.4
+
+
+Candidate routes generated: 2
+------------------------------------------------------------
+
+
+ROUTE: ROUTE_1
+Distance: 15.53 km
+Waypoints: 8
+
+Waypoint coordinates:
+  1. (12.911111, 80.311111)
+  2. (12.922222, 80.322222)
+  3. (12.933333, 80.333333)
+  4. (12.944444, 80.344444)
+  5. (12.955556, 80.355556)
+  6. (12.966667, 80.366667)
+  7. (12.977778, 80.377778)
+  8. (12.988889, 80.388889)
+
+GeoJSON:
+{'type': 'Feature', 'geometry': {'type': 'LineString', 'coordinates': [[80.3, 12.9], [80.311111, 12.911111], [80.322222, 12.922222], [80.333333, 12.933333], [80.344444, 12.944444], [80.355556, 12.955556], [80.366667, 12.966667], [80.377778, 12.977778], [80.388889, 12.988889], [80.4, 13.0]]}, 'properties': {'pfz_id': 'PFZ001', 'route_id': 'ROUTE_1'}}
+------------------------------------------------------------
+
+
+ROUTE: ROUTE_2
+Distance: 16.24 km
+Waypoints: 9
+
+Waypoint coordinates:
+  1. (12.911111, 80.3)
+  2. (12.922222, 80.311111)
+  3. (12.933333, 80.322222)
+  4. (12.944444, 80.333333)
+  5. (12.955556, 80.344444)
+  6. (12.966667, 80.355556)
+  7. (12.977778, 80.366667)
+  8. (12.988889, 80.377778)
+  9. (13.0, 80.388889)
+
+GeoJSON:
+{'type': 'Feature', 'geometry': {'type': 'LineString', 'coordinates': [[80.3, 12.9], [80.3, 12.911111], [80.311111, 12.922222], [80.322222, 12.933333], [80.333333, 12.944444], [80.344444, 12.955556], [80.355556, 12.966667], [80.366667, 12.977778], [80.377778, 12.988889], [80.388889, 13.0], [80.4, 13.0]]}, 'properties': {'pfz_id': 'PFZ001', 'route_id': 'ROUTE_2'}}
+------------------------------------------------------------
+
+
+============================================================
+        ROUTE ENGINE TEST PASSED
+============================================================
+PASSED

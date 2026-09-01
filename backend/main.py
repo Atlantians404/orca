@@ -4,14 +4,14 @@ from scalar_fastapi import get_scalar_api_reference
 
 from contextlib import asynccontextmanager
 
-from config.logging import logger
-from database.database import init_db
+from backend.config.logging import logger
+from backend.database.database import init_db
 
 import time
 
-from routes.auth import router as auth_router
-from routes.session import router as session_router
-from routes.chat import router as chat_router
+from backend.routes.auth import router as auth_router
+from backend.routes.session import router as session_router
+from backend.routes.chat import router as chat_router
 
 
 @asynccontextmanager

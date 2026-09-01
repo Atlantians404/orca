@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.database import get_db
-from schemas.chat import ChatRequest, ChatResponse, MessageResponse
-from services.chat_service import send_message, get_chat_history
-from utils.auth_util import verify_token
-from config.logging import logger
+from backend.database.database import get_db
+from backend.schemas.chat import ChatRequest, ChatResponse, MessageResponse
+from backend.services.chat_service import send_message, get_chat_history
+from backend.utils.auth_util import verify_token
+from backend.config.logging import logger
 
 router = APIRouter(
     prefix="/chat",

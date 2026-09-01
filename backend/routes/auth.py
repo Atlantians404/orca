@@ -1,17 +1,17 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.database import get_db
-from schemas.auth import (
+from backend.database.database import get_db
+from backend.schemas.auth import (
     RegisterRequest,
     LoginRequest,
     TokenResponse,
 )
-from services.auth_service import (
+from backend.services.auth_service import (
     register_user,
     login_user,
 )
-from config.logging import logger
+from backend.config.logging import logger
 
 
 router = APIRouter(

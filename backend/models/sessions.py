@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
-from database.database import Base
+from backend.database.database import Base
 
 
 class Session(Base):

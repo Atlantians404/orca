@@ -1,6 +1,6 @@
 from api.weather.weather import get_open_meteo_data
 
-# weather tools
+
 def get_temperature(
     latitude: float,
     longitude: float,
@@ -8,6 +8,7 @@ def get_temperature(
 ) -> float:
     data = get_open_meteo_data(latitude, longitude, time)
     return data["temperature"]
+
 
 def get_wind_speed(
     latitude: float,
