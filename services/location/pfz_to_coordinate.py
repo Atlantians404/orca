@@ -1,15 +1,18 @@
 import os
 from pymongo import MongoClient
+from dotenv import load_dotenv
 
+load_dotenv()
 
 def get_pfz_coordinates(pfz_name: str) -> dict:
 
-    mongo_uri ="MONGO_URI"
+    mongo_uri = os.getenv("MONGO_URI")
 
     if not mongo_uri:
         raise ValueError("MONGO_URI not found.")
 
     client = MongoClient(mongo_uri)
+
     db = client["ORCA"]
     collection = db["pfz"]
 
@@ -26,9 +29,7 @@ def get_pfz_coordinates(pfz_name: str) -> dict:
     )
 
     if not document:
-        raise ValueError(
-            f"PFZ not found: {pfz_name}"
-        )
+        raise ValueError(f"PFZ not found: {pfz_name}")
 
     pfz = document["pfz_locations"][0]
 
