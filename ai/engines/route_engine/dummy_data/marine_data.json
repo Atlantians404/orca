@@ -1,0 +1,68 @@
+{
+  "ports": [
+    {
+      "id": "PORT001",
+      "name": "Chennai Port",
+      "latitude": 13.0827,
+      "longitude": 80.2707
+    },
+    {
+      "id": "PORT002",
+      "name": "Port B",
+      "latitude": 12.9000,
+      "longitude": 80.3500
+    },
+    {
+      "id": "PORT003",
+      "name": "Port C",
+      "latitude": 12.7000,
+      "longitude": 80.5000
+    }
+  ],
+  "pfz_locations": [
+    {
+      "id": "PFZ001",
+      "latitude": 13.1400,
+      "longitude": 80.4300,
+      "depth_m": 42.0
+    },
+    {
+      "id": "PFZ002",
+      "latitude": 13.0000,
+      "longitude": 80.5500,
+      "depth_m": 55.0
+    },
+    {
+      "id": "PFZ003",
+      "latitude": 12.8500,
+      "longitude": 80.4000,
+      "depth_m": 48.0
+    },
+    {
+      "id": "PFZ004",
+      "latitude": 12.7000,
+      "longitude": 80.6500,
+      "depth_m": 60.0
+    },
+    {
+      "id": "PFZ005",
+      "latitude": 13.3000,
+      "longitude": 80.7000,
+      "depth_m": 35.0
+    }
+  ],
+  "restricted_zones": [
+  {
+    "id": "ZONE001",
+    "name": "Restricted Zone A",
+    "coordinates": [
+      [12.95, 80.32],
+      [12.95, 80.42],
+      [13.05, 80.42],
+      [13.05, 80.32],
+      [12.95, 80.32]
+    ]
+  }
+],
+  "protected_areas": []
+}
