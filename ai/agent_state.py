@@ -1,8 +1,8 @@
 from typing import TypedDict, Any
 
-from schemas.location import Location
-from schemas.time import TimeContext
-from schemas.agent_response import AgentResponse
+from ai.schemas.location import Location
+from ai.schemas.time import TimeContext
+from ai.schemas.agent_response import AgentResponse
 
 
 class AgentState(TypedDict, total=False):
