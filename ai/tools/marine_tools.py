@@ -148,7 +148,7 @@ def get_pfz_candidates(
         "source": pfz_data.get("source"),
         "forecast_validity": forecast_validity
     }
-    def select_pfz(
+def select_pfz(
     pfz_candidates: list[dict[str, Any]],
     pfz_id: str
 ) -> dict | None:
