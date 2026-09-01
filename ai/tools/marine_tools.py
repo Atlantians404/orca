@@ -148,10 +148,20 @@ def get_pfz_candidates(
         "source": pfz_data.get("source"),
         "forecast_validity": forecast_validity
     }
-def select_pfz(
+    def select_pfz(
     pfz_candidates: list[dict[str, Any]],
     pfz_id: str
 ) -> dict | None:
+    """
+    Select a specific PFZ from the list of PFZ candidates.
+
+    Input:
+        pfz_candidates - list of PFZ candidate dictionaries
+        pfz_id         - PFZ ID such as PFZ01, PFZ11, etc.
+
+    Output:
+        Selected PFZ dictionary, or None if not found.
+    """
 
     pfz_id = pfz_id.upper().strip()
 
