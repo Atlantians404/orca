@@ -30,3 +30,4 @@ class AgentState(TypedDict, total=False):
 
     pending_action: str | None
     workflow_status: str
+
