@@ -1,9 +1,9 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.sessions import Session
-from schemas.session import SessionCreate
-from core.exceptions import not_found
+from backend.models.sessions import Session
+from backend.schemas.session import SessionCreate
+from backend.core.exceptions import not_found
 
 
 async def create_session(

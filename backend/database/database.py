@@ -29,7 +29,7 @@ SessionLocal = async_sessionmaker(
 Base = declarative_base()
 
 async def init_db():
-    from models import User, Session, Message
+    from backend.models import User, Session, Message
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
