@@ -1,0 +1,911 @@
+{
+  "source": "INCOIS",
+  "sector": "North Tamil Nadu",
+  "forecast_validity": {
+    "from": "29 Aug 2026",
+    "to": "30 Aug 2026"
+  },
+  "count": 60,
+  "pfz_locations": [
+    {
+      "coastal_reference": "Ennore Mugathuvarakuppan",
+      "direction": "NE",
+      "bearing_deg": 86,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 211,
+        "max": 216
+      },
+      "latitude": 13.246944,
+      "longitude": 80.588333
+    },
+    {
+      "coastal_reference": "Kathivakkam Periakuppam",
+      "direction": "NE",
+      "bearing_deg": 87,
+      "distance_km": {
+        "min": 30,
+        "max": 35
+      },
+      "depth_m": {
+        "min": 219,
+        "max": 224
+      },
+      "latitude": 13.224444,
+      "longitude": 80.621389
+    },
+    {
+      "coastal_reference": "Kathivakkam Chinnakuppam",
+      "direction": "SE",
+      "bearing_deg": 93,
+      "distance_km": {
+        "min": 33,
+        "max": 38
+      },
+      "depth_m": {
+        "min": 227,
+        "max": 232
+      },
+      "latitude": 13.190556,
+      "longitude": 80.643611
+    },
+    {
+      "coastal_reference": "Ernavoorkuppam",
+      "direction": "SE",
+      "bearing_deg": 97,
+      "distance_km": {
+        "min": 36,
+        "max": 41
+      },
+      "depth_m": {
+        "min": 246,
+        "max": 251
+      },
+      "latitude": 13.161389,
+      "longitude": 80.671111
+    },
+    {
+      "coastal_reference": "Thiruchinnankuppam",
+      "direction": "E",
+      "bearing_deg": 90,
+      "distance_km": {
+        "min": 64,
+        "max": 69
+      },
+      "depth_m": {
+        "min": 2558,
+        "max": 2563
+      },
+      "latitude": 13.153333,
+      "longitude": 80.91
+    },
+    {
+      "coastal_reference": "Thazankuppam",
+      "direction": "SE",
+      "bearing_deg": 101,
+      "distance_km": {
+        "min": 41,
+        "max": 46
+      },
+      "depth_m": {
+        "min": 662,
+        "max": 667
+      },
+      "latitude": 13.148889,
+      "longitude": 80.709444
+    },
+    {
+      "coastal_reference": "Ennorekuppam",
+      "direction": "SE",
+      "bearing_deg": 99,
+      "distance_km": {
+        "min": 59,
+        "max": 64
+      },
+      "depth_m": {
+        "min": 2570,
+        "max": 2575
+      },
+      "latitude": 13.145278,
+      "longitude": 80.870556
+    },
+    {
+      "coastal_reference": "Kasikoilkuppam",
+      "direction": "SE",
+      "bearing_deg": 93,
+      "distance_km": {
+        "min": 45,
+        "max": 50
+      },
+      "depth_m": {
+        "min": 1346,
+        "max": 1351
+      },
+      "latitude": 13.141389,
+      "longitude": 80.749444
+    },
+    {
+      "coastal_reference": "Kasiviswanathar koil Kuppam",
+      "direction": "SE",
+      "bearing_deg": 93,
+      "distance_km": {
+        "min": 54,
+        "max": 59
+      },
+      "depth_m": {
+        "min": 2532,
+        "max": 2537
+      },
+      "latitude": 13.14,
+      "longitude": 80.830278
+    },
+    {
+      "coastal_reference": "Palagaithottikuppam",
+      "direction": "SE",
+      "bearing_deg": 93,
+      "distance_km": {
+        "min": 50,
+        "max": 55
+      },
+      "depth_m": {
+        "min": 2164,
+        "max": 2169
+      },
+      "latitude": 13.138611,
+      "longitude": 80.789722
+    },
+    {
+      "coastal_reference": "Chinna Neelankarai",
+      "direction": "SE",
+      "bearing_deg": 101,
+      "distance_km": {
+        "min": 19,
+        "max": 24
+      },
+      "depth_m": {
+        "min": 64,
+        "max": 69
+      },
+      "latitude": 12.916389,
+      "longitude": 80.455833
+    },
+    {
+      "coastal_reference": "Injampakkam",
+      "direction": "SE",
+      "bearing_deg": 101,
+      "distance_km": {
+        "min": 21,
+        "max": 26
+      },
+      "depth_m": {
+        "min": 65,
+        "max": 70
+      },
+      "latitude": 12.878333,
+      "longitude": 80.465556
+    },
+    {
+      "coastal_reference": "Kanathur",
+      "direction": "SE",
+      "bearing_deg": 96,
+      "distance_km": {
+        "min": 23,
+        "max": 28
+      },
+      "depth_m": {
+        "min": 67,
+        "max": 72
+      },
+      "latitude": 12.840278,
+      "longitude": 80.475833
+    },
+    {
+      "coastal_reference": "Covelong (Kovalam)",
+      "direction": "NE",
+      "bearing_deg": 86,
+      "distance_km": {
+        "min": 25,
+        "max": 30
+      },
+      "depth_m": {
+        "min": 71,
+        "max": 76
+      },
+      "latitude": 12.806389,
+      "longitude": 80.496389
+    },
+    {
+      "coastal_reference": "Chemacherry",
+      "direction": "NE",
+      "bearing_deg": 89,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 81,
+        "max": 86
+      },
+      "latitude": 12.778333,
+      "longitude": 80.524167
+    },
+    {
+      "coastal_reference": "Egattur Karikattukuppam",
+      "direction": "SE",
+      "bearing_deg": 102,
+      "distance_km": {
+        "min": 32,
+        "max": 37
+      },
+      "depth_m": {
+        "min": 88,
+        "max": 93
+      },
+      "latitude": 12.758333,
+      "longitude": 80.558333
+    },
+    {
+      "coastal_reference": "Nainarkuppam",
+      "direction": "SE",
+      "bearing_deg": 107,
+      "distance_km": {
+        "min": 46,
+        "max": 51
+      },
+      "depth_m": {
+        "min": 181,
+        "max": 186
+      },
+      "latitude": 12.746667,
+      "longitude": 80.674722
+    },
+    {
+      "coastal_reference": "Pudhukalpakkam",
+      "direction": "NE",
+      "bearing_deg": 87,
+      "distance_km": {
+        "min": 37,
+        "max": 42
+      },
+      "depth_m": {
+        "min": 112,
+        "max": 117
+      },
+      "latitude": 12.745278,
+      "longitude": 80.595556
+    },
+    {
+      "coastal_reference": "Kanathur Reddy Kuppam",
+      "direction": "SE",
+      "bearing_deg": 106,
+      "distance_km": {
+        "min": 41,
+        "max": 46
+      },
+      "depth_m": {
+        "min": 148,
+        "max": 153
+      },
+      "latitude": 12.744722,
+      "longitude": 80.635
+    },
+    {
+      "coastal_reference": "Nemmelikuppam",
+      "direction": "NE",
+      "bearing_deg": 87,
+      "distance_km": {
+        "min": 50,
+        "max": 55
+      },
+      "depth_m": {
+        "min": 601,
+        "max": 606
+      },
+      "latitude": 12.740278,
+      "longitude": 80.713333
+    },
+    {
+      "coastal_reference": "Kokilamedu",
+      "direction": "SE",
+      "bearing_deg": 113,
+      "distance_km": {
+        "min": 55,
+        "max": 60
+      },
+      "depth_m": {
+        "min": 1842,
+        "max": 1847
+      },
+      "latitude": 12.390556,
+      "longitude": 80.678056
+    },
+    {
+      "coastal_reference": "Meyyurkuppam",
+      "direction": "SE",
+      "bearing_deg": 107,
+      "distance_km": {
+        "min": 51,
+        "max": 56
+      },
+      "depth_m": {
+        "min": 1270,
+        "max": 1275
+      },
+      "latitude": 12.388056,
+      "longitude": 80.635556
+    },
+    {
+      "coastal_reference": "Sathurangapattinam",
+      "direction": "SE",
+      "bearing_deg": 108,
+      "distance_km": {
+        "min": 47,
+        "max": 52
+      },
+      "depth_m": {
+        "min": 691,
+        "max": 696
+      },
+      "latitude": 12.383333,
+      "longitude": 80.593333
+    },
+    {
+      "coastal_reference": "Pudupattinam",
+      "direction": "SE",
+      "bearing_deg": 108,
+      "distance_km": {
+        "min": 42,
+        "max": 47
+      },
+      "depth_m": {
+        "min": 241,
+        "max": 246
+      },
+      "latitude": 12.375556,
+      "longitude": 80.551667
+    },
+    {
+      "coastal_reference": "Sadras",
+      "direction": "SE",
+      "bearing_deg": 110,
+      "distance_km": {
+        "min": 39,
+        "max": 44
+      },
+      "depth_m": {
+        "min": 180,
+        "max": 185
+      },
+      "latitude": 12.363056,
+      "longitude": 80.511389
+    },
+    {
+      "coastal_reference": "Uyyalikuppam",
+      "direction": "SE",
+      "bearing_deg": 115,
+      "distance_km": {
+        "min": 35,
+        "max": 40
+      },
+      "depth_m": {
+        "min": 83,
+        "max": 88
+      },
+      "latitude": 12.344167,
+      "longitude": 80.473333
+    },
+    {
+      "coastal_reference": "Padalore Periya Kuppam",
+      "direction": "SE",
+      "bearing_deg": 113,
+      "distance_km": {
+        "min": 33,
+        "max": 38
+      },
+      "depth_m": {
+        "min": 101,
+        "max": 106
+      },
+      "latitude": 12.321667,
+      "longitude": 80.4375
+    },
+    {
+      "coastal_reference": "Kadalore Chinna Kuppam",
+      "direction": "SE",
+      "bearing_deg": 121,
+      "distance_km": {
+        "min": 30,
+        "max": 35
+      },
+      "depth_m": {
+        "min": 93,
+        "max": 98
+      },
+      "latitude": 12.295556,
+      "longitude": 80.403889
+    },
+    {
+      "coastal_reference": "Kadalore Ali Kuppam",
+      "direction": "SE",
+      "bearing_deg": 128,
+      "distance_km": {
+        "min": 30,
+        "max": 35
+      },
+      "depth_m": {
+        "min": 162,
+        "max": 167
+      },
+      "latitude": 12.262778,
+      "longitude": 80.377222
+    },
+    {
+      "coastal_reference": "Pudhunadukuppam",
+      "direction": "SE",
+      "bearing_deg": 129,
+      "distance_km": {
+        "min": 32,
+        "max": 37
+      },
+      "depth_m": {
+        "min": 698,
+        "max": 703
+      },
+      "latitude": 12.222222,
+      "longitude": 80.366944
+    },
+    {
+      "coastal_reference": "Anumandhaikuppam",
+      "direction": "SE",
+      "bearing_deg": 126,
+      "distance_km": {
+        "min": 26,
+        "max": 31
+      },
+      "depth_m": {
+        "min": 315,
+        "max": 320
+      },
+      "latitude": 11.971944,
+      "longitude": 80.134444
+    },
+    {
+      "coastal_reference": "Nochikuppam",
+      "direction": "SE",
+      "bearing_deg": 122,
+      "distance_km": {
+        "min": 25,
+        "max": 30
+      },
+      "depth_m": {
+        "min": 181,
+        "max": 186
+      },
+      "latitude": 11.943889,
+      "longitude": 80.104722
+    },
+    {
+      "coastal_reference": "Bommaiyarpalyam",
+      "direction": "SE",
+      "bearing_deg": 110,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 164,
+        "max": 169
+      },
+      "latitude": 11.910556,
+      "longitude": 80.080833
+    },
+    {
+      "coastal_reference": "Pondicherry",
+      "direction": "SE",
+      "bearing_deg": 100,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 308,
+        "max": 313
+      },
+      "latitude": 11.873056,
+      "longitude": 80.064722
+    },
+    {
+      "coastal_reference": "Veerampattinam",
+      "direction": "SE",
+      "bearing_deg": 105,
+      "distance_km": {
+        "min": 23,
+        "max": 28
+      },
+      "depth_m": {
+        "min": 451,
+        "max": 456
+      },
+      "latitude": 11.833889,
+      "longitude": 80.053056
+    },
+    {
+      "coastal_reference": "Nallavadu",
+      "direction": "SE",
+      "bearing_deg": 108,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 517,
+        "max": 522
+      },
+      "latitude": 11.793889,
+      "longitude": 80.043889
+    },
+    {
+      "coastal_reference": "Narambai",
+      "direction": "SE",
+      "bearing_deg": 105,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 411,
+        "max": 416
+      },
+      "latitude": 11.753333,
+      "longitude": 80.037222
+    },
+    {
+      "coastal_reference": "Thazhanguda",
+      "direction": "SE",
+      "bearing_deg": 103,
+      "distance_km": {
+        "min": 25,
+        "max": 30
+      },
+      "depth_m": {
+        "min": 571,
+        "max": 576
+      },
+      "latitude": 11.712778,
+      "longitude": 80.033889
+    },
+    {
+      "coastal_reference": "Sonaankuppam",
+      "direction": "SE",
+      "bearing_deg": 101,
+      "distance_km": {
+        "min": 26,
+        "max": 31
+      },
+      "depth_m": {
+        "min": 527,
+        "max": 532
+      },
+      "latitude": 11.671667,
+      "longitude": 80.033056
+    },
+    {
+      "coastal_reference": "Sothikuppam",
+      "direction": "SE",
+      "bearing_deg": 103,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 548,
+        "max": 553
+      },
+      "latitude": 11.630833,
+      "longitude": 80.035
+    },
+    {
+      "coastal_reference": "M.G.R. Thittu",
+      "direction": "SE",
+      "bearing_deg": 97,
+      "distance_km": {
+        "min": 21,
+        "max": 26
+      },
+      "depth_m": {
+        "min": 379,
+        "max": 384
+      },
+      "latitude": 11.446111,
+      "longitude": 79.998611
+    },
+    {
+      "coastal_reference": "Killai",
+      "direction": "SE",
+      "bearing_deg": 93,
+      "distance_km": {
+        "min": 22,
+        "max": 27
+      },
+      "depth_m": {
+        "min": 544,
+        "max": 549
+      },
+      "latitude": 11.427778,
+      "longitude": 80.026944
+    },
+    {
+      "coastal_reference": "Kottaimedu",
+      "direction": "NE",
+      "bearing_deg": 69,
+      "distance_km": {
+        "min": 23,
+        "max": 28
+      },
+      "depth_m": {
+        "min": 629,
+        "max": 634
+      },
+      "latitude": 11.406389,
+      "longitude": 80.053333
+    },
+    {
+      "coastal_reference": "Pazhayar",
+      "direction": "NE",
+      "bearing_deg": 83,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 718,
+        "max": 723
+      },
+      "latitude": 11.381389,
+      "longitude": 80.076111
+    },
+    {
+      "coastal_reference": "Madavamedu",
+      "direction": "NE",
+      "bearing_deg": 85,
+      "distance_km": {
+        "min": 26,
+        "max": 31
+      },
+      "depth_m": {
+        "min": 747,
+        "max": 752
+      },
+      "latitude": 11.353056,
+      "longitude": 80.094444
+    },
+    {
+      "coastal_reference": "Mudasalodai Village",
+      "direction": "NE",
+      "bearing_deg": 81,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 699,
+        "max": 704
+      },
+      "latitude": 11.321667,
+      "longitude": 80.107222
+    },
+    {
+      "coastal_reference": "Tirumullaivasal",
+      "direction": "NE",
+      "bearing_deg": 81,
+      "distance_km": {
+        "min": 28,
+        "max": 33
+      },
+      "depth_m": {
+        "min": 610,
+        "max": 615
+      },
+      "latitude": 11.288333,
+      "longitude": 80.114167
+    },
+    {
+      "coastal_reference": "Keezhamoovarkarai",
+      "direction": "NE",
+      "bearing_deg": 81,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 542,
+        "max": 547
+      },
+      "latitude": 11.254722,
+      "longitude": 80.116944
+    },
+    {
+      "coastal_reference": "Naickerkuppam",
+      "direction": "NE",
+      "bearing_deg": 83,
+      "distance_km": {
+        "min": 26,
+        "max": 31
+      },
+      "depth_m": {
+        "min": 401,
+        "max": 406
+      },
+      "latitude": 11.2225,
+      "longitude": 80.108056
+    },
+    {
+      "coastal_reference": "Madathukuppam",
+      "direction": "NE",
+      "bearing_deg": 86,
+      "distance_km": {
+        "min": 23,
+        "max": 28
+      },
+      "depth_m": {
+        "min": 267,
+        "max": 272
+      },
+      "latitude": 11.196667,
+      "longitude": 80.086389
+    },
+    {
+      "coastal_reference": "Tranquebar",
+      "direction": "SE",
+      "bearing_deg": 94,
+      "distance_km": {
+        "min": 28,
+        "max": 33
+      },
+      "depth_m": {
+        "min": 86,
+        "max": 91
+      },
+      "latitude": 11.044167,
+      "longitude": 80.134167
+    },
+    {
+      "coastal_reference": "Tharangampadi",
+      "direction": "SE",
+      "bearing_deg": 92,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 63,
+        "max": 68
+      },
+      "latitude": 11.021944,
+      "longitude": 80.099722
+    },
+    {
+      "coastal_reference": "Chandrappadi",
+      "direction": "SE",
+      "bearing_deg": 94,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 61,
+        "max": 66
+      },
+      "latitude": 10.983611,
+      "longitude": 80.090278
+    },
+    {
+      "coastal_reference": "Chinnorpettai",
+      "direction": "SE",
+      "bearing_deg": 100,
+      "distance_km": {
+        "min": 25,
+        "max": 30
+      },
+      "depth_m": {
+        "min": 57,
+        "max": 62
+      },
+      "latitude": 10.944167,
+      "longitude": 80.101667
+    },
+    {
+      "coastal_reference": "Pattinacherry",
+      "direction": "SE",
+      "bearing_deg": 96,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 57,
+        "max": 62
+      },
+      "latitude": 10.906111,
+      "longitude": 80.116944
+    },
+    {
+      "coastal_reference": "Karikal",
+      "direction": "SE",
+      "bearing_deg": 99,
+      "distance_km": {
+        "min": 28,
+        "max": 33
+      },
+      "depth_m": {
+        "min": 50,
+        "max": 55
+      },
+      "latitude": 10.867778,
+      "longitude": 80.131667
+    },
+    {
+      "coastal_reference": "Nagore",
+      "direction": "NE",
+      "bearing_deg": 89,
+      "distance_km": {
+        "min": 29,
+        "max": 34
+      },
+      "depth_m": {
+        "min": 58,
+        "max": 63
+      },
+      "latitude": 10.8275,
+      "longitude": 80.139444
+    },
+    {
+      "coastal_reference": "Samanthanpettai",
+      "direction": "SE",
+      "bearing_deg": 92,
+      "distance_km": {
+        "min": 28,
+        "max": 33
+      },
+      "depth_m": {
+        "min": 61,
+        "max": 66
+      },
+      "latitude": 10.79,
+      "longitude": 80.125556
+    },
+    {
+      "coastal_reference": "Nagapattinam Harbour",
+      "direction": "SE",
+      "bearing_deg": 91,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 53,
+        "max": 58
+      },
+      "latitude": 10.763333,
+      "longitude": 80.094444
+    },
+    {
+      "coastal_reference": "Seruthur",
+      "direction": "NE",
+      "bearing_deg": 76,
+      "distance_km": {
+        "min": 24,
+        "max": 29
+      },
+      "depth_m": {
+        "min": 42,
+        "max": 47
+      },
+      "latitude": 10.724444,
+      "longitude": 80.086667
+    }
+  ]
+}
