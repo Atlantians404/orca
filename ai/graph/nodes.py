@@ -32,11 +32,12 @@ async def planning_node(state: AgentState) -> dict:
         "workflow_status": "COMPLETED"
     }
 
+from langgraph.types import interrupt
+
 async def location_node(state: AgentState) -> dict:
     location = state.get("location")
 
-    # 1. Location already contains coordinates
-    #    Example: coordinates sent from frontend/map
+    # Location already available
     if (
         location
         and location.latitude is not None
@@ -44,51 +45,79 @@ async def location_node(state: AgentState) -> dict:
     ):
         return {
             "location": location,
+            "pending_action": None,
             "workflow_status": "IN_PROGRESS",
         }
 
-    # 2. User provided a place name
+    # Place name provided → resolve it
     if location and location.place:
         coordinates = get_coordinates(location.place)
 
         if (
-            coordinates["latitude"] is None
-            or coordinates["longitude"] is None
+            coordinates["latitude"] is not None
+            and coordinates["longitude"] is not None
         ):
-            return {
-                "pending_action": "GET_LOCATION",
-                "workflow_status": "WAITING_FOR_USER",
-            }
-
-        return {
-            "location": Location(
+            resolved_location = Location(
                 place=location.place,
                 latitude=coordinates["latitude"],
                 longitude=coordinates["longitude"],
-            ),
-            "workflow_status": "IN_PROGRESS",
-        }
+            )
 
-    # 3. No location available
+            return {
+                "location": resolved_location,
+                "pending_action": None,
+                "workflow_status": "IN_PROGRESS",
+            }
+
+    # Missing/invalid location → pause
+    user_location = interrupt({
+        "action": "GET_LOCATION",
+        "message": "Please provide your current location.",
+        "options": [
+            "Select location from map",
+            "Enter place name",
+            "Enter latitude and longitude",
+        ],
+    })
+
+    # Graph resumes here after Command(resume=...)
     return {
-        "pending_action": "GET_LOCATION",
-        "workflow_status": "WAITING_FOR_USER",
+        "location": Location(**user_location),
+        "pending_action": None,
+        "workflow_status": "IN_PROGRESS",
     }
+
+
+from langgraph.types import interrupt
+
 
 async def time_node(state: AgentState) -> dict:
     time_context = state.get("time_context")
 
-    # Time already resolved
+    # Time already available
     if time_context and time_context.slots:
         return {
             "time_context": time_context,
+            "pending_action": None,
             "workflow_status": "IN_PROGRESS",
         }
 
-    # Time is missing
+    # Missing time → pause
+    user_time = interrupt({
+        "action": "GET_TIME",
+        "message": "Please provide your fishing time.",
+        "options": [
+            "Specific time",
+            "Morning",
+            "Afternoon",
+            "Evening",
+        ],
+    })
+
     return {
-        "pending_action": "GET_TIME",
-        "workflow_status": "WAITING_FOR_USER",
+        "time_context": TimeContext(**user_time),
+        "pending_action": None,
+        "workflow_status": "IN_PROGRESS",
     }
 
 async def pfz_node(state: AgentState) -> dict:
