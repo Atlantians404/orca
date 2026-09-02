@@ -1,0 +1,111 @@
+{
+  "PFZ03": {
+    "2026-08-31 06:00": {
+      "request": {
+        "request_id": "TEST008",
+        "requires_route": false,
+        "forecast_hours": 24
+      },
+      "marine": {
+        "wave_height": 0.6,
+        "wave_period": 8,
+        "wave_direction": 120,
+        "swell_wave_height": 0.4,
+        "swell_wave_period": 7,
+        "swell_wave_direction": 120,
+        "ocean_current_velocity": 0.4,
+        "ocean_current_direction": 90,
+        "sea_surface_temperature": 27,
+        "sea_level_height_msl": 0.4,
+        "marine_warning": "NONE"
+      },
+      "weather": {
+        "wind_speed": 8,
+        "wind_direction": 100,
+        "wave_height": 0.6,
+        "visibility": 10,
+        "precipitation": 5,
+        "lightning": false,
+        "condition": "clear"
+      },
+      "geo": {
+        "latitude": 13.05,
+        "longitude": 80.25,
+        "restricted_area": false,
+        "protected_area": false
+      }
+    },
+
+    "2026-08-31 12:00": {
+      "request": {
+        "request_id": "TEST009",
+        "requires_route": false,
+        "forecast_hours": 24
+      },
+      "marine": {
+        "wave_height": 1.8,
+        "wave_period": 10,
+        "wave_direction": 150,
+        "swell_wave_height": 1.2,
+        "swell_wave_period": 9,
+        "swell_wave_direction": 150,
+        "ocean_current_velocity": 1.0,
+        "ocean_current_direction": 100,
+        "sea_surface_temperature": 29,
+        "sea_level_height_msl": 0.5,
+        "marine_warning": "ADVISORY"
+      },
+      "weather": {
+        "wind_speed": 14,
+        "wind_direction": 160,
+        "wave_height": 1.5,
+        "visibility": 6,
+        "precipitation": 25,
+        "lightning": false,
+        "condition": "cloudy"
+      },
+      "geo": {
+        "latitude": 13.05,
+        "longitude": 80.25,
+        "restricted_area": false,
+        "protected_area": false
+      }
+    },
+
+    "2026-08-31 17:00": {
+      "request": {
+        "request_id": "TEST010",
+        "requires_route": false,
+        "forecast_hours": 24
+      },
+      "marine": {
+        "wave_height": 3.2,
+        "wave_period": 13,
+        "wave_direction": 180,
+        "swell_wave_height": 2.2,
+        "swell_wave_period": 12,
+        "swell_wave_direction": 180,
+        "ocean_current_velocity": 2.0,
+        "ocean_current_direction": 110,
+        "sea_surface_temperature": 28,
+        "sea_level_height_msl": 0.7,
+        "marine_warning": "WARNING"
+      },
+      "weather": {
+        "wind_speed": 18,
+        "wind_direction": 180,
+        "wave_height": 2.5,
+        "visibility": 4,
+        "precipitation": 60,
+        "lightning": false,
+        "condition": "rain"
+      },
+      "geo": {
+        "latitude": 13.05,
+        "longitude": 80.25,
+        "restricted_area": false,
+        "protected_area": false
+      }
+    }
+  }
+}
