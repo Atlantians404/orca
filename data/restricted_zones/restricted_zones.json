@@ -1,0 +1,22 @@
+{
+  "source": "National Hydrographic Office",
+  "source_document": "INTM 197/(15/11)",
+  "zones": [
+    {
+      "name": "Vishakhapatnam Restricted Area",
+      "type": "restricted",
+      "location": "Approaches to Vishakhapatnam",
+      "source_authority": "Vishakhapatnam Port Trust",
+      "geometry": {
+        "type": "circle",
+        "center": {
+          "latitude": 17.652333,
+          "longitude": 83.315333
+        },
+        "radius_nm": 1.5,
+        "radius_km": 2.778
+      },
+      "notes": "Restricted area described in NHO INTM 197/(15/11). Chart-specific boundary arcs and points are preserved in the source notice."
+    }
+  ]
+}
