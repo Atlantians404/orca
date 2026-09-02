@@ -1,16 +1,16 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from models.users import User
-from schemas.auth import RegisterRequest, LoginRequest
+from backend.models.users import User
+from backend.schemas.auth import RegisterRequest, LoginRequest
 
-from utils.auth_util import (
+from backend.utils.auth_util import (
     hash_password,
     verify_password,
     create_access_token,
 )
 
-from core.exceptions import (
+from backend.core.exceptions import (
     unauthorized,
     conflict,
 )
