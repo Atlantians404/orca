@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Dict
 
 from pydantic import BaseModel, Field
 
@@ -18,25 +18,35 @@ class RequestInfo(BaseModel):
 
 class MarineData(BaseModel):
 
-    wave_height: float = Field(ge=0)
+    wave_height: float = Field(
+        ge=0
+    )
 
-    wave_period: float = Field(ge=0)
+    wave_period: float = Field(
+        ge=0
+    )
 
     wave_direction: float = Field(
         ge=0,
         lt=360
     )
 
-    swell_wave_height: float = Field(ge=0)
+    swell_wave_height: float = Field(
+        ge=0
+    )
 
-    swell_wave_period: float = Field(ge=0)
+    swell_wave_period: float = Field(
+        ge=0
+    )
 
     swell_wave_direction: float = Field(
         ge=0,
         lt=360
     )
 
-    ocean_current_velocity: float = Field(ge=0)
+    ocean_current_velocity: float = Field(
+        ge=0
+    )
 
     ocean_current_direction: float = Field(
         ge=0,
@@ -47,21 +57,27 @@ class MarineData(BaseModel):
 
     sea_level_height_msl: float
 
-    marine_warning: Optional[str] = None
+    marine_warning: str
 
 
 class WeatherData(BaseModel):
 
-    wind_speed: float = Field(ge=0)
+    wind_speed: float = Field(
+        ge=0
+    )
 
     wind_direction: float = Field(
         ge=0,
         lt=360
     )
 
-    wave_height: float = Field(ge=0)
+    wave_height: float = Field(
+        ge=0
+    )
 
-    visibility: float = Field(ge=0)
+    visibility: float = Field(
+        ge=0
+    )
 
     precipitation: float = Field(
         ge=0,
@@ -99,3 +115,17 @@ class RiskInput(BaseModel):
     weather: WeatherData
 
     geo: GeoData
+
+
+class AgentData(BaseModel):
+    """
+    Used for Cases 1-4.
+
+    PFZ ID
+        ↓
+    timestamp
+        ↓
+    RiskInput
+    """
+
+    root: Dict[str, Dict[str, RiskInput]]
