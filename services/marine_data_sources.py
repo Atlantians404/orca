@@ -2,7 +2,7 @@ import os
 import math
 from pathlib import Path
 from typing import Any
-
+from datetime import datetime
 from dotenv import load_dotenv
 from pymongo import MongoClient
 
@@ -17,14 +17,14 @@ def get_mongodb_collection():
     Connect to MongoDB and return the PFZ collection.
     """
 
-    mongo_uri = os.getenv("MONGODB_URI")
+    mongodb_uri = os.getenv("MONGODB_URI")
 
-    if not mongo_uri:
+    if not mongodb_uri:
         raise ValueError(
-            "MONGO_URI not found in environment."
+            "MONGODB_URI not found in environment."
         )
 
-    client = MongoClient(mongo_uri)
+    client = MongoClient(mongodb_uri)
 
     db = client["ORCA"]
     collection = db["pfz"]
@@ -69,28 +69,78 @@ def calculate_distance_km(
 def get_pfz_candidates(
     latitude: float,
     longitude: float,
+    requested_date: str | None = None,
     limit: int = 20
 ) -> dict[str, Any]:
     """
-    Find the nearest PFZ candidates from MongoDB.
+    Find the nearest PFZ candidates from MongoDB
+    for the requested date.
 
-    Database:
-        ORCA
+    requested_date format:
+        YYYY-MM-DD
 
-    Collection:
-        pfz
+    Example:
+        2026-08-30
     """
 
     collection = get_mongodb_collection()
 
-    document = collection.find_one({})
+    # Use today's date if no date is provided
+    if requested_date is None:
+        requested_date = datetime.now().strftime("%Y-%m-%d")
 
+    # Find PFZ advisory valid for the requested date
+    document = None
+
+    for pfz_document in collection.find({}):
+
+        validity = pfz_document.get(
+            "forecast_validity",
+            {}
+        )
+
+        valid_from = validity.get("from")
+        valid_to = validity.get("to")
+
+        if not valid_from or not valid_to:
+            continue
+
+        try:
+            
+
+            start_date = datetime.strptime(
+                valid_from,
+                "%d %b %Y"
+            ).date()
+
+            end_date = datetime.strptime(
+                valid_to,
+                "%d %b %Y"
+            ).date()
+
+            requested = datetime.strptime(
+                requested_date,
+                "%Y-%m-%d"
+            ).date()
+
+        except ValueError:
+            continue
+
+        if start_date <= requested <= end_date:
+            document = pfz_document
+            break
+
+    # No PFZ advisory for requested date
     if not document:
         return {
             "state": "pfz_candidates",
             "pfz_candidates": [],
             "count": 0,
-            "message": "No PFZ data found in MongoDB."
+            "requested_date": requested_date,
+            "message": (
+                f"No PFZ advisory available for "
+                f"{requested_date}."
+            )
         }
 
     pfz_locations = document.get(
@@ -162,9 +212,13 @@ def get_pfz_candidates(
         "state": "pfz_candidates",
         "pfz_candidates": candidates,
         "count": len(candidates),
-        "source": document.get("source")
+        "source": document.get("source"),
+        "sector": document.get("sector"),
+        "requested_date": requested_date,
+        "forecast_validity": document.get(
+            "forecast_validity"
+        )
     }
-
 
 def select_pfz(
     pfz_candidates: list[dict[str, Any]],
