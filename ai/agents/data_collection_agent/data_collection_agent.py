@@ -1,136 +1,95 @@
-from typing import Any
-
-from services.data_service import (
-    get_temperature,
-    get_wind_speed,
-    get_wind_direction,
-    get_wind_gust,
-    get_visibility,
-    get_precipitation,
-    get_weather_code,
-    get_weather_condition,
-    get_thunderstorm,
+from ai.configs.config import llm
+from ai.tools.weather_tools import (
+    temperature_tool,
+    wind_speed_tool,
+    wind_direction_tool,
+    wind_gust_tool,
+    visibility_tool,
+    precipitation_tool,
+    weather_code_tool,
+    weather_condition_tool,
+    thunderstorm_tool,
 )
+from ai.state import AgentState
 
-from api.marine.marine import get_marine_data
+
+weather_tools = [
+    temperature_tool,
+    wind_speed_tool,
+    wind_direction_tool,
+    wind_gust_tool,
+    visibility_tool,
+    precipitation_tool,
+    weather_code_tool,
+    weather_condition_tool,
+    thunderstorm_tool,
+]
+
+llm_with_tools = llm.bind_tools(weather_tools)
 
 
-def run_data_collection_agent(
-    state: dict[str, Any]
-) -> dict[str, Any]:
+def data_collection_agent(state: AgentState) -> AgentState:
     """
-    Collect weather and marine data for the selected PFZ.
-
-    Input:
-        AgentState containing selected_pfz and time_context.
-
-    Output:
-        Updated AgentState containing agent_data.
+    Collect weather data for the PFZs and time slots
+    present in AgentState.
     """
 
-    selected_pfz = state.get("selected_pfz")
+    # Read PFZ information from state
+    pfzs = state.get("pfz_candidates", [])
+
+    if not pfzs and state.get("selected_pfz"):
+        pfzs = [state["selected_pfz"]]
+
+    # Read time information from state
     time_context = state.get("time_context")
 
-    # No PFZ selected
-    if selected_pfz is None:
+    if not time_context:
         return {
             **state,
-            "agent_data": {}
+            "agent_data": {},
         }
 
-    # Get PFZ coordinates
-    latitude = selected_pfz.get("latitude")
-    longitude = selected_pfz.get("longitude")
+    collected_data = {}
 
-    if latitude is None or longitude is None:
-        return {
-            **state,
-            "agent_data": {}
-        }
+    for pfz in pfzs:
 
-    # Get requested time
-    if time_context is None or not time_context.slots:
-        return {
-            **state,
-            "agent_data": {}
-        }
+        pfz_id = pfz.get("id") or pfz.get("pfz_id", "unknown")
 
-    slot = time_context.slots[0]
+        latitude = pfz.get("latitude")
+        longitude = pfz.get("longitude")
 
-    requested_time = slot.date
+        for slot in time_context.slots:
 
-    if slot.start_time:
-        requested_time += f"T{slot.start_time}:00"
+            time = f"{slot.date}T{slot.start_time}"
 
-    # Collect weather data
-    weather = {
-        "temperature": get_temperature(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "wind_speed": get_wind_speed(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "wind_direction": get_wind_direction(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "wind_gust": get_wind_gust(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "visibility": get_visibility(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "precipitation": get_precipitation(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "weather_code": get_weather_code(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "weather_condition": get_weather_condition(
-            latitude,
-            longitude,
-            requested_time
-        ),
-        "thunderstorm": get_thunderstorm(
-            latitude,
-            longitude,
-            requested_time
-        )
-    }
+            prompt = f"""
+            Collect weather data for this PFZ.
 
-    # Collect marine data
-    marine = get_marine_data(
-        latitude,
-        longitude,
-        requested_time
-    )
+            PFZ ID: {pfz_id}
+            Latitude: {latitude}
+            Longitude: {longitude}
+            Time: {time}
 
-    # Prepare AgentState data
-    agent_data = {
-        "pfz": selected_pfz,
-        "weather": weather,
-        "marine": marine,
-        "collection_location": {
-            "latitude": latitude,
-            "longitude": longitude
-        },
-        "collection_time": requested_time
-    }
+            Use the available weather tools to collect:
+            temperature,
+            wind speed,
+            wind direction,
+            wind gust,
+            visibility,
+            precipitation,
+            weather code,
+            weather condition,
+            thunderstorm.
+            """
+
+            response = llm_with_tools.invoke(prompt)
+
+            collected_data.setdefault(pfz_id, {})
+            collected_data[pfz_id][time] = {
+                "llm_response": response,
+            }
 
     return {
         **state,
-        "agent_data": agent_data
+        "agent_data": collected_data,
     }
