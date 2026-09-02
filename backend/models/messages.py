@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
 from sqlalchemy.dialects.postgresql import JSONB
-from database.database import Base
+from backend.database.database import Base
 
 
 class Message(Base):

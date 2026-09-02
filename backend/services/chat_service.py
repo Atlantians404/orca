@@ -1,12 +1,12 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.sessions import Session
-from models.messages import Message
+from backend.models.sessions import Session
+from backend.models.messages import Message
 
-from core.exceptions import not_found
-from config.logging import logger
-from config.llm import llm
+from backend.core.exceptions import not_found
+from backend.config.logging import logger
+from ai.configs.config import llm
 
 
 async def send_message(
