@@ -5,6 +5,15 @@ from ai.schemas.time import TimeContext, TimeSlot
 from services.location.place_to_coordinate import get_coordinates
 from services.location.pfz_to_coordinate import get_pfz_coordinates
 
+from langgraph.types import interrupt
+
+from ai.configs.config import llm
+from ai.prompts.time_prompt import TIME_PROMPT
+
+from services.time.time_parser import (
+    build_specific_time,
+    build_generic_time,
+)
 
 async def general_node(state: AgentState) -> dict:
     return {
@@ -32,7 +41,6 @@ async def planning_node(state: AgentState) -> dict:
         "workflow_status": "COMPLETED"
     }
 
-from langgraph.types import interrupt
 
 async def location_node(state: AgentState) -> dict:
     location = state.get("location")
@@ -87,14 +95,14 @@ async def location_node(state: AgentState) -> dict:
         "workflow_status": "IN_PROGRESS",
     }
 
-
-from langgraph.types import interrupt
-
-
 async def time_node(state: AgentState) -> dict:
+
     time_context = state.get("time_context")
 
-    # Time already available
+    # -----------------------------------------
+    # Time already exists
+    # -----------------------------------------
+
     if time_context and time_context.slots:
         return {
             "time_context": time_context,
@@ -102,22 +110,96 @@ async def time_node(state: AgentState) -> dict:
             "workflow_status": "IN_PROGRESS",
         }
 
-    # Missing time → pause
+    # -----------------------------------------
+    # Ask user naturally
+    # -----------------------------------------
+
     user_time = interrupt({
         "action": "GET_TIME",
-        "message": "Please provide your fishing time.",
-        "options": [
-            "Specific time",
-            "Morning",
-            "Afternoon",
-            "Evening",
-        ],
+        "message": "When would you like to go fishing?"
     })
 
+    # -----------------------------------------
+    # AI extracts time information
+    # -----------------------------------------
+
+    prompt = TIME_PROMPT.format(
+        time_input=user_time
+    )
+
+    response = await llm.ainvoke(prompt)
+
+    content = response.content.strip()
+
+    # Remove markdown fences if model returns them
+    if content.startswith("```"):
+        content = content.replace("```json", "")
+        content = content.replace("```", "")
+        content = content.strip()
+
+    import json
+
+    extracted = json.loads(content)
+
+    time_type = extracted.get("time_type")
+
+    # -----------------------------------------
+    # Specific time
+    # -----------------------------------------
+
+    if time_type == "specific":
+
+        time = extracted.get("time")
+
+        if not time:
+            return {
+                "pending_action": "GET_TIME",
+                "workflow_status": "WAITING_FOR_USER",
+            }
+
+        resolved_time = build_specific_time(
+            date_expression=extracted.get("date"),
+            time=time,
+        )
+
+        return {
+            "time_context": resolved_time,
+            "pending_action": None,
+            "workflow_status": "IN_PROGRESS",
+        }
+
+    # -----------------------------------------
+    # Generic time
+    # -----------------------------------------
+
+    if time_type == "generic":
+
+        period = extracted.get("period")
+
+        if not period:
+            return {
+                "pending_action": "GET_TIME",
+                "workflow_status": "WAITING_FOR_USER",
+            }
+
+        resolved_time = build_generic_time(
+            date_expression=extracted.get("date"),
+            period=period,
+        )
+
+        return {
+            "time_context": resolved_time,
+            "pending_action": None,
+            "workflow_status": "IN_PROGRESS",
+        }
+
+    # -----------------------------------------
+    # Time missing / unclear
+    # -----------------------------------------
+
     return {
-        "time_context": TimeContext(**user_time),
-        "pending_action": None,
-        "workflow_status": "IN_PROGRESS",
+        "pending_action": "GET_TIME",
+        "workflow_status": "WAITING_FOR_USER",
     }
 
 async def pfz_node(state: AgentState) -> dict:
