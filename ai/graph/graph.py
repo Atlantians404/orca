@@ -36,7 +36,10 @@ def build_graph():
     # START → Orchestrator
     # -------------------------
 
-    graph.add_edge(START, "orchestrator")
+    graph.add_edge(
+        START,
+        "orchestrator"
+    )
 
     # -------------------------
     # Orchestrator → Router
@@ -53,36 +56,55 @@ def build_graph():
     )
 
     # -------------------------
+    # General → END
+    # -------------------------
+
+    graph.add_edge(
+        "general",
+        END
+    )
+
+    # -------------------------
     # Location → Time
     # -------------------------
 
-    graph.add_edge("location", "time")
+    graph.add_edge(
+        "location",
+        "time"
+    )
 
     # -------------------------
     # Time → PFZ
     # -------------------------
 
-    graph.add_edge("time", "pfz")
+    graph.add_edge(
+        "time",
+        "pfz"
+    )
 
     # -------------------------
-    # PFZ → End
+    # PFZ → END
     # -------------------------
 
-    graph.add_edge("pfz", END)
-
-    # -------------------------
-    # General → End
-    # -------------------------
-
-    graph.add_edge("general", END)
+    graph.add_edge(
+        "pfz",
+        END
+    )
 
     # -------------------------
     # Checkpointer
+    # Required for interrupt/resume
     # -------------------------
 
     checkpointer = MemorySaver()
 
-    return graph.compile(checkpointer=checkpointer)
+    return graph.compile(
+        checkpointer=checkpointer
+    )
 
+
+# -------------------------
+# Compiled application graph
+# -------------------------
 
 app_graph = build_graph()
