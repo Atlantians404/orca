@@ -1,4 +1,5 @@
 from langgraph.graph import StateGraph, START, END
+from langgraph.checkpoint.memory import MemorySaver
 
 from ai.agent_state import AgentState
 from ai.orchestrator import orchestrate
@@ -7,6 +8,9 @@ from ai.graph.nodes import (
     general_node,
     safety_node,
     planning_node,
+    location_node,
+    time_node,
+    pfz_node,
 )
 
 
@@ -14,32 +18,71 @@ def build_graph():
 
     graph = StateGraph(AgentState)
 
+    # -------------------------
     # Nodes
+    # -------------------------
+
     graph.add_node("orchestrator", orchestrate)
+
     graph.add_node("general", general_node)
     graph.add_node("safety", safety_node)
     graph.add_node("planning", planning_node)
 
+    graph.add_node("location", location_node)
+    graph.add_node("time", time_node)
+    graph.add_node("pfz", pfz_node)
+
+    # -------------------------
     # START → Orchestrator
+    # -------------------------
+
     graph.add_edge(START, "orchestrator")
 
+    # -------------------------
     # Orchestrator → Router
+    # -------------------------
+
     graph.add_conditional_edges(
         "orchestrator",
         route_query,
         {
             "general": "general",
-            "safety": "safety",
-            "planning": "planning",
+            "safety": "location",
+            "planning": "location",
         },
     )
 
-    # End of each flow
-    graph.add_edge("general", END)
-    graph.add_edge("safety", END)
-    graph.add_edge("planning", END)
+    # -------------------------
+    # Location → Time
+    # -------------------------
 
-    return graph.compile()
+    graph.add_edge("location", "time")
+
+    # -------------------------
+    # Time → PFZ
+    # -------------------------
+
+    graph.add_edge("time", "pfz")
+
+    # -------------------------
+    # PFZ → End
+    # -------------------------
+
+    graph.add_edge("pfz", END)
+
+    # -------------------------
+    # General → End
+    # -------------------------
+
+    graph.add_edge("general", END)
+
+    # -------------------------
+    # Checkpointer
+    # -------------------------
+
+    checkpointer = MemorySaver()
+
+    return graph.compile(checkpointer=checkpointer)
 
 
 app_graph = build_graph()

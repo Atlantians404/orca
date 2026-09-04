@@ -1,10 +1,9 @@
 from typing import Any
 
-from ai.tools.marine_tools import (
+from services.marine_data_sources import (
     get_pfz_candidates,
     select_pfz
 )
-
 
 def run_marine_agent(
     state: dict[str, Any]
@@ -38,19 +37,11 @@ def run_marine_agent(
             "selected_pfz": None
         }
 
-    # Use the first requested time slot
-    time_slot = time_context.slots[0]
-
-    requested_time = time_slot.date
-
-    if time_slot.start_time:
-        requested_time += f"T{time_slot.start_time}:00"
 
     # Get PFZ candidates
     result = get_pfz_candidates(
-        latitude=location.latitude,
-        longitude=location.longitude,
-        time=requested_time
+    latitude=location.latitude,
+    longitude=location.longitude
     )
 
     # Extract candidates

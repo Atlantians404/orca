@@ -103,6 +103,37 @@ def is_marine_warning(
 
     return data["warning"]
 
+def get_marine_warning_level(
+    latitude: float,
+    longitude: float
+) -> str | None:
+
+    data = get_marine_warning(
+        latitude,
+        longitude
+    )
+
+    warning = data.get("high_wave_warning")
+
+    if not warning:
+        return None
+
+    alert = warning.get("Alert", "").lower()
+
+    if "critical" in alert:
+        return "critical"
+
+    if "severe" in alert:
+        return "severe"
+
+    if "warning" in alert:
+        return "warning"
+
+    if "advisory" in alert:
+        return "advisory"
+
+    return None
+
 def get_high_wave_alert(
     latitude: float,
     longitude: float
