@@ -1,3 +1,5 @@
+import json
+
 from ai.agent_state import AgentState
 from ai.schemas.location import Location
 from ai.schemas.time import TimeContext, TimeSlot
@@ -14,6 +16,12 @@ from services.time.time_parser import (
     build_specific_time,
     build_generic_time,
 )
+
+from services.marine_data_sources import get_pfz_candidates
+
+
+DEFAULT_RADIUS_KM = 50.0
+MAX_PFZ_CANDIDATES = 20
 
 async def general_node(state: AgentState) -> dict:
     return {
@@ -137,7 +145,7 @@ async def time_node(state: AgentState) -> dict:
         content = content.replace("```", "")
         content = content.strip()
 
-    import json
+
 
     extracted = json.loads(content)
 
@@ -203,15 +211,18 @@ async def time_node(state: AgentState) -> dict:
     }
 
 async def pfz_node(state: AgentState) -> dict:
-    selected_pfz_id = state.get("selected_pfz_id")
+    selected_pfz_name = state.get("selected_pfz_name")
 
-    # User directly specified a PFZ
-    if selected_pfz_id:
+    # ---------------------------------------------------------
+    # 1. User directly specified a PFZ
+    # ---------------------------------------------------------
+    if selected_pfz_name:
         try:
-            pfz = get_pfz_coordinates(selected_pfz_id)
+            pfz = get_pfz_coordinates(selected_pfz_name)
 
             return {
                 "selected_pfz": pfz,
+                "pending_action": None,
                 "workflow_status": "IN_PROGRESS",
             }
 
@@ -221,17 +232,68 @@ async def pfz_node(state: AgentState) -> dict:
                 "workflow_status": "WAITING_FOR_USER",
             }
 
-    # PFZ candidates already generated
-    pfz_candidates = state.get("pfz_candidates", [])
+    # ---------------------------------------------------------
+    # 2. PFZ candidates already generated
+    # ---------------------------------------------------------
+    pfz_candidates = state.get("pfz_candidates")
 
     if pfz_candidates:
         return {
-            "pending_action": "SELECT_PFZ",
+            "pfz_candidates": pfz_candidates,
+            "pending_action": None,
+            "workflow_status": "IN_PROGRESS",
+        }
+
+    # ---------------------------------------------------------
+    # 3. Location is required for candidate generation
+    # ---------------------------------------------------------
+    location = state.get("location")
+
+    if not location:
+        return {
+            "pending_action": "GET_LOCATION",
             "workflow_status": "WAITING_FOR_USER",
         }
 
-    # No candidates yet
+    # ---------------------------------------------------------
+    # 4. Determine search radius
+    # ---------------------------------------------------------
+    distance_km = state.get("distance_km")
+
+    if distance_km is None:
+        distance_km = DEFAULT_RADIUS_KM
+
+    # ---------------------------------------------------------
+    # 5. Generate PFZ candidates
+    # ---------------------------------------------------------
+    result = get_pfz_candidates(
+        latitude=location.latitude,
+        longitude=location.longitude,
+        radius_km=distance_km,
+        number_of_zones=MAX_PFZ_CANDIDATES,
+    )
+
+    candidates = result.get("pfz_zones", {})
+
+    # ---------------------------------------------------------
+    # 6. No candidates found
+    # ---------------------------------------------------------
+    if not candidates:
+        return {
+            "pfz_candidates": {},
+            "workflow_status": "COMPLETED",
+            "response": {
+                "message": result.get(
+                    "message",
+                    "No PFZ zones found."
+                )
+            },
+        }
+
+    # ---------------------------------------------------------
+    # 7. Store candidates in AgentState
+    # ---------------------------------------------------------
     return {
-        "pending_action": "GENERATE_PFZ_CANDIDATES",
+        "pfz_candidates": candidates,
         "workflow_status": "IN_PROGRESS",
     }
