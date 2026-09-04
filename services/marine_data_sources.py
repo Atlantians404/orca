@@ -92,8 +92,9 @@ def get_current_pfz_advisory(collection):
     """
     Find the PFZ advisory that is currently valid.
 
-    The function automatically checks today's date against
-    the advisory's forecast validity period.
+    Supports advisories with either:
+    - both 'from' and 'to' dates
+    - only a 'to' date
     """
 
     today = datetime.now().date()
@@ -102,33 +103,40 @@ def get_current_pfz_advisory(collection):
 
     for advisory in advisories:
 
-        forecast_validity = advisory.get(
-            "forecast_validity",
-            {}
-        )
+        forecast_validity = advisory.get("forecast_validity", {})
 
         start_date_text = forecast_validity.get("from")
         end_date_text = forecast_validity.get("to")
 
-        if not start_date_text or not end_date_text:
+        # We need at least an end date.
+        if not end_date_text:
             continue
 
         try:
-            start_date = datetime.strptime(
-                start_date_text,
-                "%d %b %Y"
-            ).date()
-
             end_date = datetime.strptime(
-                end_date_text,
+                end_date_text.strip(),
                 "%d %b %Y"
             ).date()
-
-        except ValueError:
+        except (ValueError, AttributeError):
             continue
 
-        if start_date <= today <= end_date:
-            return advisory
+        # If there is a start date, check the complete period.
+        if start_date_text:
+            try:
+                start_date = datetime.strptime(
+                    start_date_text.strip(),
+                    "%d %b %Y"
+                ).date()
+            except (ValueError, AttributeError):
+                continue
+
+            if start_date <= today <= end_date:
+                return advisory
+
+        # If only the end date exists, check whether it has expired.
+        else:
+            if today <= end_date:
+                return advisory
 
     return None
 
@@ -322,3 +330,207 @@ def select_pfz(
         pfz_id
     )
 
+def get_live_pfz_data():
+    """
+    Retrieve the currently displayed PFZ advisory from the live INCOIS page.
+
+    Uses the existing Edge browser session connected through
+    Playwright's remote debugging port.
+    """
+
+    from playwright.sync_api import sync_playwright
+
+    INCOIS_URL = "https://www.incois.gov.in/MarineFisheries/TextData?secid=SEC007"
+
+    with sync_playwright() as p:
+        browser = p.chromium.connect_over_cdp(
+            "http://127.0.0.1:9222"
+        )
+
+        pages = browser.contexts[0].pages
+
+        page = None
+
+        for existing_page in pages:
+            if "incois.gov.in/MarineFisheries/TextData" in existing_page.url:
+                page = existing_page
+                break
+
+        if page is None:
+            raise RuntimeError(
+                "INCOIS Text Data page is not open in the debug Edge browser."
+            )
+
+        # Make sure the PFZ data area exists.
+        forecast = page.locator("#forecastdata")
+
+        if forecast.count() == 0:
+            raise RuntimeError(
+                "INCOIS PFZ forecast data was not found on the page."
+            )
+
+        # Read the currently displayed PFZ table.
+        table_text = forecast.inner_text()
+
+        if not table_text.strip():
+            raise RuntimeError(
+                "INCOIS PFZ forecast data is empty."
+            )
+
+        # Get the page text so we can capture the advisory validity information.
+        page_text = page.locator("body").inner_text()
+
+        return {
+            "source": "INCOIS",
+            "sector": "North Tamil Nadu",
+            "advisory_text": page_text,
+            "forecast_text": table_text,
+        }
+
+def dms_to_decimal(dms_text):
+    """
+    Convert DMS coordinate text into decimal degrees.
+
+    Example:
+    '13 29 40 N' -> 13.494444
+    '80 22 46 E' -> 80.379444
+    """
+
+    parts = dms_text.split()
+
+    if len(parts) != 4:
+        raise ValueError(f"Invalid DMS coordinate: {dms_text}")
+
+    degrees = float(parts[0])
+    minutes = float(parts[1])
+    seconds = float(parts[2])
+    direction = parts[3].upper()
+
+    decimal = degrees + (minutes / 60) + (seconds / 3600)
+
+    if direction in ("S", "W"):
+        decimal = -decimal
+
+    return round(decimal, 6)
+
+
+def parse_live_pfz_data(page):
+    """
+    Parse PFZ rows from the live INCOIS forecast table.
+    """
+
+    rows = page.locator("#forecastdata tr")
+
+    pfz_locations = []
+
+    for i in range(1, rows.count()):
+        cells = rows.nth(i).locator("td")
+
+        if cells.count() < 7:
+            continue
+
+        try:
+            coastal_reference = cells.nth(0).inner_text().strip()
+            direction = cells.nth(1).inner_text().strip()
+            bearing_deg = int(cells.nth(2).inner_text().strip())
+
+            distance_text = cells.nth(3).inner_text().strip()
+            depth_text = cells.nth(4).inner_text().strip()
+
+            latitude_text = cells.nth(5).inner_text().strip()
+            longitude_text = cells.nth(6).inner_text().strip()
+
+            # Convert distance range: "30-35" -> {"min": 30, "max": 35}
+            distance_parts = distance_text.split("-")
+
+            distance_km = {
+                "min": int(distance_parts[0]),
+                "max": int(distance_parts[1])
+            }
+
+            # Convert depth range: "12-17" -> {"min": 12, "max": 17}
+            depth_parts = depth_text.split("-")
+
+            depth_m = {
+                "min": int(depth_parts[0]),
+                "max": int(depth_parts[1])
+            }
+
+            # Convert DMS coordinates to decimal degrees
+            latitude = dms_to_decimal(latitude_text)
+            longitude = dms_to_decimal(longitude_text)
+
+            pfz_locations.append({
+                "coastal_reference": coastal_reference,
+                "direction": direction,
+                "bearing_deg": bearing_deg,
+                "distance_km": distance_km,
+                "depth_m": depth_m,
+                "latitude": latitude,
+                "longitude": longitude
+            })
+
+        except (ValueError, IndexError):
+            # Skip malformed rows instead of stopping the entire retrieval.
+            continue
+
+    return pfz_locations
+
+def update_live_pfz_in_mongodb(
+    pfz_locations,
+    sector="North Tamil Nadu",
+    valid_until=None
+):
+    """
+    Save the latest live INCOIS PFZ data into MongoDB.
+    """
+
+    collection = get_mongodb_collection()
+
+    # Remove the previous PFZ advisory for this sector
+    collection.delete_many({
+        "source": "INCOIS",
+        "sector": sector
+    })
+
+    # Create the new document
+    document = {
+        "source": "INCOIS",
+        "sector": sector,
+        "forecast_validity": {
+            "to": valid_until
+        },
+        "retrieved_at": datetime.utcnow().isoformat(),
+        "count": len(pfz_locations),
+        "pfz_locations": pfz_locations
+    }
+
+    # Insert the latest advisory
+    result = collection.insert_one(document)
+
+    return {
+        "success": True,
+        "mongo_id": str(result.inserted_id),
+        "count": len(pfz_locations)
+    }
+
+def get_pfz_valid_until(page):
+    """
+    Extract the PFZ validity date from the live INCOIS page.
+    """
+
+    body_text = page.locator("body").inner_text()
+
+    marker = "TILL "
+
+    if marker not in body_text.upper():
+        raise RuntimeError(
+            "PFZ validity date was not found on the INCOIS page."
+        )
+
+    text_upper = body_text.upper()
+    start = text_upper.index(marker) + len(marker)
+
+    valid_until = body_text[start:start + 15].strip()
+
+    return valid_until
