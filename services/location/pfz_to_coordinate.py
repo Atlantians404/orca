@@ -1,22 +1,23 @@
 import os
-from pymongo import MongoClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_pfz_coordinates(pfz_name: str) -> dict:
+
+async def get_pfz_coordinates(pfz_name: str) -> dict:
 
     mongo_uri = os.getenv("MONGO_URI")
 
     if not mongo_uri:
         raise ValueError("MONGO_URI not found.")
 
-    client = MongoClient(mongo_uri)
+    client = AsyncIOMotorClient(mongo_uri)
 
     db = client["ORCA"]
     collection = db["pfz"]
 
-    document = collection.find_one(
+    document = await collection.find_one(
         {
             "pfz_locations.coastal_reference": {
                 "$regex": f"^{pfz_name.strip()}$",
