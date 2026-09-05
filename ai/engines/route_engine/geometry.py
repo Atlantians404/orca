@@ -1,6 +1,10 @@
 from shapely.geometry import Point, LineString, Polygon
 
 
+# =========================================================
+# POINT
+# =========================================================
+
 def create_point(
     latitude: float,
     longitude: float
@@ -8,16 +12,40 @@ def create_point(
     """
     Create a Shapely Point.
 
-    Shapely uses:
-        (x, y) = (longitude, latitude)
+    Application format:
+        (latitude, longitude)
+
+    Shapely format:
+        (longitude, latitude)
     """
 
-    return Point(longitude, latitude)
+    return Point(
+        longitude,
+        latitude
+    )
 
+
+# =========================================================
+# LINESTRING
+# =========================================================
 
 def create_linestring(
     coordinates: list[tuple[float, float]]
-):
+) -> LineString:
+    """
+    Create a Shapely LineString.
+
+    Input:
+        [
+            (latitude, longitude),
+            (latitude, longitude),
+            ...
+        ]
+
+    Shapely internally uses:
+        (longitude, latitude)
+    """
+
     if len(coordinates) < 2:
         raise ValueError(
             "A LineString requires at least two points"
@@ -31,13 +59,27 @@ def create_linestring(
     )
 
 
+# =========================================================
+# POLYGON
+# =========================================================
+
 def create_polygon(
     coordinates: list[tuple[float, float]]
 ) -> Polygon:
     """
-    Create a Polygon from
-    (latitude, longitude) coordinates.
+    Create a Shapely Polygon.
+
+    Input coordinates use:
+        (latitude, longitude)
+
+    Shapely uses:
+        (longitude, latitude)
     """
+
+    if len(coordinates) < 3:
+        raise ValueError(
+            "A Polygon requires at least three points"
+        )
 
     return Polygon(
         [
@@ -45,6 +87,11 @@ def create_polygon(
             for latitude, longitude in coordinates
         ]
     )
+
+
+# =========================================================
+# POINT INSIDE POLYGON
+# =========================================================
 
 def point_inside_polygon(
     point: Point,
@@ -56,33 +103,106 @@ def point_inside_polygon(
 
     return polygon.contains(point)
 
+
+# =========================================================
+# ROUTE INTERSECTION
+# =========================================================
+
 def route_intersects_polygon(
     route: LineString,
     polygon: Polygon
 ) -> bool:
     """
     Check whether a route intersects a polygon.
+
+    Returns:
+        True  -> route intersects the polygon
+        False -> route does not intersect the polygon
     """
 
     return route.intersects(polygon)
 
-def pfz_to_point(pfz: dict) -> Point:
+
+# =========================================================
+# PFZ TO POINT
+# =========================================================
+
+def pfz_to_point(
+    pfz: dict
+) -> Point:
     """
     Convert a PFZ dictionary into a Shapely Point.
+
+    Expected PFZ data:
+
+        {
+            "coastal_reference": "...",
+            "latitude": 13.24,
+            "longitude": 80.58,
+            ...
+        }
     """
+
+    if "latitude" not in pfz:
+        raise ValueError(
+            "PFZ latitude is missing"
+        )
+
+    if "longitude" not in pfz:
+        raise ValueError(
+            "PFZ longitude is missing"
+        )
 
     return create_point(
         pfz["latitude"],
         pfz["longitude"]
     )
-def zone_to_polygon(zone) -> Polygon:
+
+
+# =========================================================
+# ZONE TO POLYGON
+# =========================================================
+
+def zone_to_polygon(
+    zone
+) -> Polygon:
+    """
+    Convert a restricted/protected zone
+    into a Shapely Polygon.
+
+    The zone may be either:
+
+        1. A dictionary
+
+        2. A Pydantic object with
+           a 'coordinates' attribute
+    """
 
     if hasattr(zone, "coordinates"):
         coordinates = zone.coordinates
-    else:
+
+    elif isinstance(zone, dict):
+        if "coordinates" not in zone:
+            raise ValueError(
+                "Zone coordinates are missing"
+            )
+
         coordinates = zone["coordinates"]
 
-    return create_polygon(coordinates)
+    else:
+        raise TypeError(
+            "Zone must be a dictionary or an object "
+            "with a coordinates attribute"
+        )
+
+    return create_polygon(
+        coordinates
+    )
+
+
+# =========================================================
+# ROUTE VALIDATION
+# =========================================================
 
 def validate_route(
     route: LineString,
@@ -93,8 +213,13 @@ def validate_route(
     any restricted polygon.
 
     Returns:
-        True  -> route is safe
-        False -> route intersects a restricted area
+
+        True
+            Route is safe.
+
+        False
+            Route intersects at least one
+            restricted/protected polygon.
     """
 
     for polygon in restricted_polygons:
