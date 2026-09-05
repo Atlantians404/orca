@@ -1,4 +1,9 @@
-from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry import (
+    Point,
+    LineString,
+    Polygon,
+    mapping,
+)
 
 
 # =========================================================
@@ -7,7 +12,7 @@ from shapely.geometry import Point, LineString, Polygon
 
 def create_point(
     latitude: float,
-    longitude: float
+    longitude: float,
 ) -> Point:
     """
     Create a Shapely Point.
@@ -21,7 +26,7 @@ def create_point(
 
     return Point(
         longitude,
-        latitude
+        latitude,
     )
 
 
@@ -30,14 +35,13 @@ def create_point(
 # =========================================================
 
 def create_linestring(
-    coordinates: list[tuple[float, float]]
+    coordinates: list[tuple[float, float]],
 ) -> LineString:
     """
     Create a Shapely LineString.
 
     Input:
         [
-            (latitude, longitude),
             (latitude, longitude),
             ...
         ]
@@ -64,19 +68,15 @@ def create_linestring(
 # =========================================================
 
 def create_polygon(
-    coordinates: list[tuple[float, float]]
+    coordinates: list[tuple[float, float]],
 ) -> Polygon:
     """
     Create a Shapely Polygon.
 
     Input:
-        [
-            (latitude, longitude),
-            (latitude, longitude),
-            ...
-        ]
+        (latitude, longitude)
 
-    Shapely internally uses:
+    Shapely uses:
         (longitude, latitude)
     """
 
@@ -99,7 +99,7 @@ def create_polygon(
 
 def point_inside_polygon(
     point: Point,
-    polygon: Polygon
+    polygon: Polygon,
 ) -> bool:
     """
     Check whether a point is inside a polygon.
@@ -114,14 +114,10 @@ def point_inside_polygon(
 
 def route_intersects_polygon(
     route: LineString,
-    polygon: Polygon
+    polygon: Polygon,
 ) -> bool:
     """
     Check whether a route intersects a polygon.
-
-    Returns:
-        True  -> route intersects polygon
-        False -> route does not intersect polygon
     """
 
     return route.intersects(polygon)
@@ -132,18 +128,10 @@ def route_intersects_polygon(
 # =========================================================
 
 def pfz_to_point(
-    pfz: dict
+    pfz: dict,
 ) -> Point:
     """
     Convert a PFZ dictionary into a Shapely Point.
-
-    Expected PFZ data:
-
-        {
-            "coastal_reference": "...",
-            "latitude": 13.24,
-            "longitude": 80.58
-        }
     """
 
     if "latitude" not in pfz:
@@ -158,7 +146,7 @@ def pfz_to_point(
 
     return create_point(
         pfz["latitude"],
-        pfz["longitude"]
+        pfz["longitude"],
     )
 
 
@@ -167,18 +155,11 @@ def pfz_to_point(
 # =========================================================
 
 def zone_to_polygon(
-    zone
+    zone,
 ) -> Polygon:
     """
     Convert a restricted/protected zone
     into a Shapely Polygon.
-
-    The zone may be:
-
-        1. A dictionary
-
-        2. A Pydantic object with
-           a 'coordinates' attribute
     """
 
     if hasattr(zone, "coordinates"):
@@ -212,20 +193,14 @@ def zone_to_polygon(
 
 def validate_route(
     route: LineString,
-    restricted_polygons: list[Polygon]
+    restricted_polygons: list[Polygon],
 ) -> bool:
     """
     Validate that a route does not intersect
-    any restricted or protected polygon.
+    any restricted polygon.
 
-    Returns:
-
-        True
-            Route is safe.
-
-        False
-            Route intersects at least one
-            restricted/protected polygon.
+    Restricted/protected-area handling is retained
+    for future integration.
     """
 
     for polygon in restricted_polygons:
@@ -234,3 +209,29 @@ def validate_route(
             return False
 
     return True
+
+
+# =========================================================
+# LINESTRING → GEOJSON
+# =========================================================
+
+def linestring_to_geojson(
+    route: LineString,
+) -> dict:
+    """
+    Convert a Shapely LineString
+    into a GeoJSON Feature.
+    """
+
+    geom = mapping(route)
+
+    geom["coordinates"] = [
+        list(coord)
+        for coord in geom["coordinates"]
+    ]
+
+    return {
+        "type": "Feature",
+        "geometry": geom,
+        "properties": {},
+    }

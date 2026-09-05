@@ -9,7 +9,10 @@ from .graph import (
     path_to_coordinates,
 )
 
-from .pathfinding import generate_candidate_paths
+from .pathfinding import (
+    generate_candidate_paths,
+    astar_with_risk,
+)
 
 from .geometry import (
     create_linestring,
@@ -41,6 +44,9 @@ class RouteEngine:
         """
         Calculate Haversine distance between two
         geographic coordinates.
+
+        Coordinates:
+            (latitude, longitude)
 
         Returns:
             Distance in kilometres.
@@ -84,7 +90,7 @@ class RouteEngine:
     ) -> MarineGraph:
         """
         Create and connect a geographic grid
-        between the user's location and the selected PFZ.
+        between the user's location and selected PFZ.
         """
 
         graph = create_route_grid(
@@ -143,11 +149,10 @@ class RouteEngine:
         time: str,
     ) -> dict[str, Any]:
         """
-        Convert the generated route grid into the
-        input format expected by risk_helper.process_grid().
+        Convert the route grid into the input format
+        expected by risk_helper.process_grid().
 
-        Restricted/protected areas are currently kept
-        as False and will be integrated later.
+        Restricted/protected areas remain False for now.
         """
 
         nodes = []
@@ -177,10 +182,18 @@ class RouteEngine:
         time: str,
     ) -> list[dict[str, Any]]:
         """
-        Send all generated grid nodes to the Risk Helper.
+        Send every grid node to the Risk Helper.
 
-        Risk Helper collects the weather/marine data for
-        each node and returns the corresponding risk score.
+        Returns results such as:
+
+            [
+                {
+                    "node_id": "N1",
+                    "risk_score": 25,
+                    "safe": True
+                },
+                ...
+            ]
         """
 
         risk_input = RouteEngine.build_risk_input(
@@ -188,9 +201,46 @@ class RouteEngine:
             time=time,
         )
 
-        return process_grid(
-            risk_input
-        )
+        return process_grid(risk_input)
+
+    # =========================================================
+    # CONVERT RISK RESULTS
+    # =========================================================
+
+    @staticmethod
+    def build_risk_score_map(
+        risk_results: list[dict[str, Any]],
+    ) -> dict[str, float]:
+        """
+        Convert Risk Helper output into:
+
+            {
+                "N1": 25.0,
+                "N2": 60.0,
+                "N3": 82.0
+            }
+
+        This format is consumed by risk-aware A*.
+        """
+
+        risk_scores = {}
+
+        for result in risk_results:
+
+            node_id = result.get("node_id")
+            risk_score = result.get("risk_score")
+
+            if node_id is None:
+                continue
+
+            if risk_score is None:
+                continue
+
+            risk_scores[node_id] = float(
+                risk_score
+            )
+
+        return risk_scores
 
     # =========================================================
     # CREATE ROUTE RESULT
@@ -244,14 +294,17 @@ class RouteEngine:
         # -----------------------------------------------------
 
         return RouteResult(
-            route_id=f"ROUTE_{route_number}",
-            coastal_reference=coastal_reference,
-            start=start,
-            destination=destination,
-            waypoints=waypoints,
-            distance_km=distance,
-            geojson=geojson,
-        )
+    route_id=f"ROUTE_{route_number}",
+    coastal_reference=coastal_reference,
+    start=start,
+    destination=Coordinate(
+        latitude=destination.latitude,
+        longitude=destination.longitude,
+    ),
+    waypoints=waypoints,
+    distance_km=distance,
+    geojson=geojson,
+)
 
     # =========================================================
     # GENERATE ROUTES
@@ -267,10 +320,9 @@ class RouteEngine:
     ) -> CandidateRoutes:
         """
         Generate candidate routes between the user's
-        location and the selected PFZ.
+        location and selected PFZ.
 
-        The generated grid is also sent to the Risk Helper
-        for node-level risk evaluation.
+        Risk Helper is used to evaluate every grid node.
         """
 
         # -----------------------------------------------------
@@ -285,28 +337,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 2. EVALUATE GRID RISK
-        # -----------------------------------------------------
-
-        risk_results = self.evaluate_grid_risk(
-            graph=graph,
-            time=time,
-        )
-
-        # -----------------------------------------------------
-        # NOTE:
-        #
-        # Risk results are currently collected but are not
-        # modifying the graph/pathfinding weights yet.
-        #
-        # Next stage:
-        # risk score → graph cost → risk-aware A*
-        # -----------------------------------------------------
-
-        _ = risk_results
-
-        # -----------------------------------------------------
-        # 3. FIND START AND DESTINATION NODES
+        # 2. FIND START AND DESTINATION NODES
         # -----------------------------------------------------
 
         start_node, destination_node = (
@@ -318,7 +349,36 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 4. GENERATE CANDIDATE PATHS
+        # 3. EVALUATE GRID RISK
+        # -----------------------------------------------------
+
+        risk_results = self.evaluate_grid_risk(
+            graph=graph,
+            time=time,
+        )
+
+        # -----------------------------------------------------
+        # 4. BUILD RISK SCORE MAP
+        # -----------------------------------------------------
+
+        risk_scores = self.build_risk_score_map(
+            risk_results
+        )
+
+        # -----------------------------------------------------
+        # 5. GENERATE RISK-AWARE PRIMARY ROUTE
+        # -----------------------------------------------------
+
+        risk_route, risk_cost = astar_with_risk(
+            graph=graph,
+            start=start_node,
+            goal=destination_node,
+            risk_scores=risk_scores,
+            risk_weight=1.0,
+        )
+
+        # -----------------------------------------------------
+        # 6. GENERATE NORMAL CANDIDATE ROUTES
         # -----------------------------------------------------
 
         candidates = generate_candidate_paths(
@@ -329,20 +389,76 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 5. CONVERT PATHS TO ROUTE RESULTS
+        # 7. PUT RISK-AWARE ROUTE FIRST
+        # -----------------------------------------------------
+
+        candidate_paths = [
+            (risk_route, risk_cost)
+        ]
+
+        seen_paths = {
+            tuple(risk_route)
+        }
+
+        for path, distance in candidates:
+
+            path_key = tuple(path)
+
+            if path_key not in seen_paths:
+
+                candidate_paths.append(
+                    (
+                        path,
+                        distance
+                    )
+                )
+
+                seen_paths.add(
+                    path_key
+                )
+
+        # Limit number of routes
+        candidate_paths = candidate_paths[:max_routes]
+
+        # -----------------------------------------------------
+        # 8. CALCULATE PHYSICAL DISTANCE
         # -----------------------------------------------------
 
         routes = []
 
-        for index, (path, distance) in enumerate(
-            candidates,
+        for index, (path, _) in enumerate(
+            candidate_paths,
             start=1,
         ):
+
+            physical_distance = 0.0
+
+            for source, target in zip(
+                path,
+                path[1:]
+            ):
+
+                edge = next(
+                    (
+                        edge
+                        for edge
+                        in graph.get_neighbors(source)
+                        if edge.target == target
+                    ),
+                    None
+                )
+
+                if edge is None:
+                    raise ValueError(
+                        f"No edge between {source} and {target}"
+                    )
+
+                physical_distance += edge.weight
 
             route = self.create_route_result(
                 graph=graph,
                 path=path,
-                distance=distance,
+                distance=physical_distance,
                 start=request.start,
                 destination=request.destination,
                 coastal_reference=(
@@ -354,7 +470,7 @@ class RouteEngine:
             routes.append(route)
 
         # -----------------------------------------------------
-        # 6. RETURN CANDIDATE ROUTES
+        # 9. RETURN CANDIDATE ROUTES
         # -----------------------------------------------------
 
         return CandidateRoutes(
@@ -384,9 +500,7 @@ class RouteEngine:
             state["selected_pfz"]
             state["time_context"]
 
-        and generates candidate routes.
-
-        The generated route result is stored in:
+        Generates routes and stores the result in:
 
             state["route_result"]
         """
@@ -406,7 +520,9 @@ class RouteEngine:
         # 2. GET SELECTED PFZ
         # -----------------------------------------------------
 
-        selected_pfz = state.get("selected_pfz")
+        selected_pfz = state.get(
+            "selected_pfz"
+        )
 
         if selected_pfz is None:
             raise ValueError(
@@ -417,7 +533,9 @@ class RouteEngine:
         # 3. GET TIME CONTEXT
         # -----------------------------------------------------
 
-        time_context = state.get("time_context")
+        time_context = state.get(
+            "time_context"
+        )
 
         if (
             time_context is None
@@ -441,7 +559,7 @@ class RouteEngine:
             )
 
         # -----------------------------------------------------
-        # 5. CONVERT LOCATION TO ROUTE COORDINATE
+        # 5. CREATE START COORDINATE
         # -----------------------------------------------------
 
         start = Coordinate(
@@ -450,7 +568,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 6. CONVERT PFZ TO ROUTE DESTINATION
+        # 6. CREATE PFZ DESTINATION
         # -----------------------------------------------------
 
         destination = {
@@ -461,13 +579,17 @@ class RouteEngine:
             "longitude": selected_pfz["longitude"],
         }
 
+        # -----------------------------------------------------
+        # 7. CREATE ROUTE REQUEST
+        # -----------------------------------------------------
+
         request = RouteRequest(
             start=start,
             destination=destination,
         )
 
         # -----------------------------------------------------
-        # 7. GENERATE ROUTES
+        # 8. GENERATE ROUTES
         # -----------------------------------------------------
 
         result = self.generate_routes(
@@ -479,10 +601,11 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 8. UPDATE AGENT STATE
+        # 9. UPDATE AGENT STATE
         # -----------------------------------------------------
 
         return {
             **state,
+            "route_required": True,
             "route_result": result.model_dump(),
         }

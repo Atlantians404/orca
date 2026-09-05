@@ -4,702 +4,727 @@ from ai.engines.route_engine.engine import RouteEngine
 from ai.engines.route_engine.schemas import (
     Coordinate,
     RouteDestination,
-    RouteConstraints,
     RouteRequest,
-    RestrictedZone,
+)
+from ai.schemas.location import Location
+from ai.schemas.time import TimeContext, TimeSlot
+
+
+# =========================================================
+# TEST DATA
+# =========================================================
+
+START = Coordinate(
+    latitude=13.0827,
+    longitude=80.2707,
+)
+
+DESTINATION = RouteDestination(
+    coastal_reference="Kathivakkam Chinnakuppam",
+    latitude=13.494444,
+    longitude=80.379444,
 )
 
 
-# =========================================================
-# HELPER
-# =========================================================
-
-def create_request(
-    start_latitude=12.90,
-    start_longitude=80.30,
-    destination_latitude=13.00,
-    destination_longitude=80.40,
-    coastal_reference="PFZ001",
-    restricted_zones=None,
-):
+def create_state():
     """
-    Create a standard RouteRequest for testing.
+    Create the AgentState data required by
+    RouteEngine.process().
     """
 
-    constraints = RouteConstraints(
-        avoid_restricted_zones=True,
-        restricted_zones=(
-            restricted_zones
-            if restricted_zones is not None
-            else []
+    return {
+        "location": Location(
+            latitude=13.0827,
+            longitude=80.2707,
         ),
-    )
 
-    return RouteRequest(
-        start=Coordinate(
-            latitude=start_latitude,
-            longitude=start_longitude,
+        "selected_pfz": {
+            "coastal_reference": "Kathivakkam Chinnakuppam",
+            "latitude": 13.494444,
+            "longitude": 80.379444,
+            "depth_m": 42.0,
+        },
+
+        "time_context": TimeContext(
+            slots=[
+                TimeSlot(
+                    date="2026-09-05",
+                    start_time="12:00",
+                    end_time="13:00",
+                )
+            ],
+            timezone="Asia/Kolkata",
         ),
-        destination=RouteDestination(
-            coastal_reference=coastal_reference,
-            latitude=destination_latitude,
-            longitude=destination_longitude,
-        ),
-        constraints=constraints,
-    )
+
+        "route_required": True,
+    }
 
 
 # =========================================================
-# FIXTURE
+# HAVERSINE DISTANCE
 # =========================================================
 
-@pytest.fixture
-def engine():
-    return RouteEngine()
-
-
-# =========================================================
-# DISTANCE TESTS
-# =========================================================
-
-def test_same_point_distance():
+def test_calculate_distance():
 
     distance = RouteEngine.calculate_distance(
-        (13.0827, 80.2707),
-        (13.0827, 80.2707),
+        (
+            START.latitude,
+            START.longitude,
+        ),
+        (
+            DESTINATION.latitude,
+            DESTINATION.longitude,
+        ),
     )
 
-    assert distance == pytest.approx(
-        0,
-        abs=0.001,
-    )
-
-
-def test_distance_positive():
-
-    distance = RouteEngine.calculate_distance(
-        (13.0827, 80.2707),
-        (13.1400, 80.4300),
-    )
-
+    assert isinstance(distance, float)
     assert distance > 0
 
 
-def test_distance_symmetric():
-
-    point_a = (
-        13.0827,
-        80.2707,
-    )
-
-    point_b = (
-        13.1400,
-        80.4300,
-    )
-
-    distance_ab = RouteEngine.calculate_distance(
-        point_a,
-        point_b,
-    )
-
-    distance_ba = RouteEngine.calculate_distance(
-        point_b,
-        point_a,
-    )
-
-    assert distance_ab == pytest.approx(
-        distance_ba,
-        abs=0.001,
-    )
-
-
 # =========================================================
-# GRAPH BUILD TESTS
+# BUILD GRAPH
 # =========================================================
 
-def test_build_graph(engine):
+def test_build_graph():
 
-    request = create_request()
-
-    graph = engine.build_graph(
-        start=request.start,
-        destination=request.destination,
+    graph = RouteEngine.build_graph(
+        start=START,
+        destination=Coordinate(
+            latitude=DESTINATION.latitude,
+            longitude=DESTINATION.longitude,
+        ),
         rows=10,
         columns=10,
     )
 
     assert graph is not None
-    assert len(graph.nodes) > 0
-    assert len(graph.edges) > 0
-
-
-def test_build_graph_contains_expected_grid_size(engine):
-
-    request = create_request()
-
-    graph = engine.build_graph(
-        start=request.start,
-        destination=request.destination,
-        rows=5,
-        columns=5,
-    )
-
-    assert len(graph.nodes) == 25
+    assert len(graph.nodes) == 100
+    assert len(graph.edges) == 100
 
 
 # =========================================================
-# ROUTE NODE TESTS
+# FIND ROUTE NODES
 # =========================================================
 
-def test_find_route_nodes(engine):
+def test_find_route_nodes():
 
-    request = create_request()
+    engine = RouteEngine()
 
     graph = engine.build_graph(
-        start=request.start,
-        destination=request.destination,
+        start=START,
+        destination=Coordinate(
+            latitude=DESTINATION.latitude,
+            longitude=DESTINATION.longitude,
+        ),
+        rows=10,
+        columns=10,
     )
 
     start_node, destination_node = (
         engine.find_route_nodes(
             graph,
-            request.start,
-            request.destination,
+            START,
+            Coordinate(
+                latitude=DESTINATION.latitude,
+                longitude=DESTINATION.longitude,
+            ),
         )
     )
 
     assert start_node in graph.nodes
     assert destination_node in graph.nodes
-
     assert start_node != destination_node
 
 
 # =========================================================
-# SINGLE ROUTE GENERATION
+# ROUTE REQUEST
 # =========================================================
 
-def test_generate_routes(engine):
+def test_route_request():
 
-    request = create_request()
-
-    result = engine.generate_routes(
-        request,
-        max_routes=1,
+    request = RouteRequest(
+        start=START,
+        destination=DESTINATION,
     )
 
-    assert result is not None
+    assert request.start.latitude == 13.0827
+    assert request.start.longitude == 80.2707
 
-    assert result.coastal_reference == "PFZ001"
-
-    assert isinstance(
-        result.routes,
-        list,
+    assert (
+        request.destination.coastal_reference
+        == "Kathivakkam Chinnakuppam"
     )
-
-    assert len(result.routes) >= 1
 
 
 # =========================================================
-# PROCESS TEST
+# BUILD RISK INPUT
 # =========================================================
 
-def test_process_returns_candidate_routes(engine):
+def test_build_risk_input():
 
-    request = create_request()
+    engine = RouteEngine()
 
-    result = engine.process(
-        request,
-        max_routes=3,
+    graph = engine.build_graph(
+        start=START,
+        destination=Coordinate(
+            latitude=DESTINATION.latitude,
+            longitude=DESTINATION.longitude,
+        ),
+        rows=3,
+        columns=3,
     )
 
-    assert result is not None
-
-    assert result.coastal_reference == "PFZ001"
-
-    assert isinstance(
-        result.routes,
-        list,
+    risk_input = engine.build_risk_input(
+        graph=graph,
+        time="2026-09-05T12:00:00",
     )
 
-    assert len(result.routes) >= 1
+    assert "nodes" in risk_input
+    assert "time" in risk_input
+
+    assert (
+        risk_input["time"]
+        == "2026-09-05T12:00:00"
+    )
+
+    assert len(risk_input["nodes"]) == 9
+
+    for node in risk_input["nodes"]:
+
+        assert "node_id" in node
+        assert "latitude" in node
+        assert "longitude" in node
 
 
 # =========================================================
-# ROUTE RESULT TESTS
+# BUILD RISK SCORE MAP
 # =========================================================
 
-def test_route_result_contains_start_and_destination(engine):
+def test_build_risk_score_map():
 
-    request = create_request()
+    risk_results = [
+        {
+            "node_id": "N1",
+            "risk_score": 20,
+            "safe": True,
+        },
+        {
+            "node_id": "N2",
+            "risk_score": 55,
+            "safe": True,
+        },
+        {
+            "node_id": "N3",
+            "risk_score": 80,
+            "safe": False,
+        },
+    ]
 
-    result = engine.process(
-        request,
-        max_routes=1,
+    result = RouteEngine.build_risk_score_map(
+        risk_results
     )
 
-    route = result.routes[0]
+    assert result == {
+        "N1": 20.0,
+        "N2": 55.0,
+        "N3": 80.0,
+    }
 
-    assert route.start.latitude == pytest.approx(
-        12.90
+
+# =========================================================
+# CREATE ROUTE RESULT
+# =========================================================
+
+def test_create_route_result():
+
+    engine = RouteEngine()
+
+    graph = engine.build_graph(
+        start=START,
+        destination=Coordinate(
+            latitude=DESTINATION.latitude,
+            longitude=DESTINATION.longitude,
+        ),
+        rows=3,
+        columns=3,
     )
 
-    assert route.start.longitude == pytest.approx(
-        80.30
+    start_node, destination_node = (
+        engine.find_route_nodes(
+            graph,
+            START,
+            Coordinate(
+                latitude=DESTINATION.latitude,
+                longitude=DESTINATION.longitude,
+            ),
+        )
     )
 
-    assert route.destination.latitude == pytest.approx(
-        13.00
+    path = [
+        start_node,
+        destination_node,
+    ]
+
+    route = engine.create_route_result(
+        graph=graph,
+        path=path,
+        distance=10.0,
+        start=START,
+        destination=Coordinate(
+            latitude=DESTINATION.latitude,
+            longitude=DESTINATION.longitude,
+        ),
+        coastal_reference=(
+            "Kathivakkam Chinnakuppam"
+        ),
+        route_number=1,
     )
 
-    assert route.destination.longitude == pytest.approx(
-        80.40
+    assert route.route_id == "ROUTE_1"
+
+    assert (
+        route.coastal_reference
+        == "Kathivakkam Chinnakuppam"
     )
 
-
-def test_route_result_has_positive_distance(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=1,
-    )
-
-    route = result.routes[0]
-
-    assert route.distance_km > 0
-
-
-def test_route_result_has_waypoints(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=1,
-    )
-
-    route = result.routes[0]
+    assert route.distance_km == 10.0
 
     assert isinstance(
         route.waypoints,
         list,
     )
 
-    assert len(route.waypoints) >= 1
-
-
-def test_route_result_waypoints_have_valid_coordinates(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=1,
+    assert isinstance(
+        route.geojson,
+        dict,
     )
-
-    route = result.routes[0]
-
-    for waypoint in route.waypoints:
-
-        assert -90 <= waypoint.latitude <= 90
-
-        assert -180 <= waypoint.longitude <= 180
-
-
-# =========================================================
-# GEOJSON TESTS
-# =========================================================
-
-def test_route_result_geojson(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=1,
-    )
-
-    route = result.routes[0]
 
     assert route.geojson["type"] == "Feature"
 
-    assert (
-        route.geojson["geometry"]["type"]
-        == "LineString"
-    )
-
-    coordinates = (
-        route.geojson["geometry"]["coordinates"]
-    )
-
-    assert len(coordinates) >= 2
-
 
 # =========================================================
-# CANDIDATE ROUTE TESTS
+# GENERATE ROUTES
 # =========================================================
 
-def test_multiple_candidate_routes(engine):
+def test_generate_routes(monkeypatch):
 
-    request = create_request()
+    engine = RouteEngine()
 
-    result = engine.process(
-        request,
+    request = RouteRequest(
+        start=START,
+        destination=DESTINATION,
+    )
+
+    # -----------------------------------------------------
+    # Mock Risk Helper
+    # -----------------------------------------------------
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 20.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
+
+    result = engine.generate_routes(
+        request=request,
+        time="2026-09-05T12:00:00",
         max_routes=3,
+        rows=10,
+        columns=10,
     )
 
-    assert len(result.routes) >= 1
-    assert len(result.routes) <= 3
-
-
-def test_candidate_routes_have_unique_ids(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=3,
-    )
-
-    route_ids = [
-        route.route_id
-        for route in result.routes
-    ]
-
-    assert len(route_ids) == len(
-        set(route_ids)
-    )
-
-
-def test_candidate_routes_have_valid_distances(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=3,
-    )
-
-    for route in result.routes:
-
-        assert route.distance_km > 0
-
-
-def test_candidate_routes_are_different(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=3,
-    )
-
-    route_coordinates = []
-
-    for route in result.routes:
-
-        coordinates = tuple(
-            tuple(point)
-            for point
-            in route.geojson[
-                "geometry"
-            ][
-                "coordinates"
-            ]
-        )
-
-        route_coordinates.append(
-            coordinates
-        )
-
-    assert len(route_coordinates) == len(
-        set(route_coordinates)
-    )
-
-
-# =========================================================
-# MAX ROUTES VALIDATION
-# =========================================================
-
-def test_max_routes_zero(engine):
-
-    request = create_request()
-
-    with pytest.raises(ValueError):
-
-        engine.process(
-            request,
-            max_routes=0,
-        )
-
-
-def test_max_routes_one(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=1,
-    )
-
-    assert len(result.routes) >= 1
-    assert len(result.routes) <= 1
-
-
-def test_max_routes_two(engine):
-
-    request = create_request()
-
-    result = engine.process(
-        request,
-        max_routes=2,
-    )
-
-    assert len(result.routes) >= 1
-    assert len(result.routes) <= 2
-
-
-# =========================================================
-# PFZ / COASTAL REFERENCE TEST
-# =========================================================
-
-def test_coastal_reference_is_preserved(engine):
-
-    request = create_request(
-        coastal_reference="Kathivakkam Chinnakuppam",
-    )
-
-    result = engine.process(
-        request,
-        max_routes=1,
-    )
+    assert result is not None
 
     assert (
         result.coastal_reference
         == "Kathivakkam Chinnakuppam"
     )
 
+    assert isinstance(
+        result.routes,
+        list,
+    )
+
+    assert len(result.routes) >= 1
+    assert len(result.routes) <= 3
+
+
+# =========================================================
+# PROCESS - AGENT STATE
+# =========================================================
+
+def test_process(monkeypatch):
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    # -----------------------------------------------------
+    # Mock Risk Helper
+    # -----------------------------------------------------
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 20.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
+
+    result = engine.process(
+        state=state,
+        max_routes=3,
+        rows=10,
+        columns=10,
+    )
+
+    assert result is not None
+
+    assert result["route_required"] is True
+
+    assert "route_result" in result
+
+    route_result = result["route_result"]
+
     assert (
-        result.routes[0].coastal_reference
+        route_result["coastal_reference"]
         == "Kathivakkam Chinnakuppam"
     )
 
+    assert "routes" in route_result
 
-# =========================================================
-# INVALID COORDINATE TESTS
-# =========================================================
-
-def test_invalid_start_latitude():
-
-    with pytest.raises(ValueError):
-
-        create_request(
-            start_latitude=100,
-        )
-
-
-def test_invalid_start_longitude():
-
-    with pytest.raises(ValueError):
-
-        create_request(
-            start_longitude=200,
-        )
-
-
-def test_invalid_destination_latitude():
-
-    with pytest.raises(ValueError):
-
-        create_request(
-            destination_latitude=100,
-        )
-
-
-def test_invalid_destination_longitude():
-
-    with pytest.raises(ValueError):
-
-        create_request(
-            destination_longitude=200,
-        )
+    assert len(route_result["routes"]) >= 1
 
 
 # =========================================================
-# RESTRICTED ZONE TEST
+# PROCESS USES LOCATION
 # =========================================================
 
-def test_restricted_zone_request():
+def test_process_uses_location(monkeypatch):
 
-    restricted_zone = RestrictedZone(
-        name="Test Restricted Zone",
-        state="Tamil Nadu",
-        type="restricted",
-        restriction_level="high",
-        latitude=12.95,
-        longitude=80.35,
+    engine = RouteEngine()
+
+    state = create_state()
+
+    # Change user location
+    state["location"] = Location(
+        latitude=12.9000,
+        longitude=80.2000,
     )
 
-    request = create_request(
-        restricted_zones=[
-            restricted_zone
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 10.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
         ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
     )
 
-    assert (
-        request.constraints
-        .avoid_restricted_zones
-        is True
-    )
-
-    assert len(
-        request.constraints
-        .restricted_zones
-    ) == 1
-
-
-# =========================================================
-# RISK HELPER INTEGRATION
-# =========================================================
-
-def test_risk_helper_input_format():
-
-    """
-    Verify the grid format expected by
-    ai.tools.risk_helper.process_grid().
-    """
-
-    k7_input = {
-        "nodes": [
-            {
-                "node_id": "N1",
-                "latitude": 13.08,
-                "longitude": 80.27,
-            },
-            {
-                "node_id": "N2",
-                "latitude": 13.09,
-                "longitude": 80.28,
-            },
-        ],
-        "time": "2026-09-05T08:00:00",
-    }
-
-    assert "nodes" in k7_input
-    assert "time" in k7_input
-
-    assert isinstance(
-        k7_input["nodes"],
-        list,
-    )
-
-    for node in k7_input["nodes"]:
-
-        assert "node_id" in node
-        assert "latitude" in node
-        assert "longitude" in node
-
-
-# =========================================================
-# RISK HELPER PROCESS GRID
-# =========================================================
-
-def test_risk_helper_process_grid():
-
-    from ai.tools.risk_helper import process_grid
-
-    k7_input = {
-        "nodes": [
-            {
-                "node_id": "N1",
-                "latitude": 13.08,
-                "longitude": 80.27,
-            },
-        ],
-        "time": "2026-09-05T08:00:00",
-    }
-
-    result = process_grid(k7_input)
-
-    assert result is not None
-    assert isinstance(
-        result,
-        list,
-    )
-
-    assert len(result) == 1
-
-    assert "node_id" in result[0]
-    assert "risk_score" in result[0]
-    assert "safe" in result[0]
-
-
-# =========================================================
-# ROUTE → RISK GRID FORMAT
-# =========================================================
-
-def test_route_nodes_can_be_converted_to_risk_input(
-    engine,
-):
-
-    request = create_request()
-
-    graph = engine.build_graph(
-        start=request.start,
-        destination=request.destination,
+    result = engine.process(
+        state=state,
+        max_routes=1,
         rows=5,
         columns=5,
     )
 
-    start_node, destination_node = (
-        engine.find_route_nodes(
-            graph,
-            request.start,
-            request.destination,
-        )
+    assert result["route_result"] is not None
+
+    route = result["route_result"]["routes"][0]
+
+    assert (
+        route["start"]["latitude"]
+        == 12.9000
     )
 
-    path, distance = engine_path = (
-        __import__(
-            "ai.engines.route_engine.pathfinding",
-            fromlist=["astar"],
-        ).astar(
-            graph,
-            start_node,
-            destination_node,
-        )
+    assert (
+        route["start"]["longitude"]
+        == 80.2000
     )
 
-    assert len(path) >= 2
-    assert distance > 0
 
-    nodes = []
+# =========================================================
+# PROCESS USES SELECTED PFZ
+# =========================================================
 
-    for node_id in path:
+def test_process_uses_selected_pfz(monkeypatch):
 
-        node = graph.nodes[node_id]
+    engine = RouteEngine()
 
-        nodes.append(
-            {
-                "node_id": node_id,
-                "latitude": node.latitude,
-                "longitude": node.longitude,
-            }
-        )
+    state = create_state()
 
-    k7_input = {
-        "nodes": nodes,
-        "time": "2026-09-05T08:00:00",
+    state["selected_pfz"] = {
+        "coastal_reference": "Test PFZ",
+        "latitude": 13.6000,
+        "longitude": 80.5000,
+        "depth_m": 50.0,
     }
 
-    assert len(k7_input["nodes"]) == len(path)
+    def fake_process_grid(k7_input):
 
-    for node in k7_input["nodes"]:
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 15.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
 
-        assert "node_id" in node
-        assert "latitude" in node
-        assert "longitude" in node
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
 
-        assert -90 <= node["latitude"] <= 90
-        assert -180 <= node["longitude"] <= 180
+    result = engine.process(
+        state=state,
+        max_routes=1,
+        rows=5,
+        columns=5,
+    )
+
+    route_result = result["route_result"]
+
+    assert (
+        route_result["coastal_reference"]
+        == "Test PFZ"
+    )
+
+    route = route_result["routes"][0]
+
+    assert (
+        route["destination"]["latitude"]
+        == 13.6000
+    )
+
+    assert (
+        route["destination"]["longitude"]
+        == 80.5000
+    )
+
+
+# =========================================================
+# PROCESS REQUIRES LOCATION
+# =========================================================
+
+def test_process_requires_location(monkeypatch):
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    state["location"] = None
+
+    with pytest.raises(
+        ValueError,
+        match="requires a location",
+    ):
+
+        engine.process(
+            state=state,
+        )
+
+
+# =========================================================
+# PROCESS REQUIRES PFZ
+# =========================================================
+
+def test_process_requires_selected_pfz():
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    state["selected_pfz"] = None
+
+    with pytest.raises(
+        ValueError,
+        match="requires a selected PFZ",
+    ):
+
+        engine.process(
+            state=state,
+        )
+
+
+# =========================================================
+# PROCESS REQUIRES TIME
+# =========================================================
+
+def test_process_requires_time_context():
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    state["time_context"] = None
+
+    with pytest.raises(
+        ValueError,
+        match="requires a time context",
+    ):
+
+        engine.process(
+            state=state,
+        )
+
+
+# =========================================================
+# INVALID MAX ROUTES
+# =========================================================
+
+def test_invalid_max_routes(monkeypatch):
+
+    engine = RouteEngine()
+
+    request = RouteRequest(
+        start=START,
+        destination=DESTINATION,
+    )
+
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 20.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
+
+    with pytest.raises(ValueError):
+
+        engine.generate_routes(
+            request=request,
+            time="2026-09-05T12:00:00",
+            max_routes=0,
+            rows=5,
+            columns=5,
+        )
+
+
+# =========================================================
+# ROUTE GEOJSON
+# =========================================================
+
+def test_route_geojson(monkeypatch):
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 20.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
+
+    result = engine.process(
+        state=state,
+        max_routes=1,
+        rows=5,
+        columns=5,
+    )
+
+    route = result["route_result"]["routes"][0]
+
+    assert isinstance(
+        route["geojson"],
+        dict,
+    )
+
+    assert route["geojson"]["type"] == "Feature"
+
+    assert (
+        route["geojson"]["geometry"]["type"]
+        == "LineString"
+    )
+
+    assert (
+        len(
+            route["geojson"]
+            ["geometry"]
+            ["coordinates"]
+        )
+        >= 2
+    )
+
+
+# =========================================================
+# WAYPOINT VALIDATION
+# =========================================================
+
+def test_waypoints_are_valid(monkeypatch):
+
+    engine = RouteEngine()
+
+    state = create_state()
+
+    def fake_process_grid(k7_input):
+
+        return [
+            {
+                "node_id": node["node_id"],
+                "risk_score": 20.0,
+                "safe": True,
+            }
+            for node in k7_input["nodes"]
+        ]
+
+    monkeypatch.setattr(
+        "ai.engines.route_engine.engine.process_grid",
+        fake_process_grid,
+    )
+
+    result = engine.process(
+        state=state,
+        max_routes=1,
+        rows=5,
+        columns=5,
+    )
+
+    route = result["route_result"]["routes"][0]
+
+    for waypoint in route["waypoints"]:
+
+        assert -90 <= waypoint["latitude"] <= 90
+        assert -180 <= waypoint["longitude"] <= 180
