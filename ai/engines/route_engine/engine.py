@@ -6,9 +6,10 @@ from .graph import (
     connect_grid,
     find_nearest_node,
     path_to_coordinates,
+    apply_risk_constraints,
 )
 
-from .algorithms import generate_candidate_paths
+from .pathfinding import generate_candidate_paths
 
 from .geometry import (
     create_linestring,
@@ -22,6 +23,8 @@ from .schemas import (
     Coordinate,
     Waypoint,
 )
+
+from ai.tools.risk_helper import process_grid
 
 
 class RouteEngine:
@@ -39,8 +42,7 @@ class RouteEngine:
         Calculate Haversine distance between two
         geographic coordinates.
 
-        Coordinates are:
-
+        Coordinates:
             (latitude, longitude)
 
         Returns:
@@ -72,7 +74,7 @@ class RouteEngine:
 
         c = 2 * math.atan2(
             math.sqrt(a),
-            math.sqrt(1 - a),
+            math.sqrt(1 - a)
         )
 
         return radius * c
@@ -111,6 +113,88 @@ class RouteEngine:
         return graph
 
     # =========================================================
+    # BUILD RISK HELPER INPUT
+    # =========================================================
+
+    @staticmethod
+    def build_risk_input(
+        graph: MarineGraph,
+        time: str,
+    ) -> dict:
+        """
+        Convert graph nodes into the input format
+        expected by the Risk Helper.
+
+        The Risk Helper receives:
+
+            {
+                "nodes": [
+                    {
+                        "node_id": "...",
+                        "latitude": ...,
+                        "longitude": ...
+                    }
+                ],
+                "time": "..."
+            }
+        """
+
+        nodes = []
+
+        for node_id, node in graph.nodes.items():
+
+            nodes.append(
+                {
+                    "node_id": node_id,
+                    "latitude": node.latitude,
+                    "longitude": node.longitude,
+                }
+            )
+
+        return {
+            "nodes": nodes,
+            "time": time,
+        }
+
+    # =========================================================
+    # APPLY RISK CONSTRAINTS
+    # =========================================================
+
+    @staticmethod
+    def apply_risk(
+        graph: MarineGraph,
+        time: str,
+    ) -> MarineGraph:
+        """
+        Send every grid node to the Risk Helper.
+
+        Unsafe nodes are removed from the graph.
+
+        Restricted/protected areas are currently kept
+        as False inside the Risk Helper and are not
+        applied here yet.
+        """
+
+        risk_input = RouteEngine.build_risk_input(
+            graph,
+            time,
+        )
+
+        routing_risk = process_grid(
+            risk_input
+        )
+
+        risk_lookup = {
+            result["node_id"]: result
+            for result in routing_risk
+        }
+
+        return apply_risk_constraints(
+            graph,
+            risk_lookup,
+        )
+
+    # =========================================================
     # FIND ROUTE NODES
     # =========================================================
 
@@ -121,7 +205,7 @@ class RouteEngine:
         destination: Coordinate,
     ) -> tuple[str, str]:
         """
-        Find the grid nodes nearest to the
+        Find the graph nodes nearest to the
         requested start and PFZ destination.
         """
 
@@ -187,7 +271,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # ROUTE RESULT
+        # RESULT
         # -----------------------------------------------------
 
         return RouteResult(
@@ -201,7 +285,7 @@ class RouteEngine:
         )
 
     # =========================================================
-    # GENERATE CANDIDATE ROUTES
+    # GENERATE ROUTES
     # =========================================================
 
     def generate_routes(
@@ -210,10 +294,20 @@ class RouteEngine:
         max_routes: int = 3,
         rows: int = 10,
         columns: int = 10,
+        time: str | None = None,
     ) -> CandidateRoutes:
         """
-        Generate multiple candidate routes between
-        the start location and selected PFZ.
+        Generate multiple candidate routes.
+
+        Flow:
+
+            1. Build geographic grid
+            2. Connect grid nodes
+            3. Send grid nodes to Risk Helper
+            4. Remove unsafe nodes
+            5. Find start/destination nodes
+            6. Generate candidate paths
+            7. Convert paths into RouteResults
         """
 
         # -----------------------------------------------------
@@ -228,7 +322,24 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 2. FIND START AND DESTINATION GRID NODES
+        # 2. APPLY RISK ENGINE
+        # -----------------------------------------------------
+        #
+        # The Risk Helper needs a timestamp.
+        #
+        # Until API integration is added, a timestamp
+        # can be supplied directly through `time`.
+        #
+
+        if time is not None:
+
+            graph = self.apply_risk(
+                graph,
+                time,
+            )
+
+        # -----------------------------------------------------
+        # 3. FIND START AND DESTINATION NODES
         # -----------------------------------------------------
 
         start_node, destination_node = (
@@ -240,7 +351,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 3. GENERATE CANDIDATE PATHS
+        # 4. GENERATE CANDIDATE PATHS
         # -----------------------------------------------------
 
         candidates = generate_candidate_paths(
@@ -251,7 +362,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 4. CONVERT PATHS INTO ROUTE RESULTS
+        # 5. CONVERT PATHS TO ROUTE RESULTS
         # -----------------------------------------------------
 
         routes = []
@@ -276,7 +387,7 @@ class RouteEngine:
             routes.append(route)
 
         # -----------------------------------------------------
-        # 5. RETURN CANDIDATE ROUTES
+        # 6. RETURN CANDIDATE ROUTES
         # -----------------------------------------------------
 
         return CandidateRoutes(
@@ -296,6 +407,7 @@ class RouteEngine:
         max_routes: int = 3,
         rows: int = 10,
         columns: int = 10,
+        time: str | None = None,
     ) -> CandidateRoutes:
         """
         Main entry point for the Route Engine.
@@ -306,4 +418,5 @@ class RouteEngine:
             max_routes=max_routes,
             rows=rows,
             columns=columns,
+            time=time,
         )

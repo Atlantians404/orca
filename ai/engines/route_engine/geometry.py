@@ -69,10 +69,14 @@ def create_polygon(
     """
     Create a Shapely Polygon.
 
-    Input coordinates use:
-        (latitude, longitude)
+    Input:
+        [
+            (latitude, longitude),
+            (latitude, longitude),
+            ...
+        ]
 
-    Shapely uses:
+    Shapely internally uses:
         (longitude, latitude)
     """
 
@@ -116,8 +120,8 @@ def route_intersects_polygon(
     Check whether a route intersects a polygon.
 
     Returns:
-        True  -> route intersects the polygon
-        False -> route does not intersect the polygon
+        True  -> route intersects polygon
+        False -> route does not intersect polygon
     """
 
     return route.intersects(polygon)
@@ -138,8 +142,7 @@ def pfz_to_point(
         {
             "coastal_reference": "...",
             "latitude": 13.24,
-            "longitude": 80.58,
-            ...
+            "longitude": 80.58
         }
     """
 
@@ -170,7 +173,7 @@ def zone_to_polygon(
     Convert a restricted/protected zone
     into a Shapely Polygon.
 
-    The zone may be either:
+    The zone may be:
 
         1. A dictionary
 
@@ -179,9 +182,11 @@ def zone_to_polygon(
     """
 
     if hasattr(zone, "coordinates"):
+
         coordinates = zone.coordinates
 
     elif isinstance(zone, dict):
+
         if "coordinates" not in zone:
             raise ValueError(
                 "Zone coordinates are missing"
@@ -190,6 +195,7 @@ def zone_to_polygon(
         coordinates = zone["coordinates"]
 
     else:
+
         raise TypeError(
             "Zone must be a dictionary or an object "
             "with a coordinates attribute"
@@ -210,7 +216,7 @@ def validate_route(
 ) -> bool:
     """
     Validate that a route does not intersect
-    any restricted polygon.
+    any restricted or protected polygon.
 
     Returns:
 
