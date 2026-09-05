@@ -1,4 +1,5 @@
 from ai.engines.risk_engine.main import run_risk_engine
+from services.location.marine_zones import is_protected, is_restricted
 
 from services.weather_data import (
     get_wind_speed,
@@ -27,8 +28,8 @@ def get_geo_data(latitude, longitude):
     return {
         "latitude": latitude,
         "longitude": longitude,
-        "restricted_area": False,
-        "protected_area": False
+        "restricted_area": is_restricted(latitude, longitude),
+        "protected_area": is_protected(latitude, longitude)
     }
 
 
@@ -85,11 +86,6 @@ def evaluate_node(node, time):
         }
     }
 
-    print("\nNODE:", node["node_id"])
-    print("LATITUDE:", node["latitude"])
-    print("LONGITUDE:", node["longitude"])
-    print("RISK INPUT:", risk_input)
-
     result = run_risk_engine(agent_data)
 
     risk_result = result["ranked_results"][0]
@@ -97,8 +93,8 @@ def evaluate_node(node, time):
 
     return {
         "node_id": node["node_id"],
-        "risk_score": risk_result["risk_score"],
-        "safe": risk_result["risk_score"] <= 60
+        "risk_score": risk_score,
+        "safe": risk_score <= 60
     }
 def process_grid(k7_input):
     results = []
