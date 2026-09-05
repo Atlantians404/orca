@@ -1,4 +1,5 @@
 import math
+from typing import Any
 
 from .graph import (
     MarineGraph,
@@ -6,7 +7,6 @@ from .graph import (
     connect_grid,
     find_nearest_node,
     path_to_coordinates,
-    apply_risk_constraints,
 )
 
 from .pathfinding import generate_candidate_paths
@@ -42,9 +42,6 @@ class RouteEngine:
         Calculate Haversine distance between two
         geographic coordinates.
 
-        Coordinates:
-            (latitude, longitude)
-
         Returns:
             Distance in kilometres.
         """
@@ -57,13 +54,8 @@ class RouteEngine:
         lat1_rad = math.radians(lat1)
         lat2_rad = math.radians(lat2)
 
-        delta_lat = math.radians(
-            lat2 - lat1
-        )
-
-        delta_lon = math.radians(
-            lon2 - lon1
-        )
+        delta_lat = math.radians(lat2 - lat1)
+        delta_lon = math.radians(lon2 - lon1)
 
         a = (
             math.sin(delta_lat / 2) ** 2
@@ -74,7 +66,7 @@ class RouteEngine:
 
         c = 2 * math.atan2(
             math.sqrt(a),
-            math.sqrt(1 - a)
+            math.sqrt(1 - a),
         )
 
         return radius * c
@@ -92,7 +84,7 @@ class RouteEngine:
     ) -> MarineGraph:
         """
         Create and connect a geographic grid
-        between the start location and PFZ.
+        between the user's location and the selected PFZ.
         """
 
         graph = create_route_grid(
@@ -113,6 +105,35 @@ class RouteEngine:
         return graph
 
     # =========================================================
+    # FIND ROUTE NODES
+    # =========================================================
+
+    @staticmethod
+    def find_route_nodes(
+        graph: MarineGraph,
+        start: Coordinate,
+        destination: Coordinate,
+    ) -> tuple[str, str]:
+        """
+        Find the grid nodes nearest to the user's
+        starting location and selected PFZ.
+        """
+
+        start_node = find_nearest_node(
+            graph,
+            start.latitude,
+            start.longitude,
+        )
+
+        destination_node = find_nearest_node(
+            graph,
+            destination.latitude,
+            destination.longitude,
+        )
+
+        return start_node, destination_node
+
+    # =========================================================
     # BUILD RISK HELPER INPUT
     # =========================================================
 
@@ -120,23 +141,13 @@ class RouteEngine:
     def build_risk_input(
         graph: MarineGraph,
         time: str,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """
-        Convert graph nodes into the input format
-        expected by the Risk Helper.
+        Convert the generated route grid into the
+        input format expected by risk_helper.process_grid().
 
-        The Risk Helper receives:
-
-            {
-                "nodes": [
-                    {
-                        "node_id": "...",
-                        "latitude": ...,
-                        "longitude": ...
-                    }
-                ],
-                "time": "..."
-            }
+        Restricted/protected areas are currently kept
+        as False and will be integrated later.
         """
 
         nodes = []
@@ -157,71 +168,29 @@ class RouteEngine:
         }
 
     # =========================================================
-    # APPLY RISK CONSTRAINTS
+    # EVALUATE GRID RISK
     # =========================================================
 
     @staticmethod
-    def apply_risk(
+    def evaluate_grid_risk(
         graph: MarineGraph,
         time: str,
-    ) -> MarineGraph:
+    ) -> list[dict[str, Any]]:
         """
-        Send every grid node to the Risk Helper.
+        Send all generated grid nodes to the Risk Helper.
 
-        Unsafe nodes are removed from the graph.
-
-        Restricted/protected areas are currently kept
-        as False inside the Risk Helper and are not
-        applied here yet.
+        Risk Helper collects the weather/marine data for
+        each node and returns the corresponding risk score.
         """
 
         risk_input = RouteEngine.build_risk_input(
-            graph,
-            time,
+            graph=graph,
+            time=time,
         )
 
-        routing_risk = process_grid(
+        return process_grid(
             risk_input
         )
-
-        risk_lookup = {
-            result["node_id"]: result
-            for result in routing_risk
-        }
-
-        return apply_risk_constraints(
-            graph,
-            risk_lookup,
-        )
-
-    # =========================================================
-    # FIND ROUTE NODES
-    # =========================================================
-
-    @staticmethod
-    def find_route_nodes(
-        graph: MarineGraph,
-        start: Coordinate,
-        destination: Coordinate,
-    ) -> tuple[str, str]:
-        """
-        Find the graph nodes nearest to the
-        requested start and PFZ destination.
-        """
-
-        start_node = find_nearest_node(
-            graph,
-            start.latitude,
-            start.longitude,
-        )
-
-        destination_node = find_nearest_node(
-            graph,
-            destination.latitude,
-            destination.longitude,
-        )
-
-        return start_node, destination_node
 
     # =========================================================
     # CREATE ROUTE RESULT
@@ -271,7 +240,7 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # RESULT
+        # ROUTE RESULT
         # -----------------------------------------------------
 
         return RouteResult(
@@ -291,23 +260,17 @@ class RouteEngine:
     def generate_routes(
         self,
         request: RouteRequest,
+        time: str,
         max_routes: int = 3,
         rows: int = 10,
         columns: int = 10,
-        time: str | None = None,
     ) -> CandidateRoutes:
         """
-        Generate multiple candidate routes.
+        Generate candidate routes between the user's
+        location and the selected PFZ.
 
-        Flow:
-
-            1. Build geographic grid
-            2. Connect grid nodes
-            3. Send grid nodes to Risk Helper
-            4. Remove unsafe nodes
-            5. Find start/destination nodes
-            6. Generate candidate paths
-            7. Convert paths into RouteResults
+        The generated grid is also sent to the Risk Helper
+        for node-level risk evaluation.
         """
 
         # -----------------------------------------------------
@@ -322,21 +285,25 @@ class RouteEngine:
         )
 
         # -----------------------------------------------------
-        # 2. APPLY RISK ENGINE
+        # 2. EVALUATE GRID RISK
         # -----------------------------------------------------
-        #
-        # The Risk Helper needs a timestamp.
-        #
-        # Until API integration is added, a timestamp
-        # can be supplied directly through `time`.
-        #
 
-        if time is not None:
+        risk_results = self.evaluate_grid_risk(
+            graph=graph,
+            time=time,
+        )
 
-            graph = self.apply_risk(
-                graph,
-                time,
-            )
+        # -----------------------------------------------------
+        # NOTE:
+        #
+        # Risk results are currently collected but are not
+        # modifying the graph/pathfinding weights yet.
+        #
+        # Next stage:
+        # risk score → graph cost → risk-aware A*
+        # -----------------------------------------------------
+
+        _ = risk_results
 
         # -----------------------------------------------------
         # 3. FIND START AND DESTINATION NODES
@@ -398,25 +365,124 @@ class RouteEngine:
         )
 
     # =========================================================
-    # PROCESS
+    # PROCESS FROM AGENT STATE
     # =========================================================
 
     def process(
         self,
-        request: RouteRequest,
+        state: dict[str, Any],
         max_routes: int = 3,
         rows: int = 10,
         columns: int = 10,
-        time: str | None = None,
-    ) -> CandidateRoutes:
+    ) -> dict[str, Any]:
         """
-        Main entry point for the Route Engine.
+        Main Route Engine entry point.
+
+        Reads:
+
+            state["location"]
+            state["selected_pfz"]
+            state["time_context"]
+
+        and generates candidate routes.
+
+        The generated route result is stored in:
+
+            state["route_result"]
         """
 
-        return self.generate_routes(
+        # -----------------------------------------------------
+        # 1. GET USER LOCATION
+        # -----------------------------------------------------
+
+        location = state.get("location")
+
+        if location is None:
+            raise ValueError(
+                "Route Engine requires a location"
+            )
+
+        # -----------------------------------------------------
+        # 2. GET SELECTED PFZ
+        # -----------------------------------------------------
+
+        selected_pfz = state.get("selected_pfz")
+
+        if selected_pfz is None:
+            raise ValueError(
+                "Route Engine requires a selected PFZ"
+            )
+
+        # -----------------------------------------------------
+        # 3. GET TIME CONTEXT
+        # -----------------------------------------------------
+
+        time_context = state.get("time_context")
+
+        if (
+            time_context is None
+            or not time_context.slots
+        ):
+            raise ValueError(
+                "Route Engine requires a time context"
+            )
+
+        # -----------------------------------------------------
+        # 4. GET REQUESTED TIME
+        # -----------------------------------------------------
+
+        slot = time_context.slots[0]
+
+        requested_time = slot.date
+
+        if slot.start_time:
+            requested_time += (
+                f"T{slot.start_time}:00"
+            )
+
+        # -----------------------------------------------------
+        # 5. CONVERT LOCATION TO ROUTE COORDINATE
+        # -----------------------------------------------------
+
+        start = Coordinate(
+            latitude=location.latitude,
+            longitude=location.longitude,
+        )
+
+        # -----------------------------------------------------
+        # 6. CONVERT PFZ TO ROUTE DESTINATION
+        # -----------------------------------------------------
+
+        destination = {
+            "coastal_reference": (
+                selected_pfz["coastal_reference"]
+            ),
+            "latitude": selected_pfz["latitude"],
+            "longitude": selected_pfz["longitude"],
+        }
+
+        request = RouteRequest(
+            start=start,
+            destination=destination,
+        )
+
+        # -----------------------------------------------------
+        # 7. GENERATE ROUTES
+        # -----------------------------------------------------
+
+        result = self.generate_routes(
             request=request,
+            time=requested_time,
             max_routes=max_routes,
             rows=rows,
             columns=columns,
-            time=time,
         )
+
+        # -----------------------------------------------------
+        # 8. UPDATE AGENT STATE
+        # -----------------------------------------------------
+
+        return {
+            **state,
+            "route_result": result.model_dump(),
+        }
