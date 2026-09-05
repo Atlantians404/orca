@@ -10,7 +10,11 @@ def linestring_to_geojson(
     """
 
     geom = mapping(route)
-    geom["coordinates"] = [list(coord) for coord in geom["coordinates"]]
+
+    geom["coordinates"] = [
+        list(coord)
+        for coord in geom["coordinates"]
+    ]
 
     return {
         "type": "Feature",
