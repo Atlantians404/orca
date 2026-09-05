@@ -1,11 +1,11 @@
-import requests
+import httpx
 import json
 from datetime import datetime
 
 MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
 
 
-def get_marine_data(
+async def get_marine_data(
     latitude: float,
     longitude: float,
     time: str
@@ -31,11 +31,11 @@ def get_marine_data(
         "cell_selection": "sea"
     }
 
-    response = requests.get(
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
         MARINE_URL,
-        params=params,
-        timeout=30
-    )
+        params=params
+        )
 
     response.raise_for_status()
 
@@ -139,7 +139,7 @@ def parse_json_list(value):
     return []
 
 
-def get_location(latitude, longitude):
+async def get_location(latitude, longitude):
 
     params = {
         "lat": latitude,
@@ -153,12 +153,12 @@ def get_location(latitude, longitude):
         "User-Agent": "ORCA-Marine-Risk-System/1.0"
     }
 
-    response = requests.get(
-        NOMINATIM_URL,
-        params=params,
-        headers=headers,
-        timeout=30
-    )
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
+            NOMINATIM_URL,
+            params=params,
+            headers=headers
+        )
 
     response.raise_for_status()
 
@@ -262,7 +262,7 @@ def get_latest_date(alerts):
     return max(dates).strftime("%Y%m%d")
 
 
-def get_marine_warning(latitude: float, longitude: float) -> dict:
+async def get_marine_warning(latitude: float, longitude: float) -> dict:
 
     if not -90 <= latitude <= 90:
         raise ValueError(
@@ -274,15 +274,15 @@ def get_marine_warning(latitude: float, longitude: float) -> dict:
             "Longitude must be between -180 and 180."
         )
 
-    location = get_location(
+    location = await get_location(
         latitude,
         longitude
     )
 
-    response = requests.get(
-        INCOIS_API_URL,
-        timeout=30
-    )
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
+        INCOIS_API_URL
+        )
 
     response.raise_for_status()
 

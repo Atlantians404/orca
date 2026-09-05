@@ -1,11 +1,10 @@
-import requests
+import httpx
 
 
 NOMINATIM_URL = "https://nominatim.openstreetmap.org/search"
 
 
-def get_coordinates(place: str) -> dict:
-   
+async def get_coordinates(place: str) -> dict:
 
     if not place or not place.strip():
         raise ValueError("Place name cannot be empty.")
@@ -21,12 +20,12 @@ def get_coordinates(place: str) -> dict:
         "User-Agent": "ORCA-Marine-Risk-System/1.0"
     }
 
-    response = requests.get(
-        NOMINATIM_URL,
-        params=params,
-        headers=headers,
-        timeout=10
-    )
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
+            NOMINATIM_URL,
+            params=params,
+            headers=headers
+        )
 
     response.raise_for_status()
 
