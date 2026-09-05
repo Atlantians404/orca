@@ -22,7 +22,7 @@ print("TEST FILE STARTED")
 
 
 with open(
-    "test/risk_engine_test/test_case1.json",
+    "test/risk_engine_test/test_case4.json",
     "r"
 ) as file:
 
