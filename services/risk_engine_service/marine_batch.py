@@ -1,29 +1,99 @@
-import asyncio
 import httpx
 
-from api.marine.marine import (
-    MARINE_URL,
-    INCOIS_API_URL,
-    parse_json_list,
-    get_location,
-    find_matching_district,
-    normalize
+from services.risk_engine_service.location_cache import get_locations_batch
+
+
+MARINE_URL = "https://marine-api.open-meteo.com/v1/marine"
+
+INCOIS_API_URL = (
+    "https://sarat.incois.gov.in/"
+    "incoismobileappdata/rest/incois/hwassalatestdata"
 )
 
 
-async def get_marine_data_batch(nodes, time):
+def normalize(value):
+    if value is None:
+        return ""
 
-    if not nodes:
-        return {}
+    value = str(value).strip().upper()
 
-    batch_size = 50
-    results = {}
+    suffixes = [
+        " MUNICIPAL CORPORATION",
+        " MUNICIPALITY",
+        " CORPORATION",
+        " CITY CORPORATION"
+    ]
+
+    for suffix in suffixes:
+        if value.endswith(suffix):
+            value = value[:-len(suffix)].strip()
+            break
+
+    return " ".join(value.split())
+
+
+def parse_json_list(value):
+    if value is None:
+        return []
+
+    if isinstance(value, list):
+        return value
+
+    if isinstance(value, str):
+        try:
+            import json
+
+            parsed = json.loads(value)
+
+            if isinstance(parsed, list):
+                return parsed
+
+            if isinstance(parsed, dict):
+                return [parsed]
+
+        except json.JSONDecodeError:
+            return []
+
+    return []
+
+
+def find_matching_warning(location, alerts):
+    district = normalize(location.get("district"))
+    state = normalize(location.get("state"))
+
+    if not district or not state:
+        return None
+
+    for alert in alerts:
+
+        if normalize(alert.get("STATE")) != state:
+            continue
+
+        districts = [
+            normalize(d)
+            for d in str(alert.get("District", "")).split(",")
+        ]
+
+        if district in districts:
+            return alert
+
+    return None
+
+
+async def get_marine_batch(nodes, time):
+    locations = await get_locations_batch(nodes)
+
+    all_results = {}
 
     async with httpx.AsyncClient(timeout=30) as client:
 
-        for start in range(0, len(nodes), batch_size):
+        # -------------------------------------------------
+        # MARINE DATA
+        # -------------------------------------------------
 
-            batch = nodes[start:start + batch_size]
+        for start in range(0, len(nodes), 50):
+
+            batch = nodes[start:start + 50]
 
             latitudes = ",".join(
                 str(node["latitude"])
@@ -40,11 +110,11 @@ async def get_marine_data_batch(nodes, time):
                 "longitude": longitudes,
                 "hourly": [
                     "wave_height",
-                    "wave_period",
                     "wave_direction",
+                    "wave_period",
                     "swell_wave_height",
-                    "swell_wave_period",
                     "swell_wave_direction",
+                    "swell_wave_period",
                     "ocean_current_velocity",
                     "ocean_current_direction",
                     "sea_surface_temperature",
@@ -65,198 +135,124 @@ async def get_marine_data_batch(nodes, time):
 
             data = response.json()
 
+            # Open-Meteo returns one object per coordinate
             if isinstance(data, dict):
                 data = [data]
 
             for index, node in enumerate(batch):
 
-                hourly = data[index].get(
-                    "hourly",
+                marine = data[index] if index < len(data) else {}
+
+                hourly = marine.get("hourly", {})
+
+                location = locations.get(
+                    node["node_id"],
                     {}
                 )
 
-                results[node["node_id"]] = {
-                    "wave_height": hourly.get(
-                        "wave_height",
-                        [None]
-                    )[0],
+                high_wave_warning = None
+                swell_surge_warning = None
 
-                    "wave_period": hourly.get(
-                        "wave_period",
-                        [None]
+                all_results[node["node_id"]] = {
+                    "wave_height": hourly.get(
+                        "wave_height", [None]
                     )[0],
 
                     "wave_direction": hourly.get(
-                        "wave_direction",
-                        [None]
+                        "wave_direction", [None]
+                    )[0],
+
+                    "wave_period": hourly.get(
+                        "wave_period", [None]
                     )[0],
 
                     "swell_wave_height": hourly.get(
-                        "swell_wave_height",
-                        [None]
-                    )[0],
-
-                    "swell_wave_period": hourly.get(
-                        "swell_wave_period",
-                        [None]
+                        "swell_wave_height", [None]
                     )[0],
 
                     "swell_wave_direction": hourly.get(
-                        "swell_wave_direction",
-                        [None]
+                        "swell_wave_direction", [None]
+                    )[0],
+
+                    "swell_wave_period": hourly.get(
+                        "swell_wave_period", [None]
                     )[0],
 
                     "ocean_current_velocity": hourly.get(
-                        "ocean_current_velocity",
-                        [None]
+                        "ocean_current_velocity", [None]
                     )[0],
 
                     "ocean_current_direction": hourly.get(
-                        "ocean_current_direction",
-                        [None]
+                        "ocean_current_direction", [None]
                     )[0],
 
                     "sea_surface_temperature": hourly.get(
-                        "sea_surface_temperature",
-                        [None]
+                        "sea_surface_temperature", [None]
                     )[0],
 
                     "sea_level_height_msl": hourly.get(
-                        "sea_level_height_msl",
-                        [None]
-                    )[0]
+                        "sea_level_height_msl", [None]
+                    )[0],
+
+                    "district": location.get("district"),
+                    "state": location.get("state"),
+
+                    "high_wave_warning": high_wave_warning,
+                    "swell_surge_warning": swell_surge_warning,
+
+                    "warning": False
                 }
 
-    warning_results = await get_marine_warning_batch(
-        nodes
-    )
+        # -------------------------------------------------
+        # INCOIS DATA
+        # -------------------------------------------------
 
-    for node in nodes:
-
-        node_id = node["node_id"]
-
-        warning = warning_results.get(
-            node_id,
-            {}
-        )
-
-        if warning.get("high_wave_warning"):
-            results[node_id]["marine_warning"] = "HIGH_WAVE"
-
-        elif warning.get("swell_surge_warning"):
-            results[node_id]["marine_warning"] = "SWELL_SURGE"
-
-        else:
-            results[node_id]["marine_warning"] = "NONE"
-
-    return {
-        node["node_id"]: results[node["node_id"]]
-        for node in nodes
-    }
-
-
-async def get_marine_warning_batch(nodes):
-
-    if not nodes:
-        return {}
-
-    # Fetch INCOIS only once
-    async with httpx.AsyncClient(timeout=30) as client:
-
-        response = await client.get(
-            INCOIS_API_URL
-        )
+        response = await client.get(INCOIS_API_URL)
 
         response.raise_for_status()
 
-        data = response.json()
+        incois_data = response.json()
 
-    hwa_list = parse_json_list(
-        data.get("HWAJson")
-    )
-
-    ssa_list = parse_json_list(
-        data.get("SSAJson")
-    )
-
-    async def process_node(node):
-
-        location = await get_location(
-            node["latitude"],
-            node["longitude"]
+        hwa_list = parse_json_list(
+            incois_data.get("HWAJson")
         )
 
-        hwa_district = find_matching_district(
-            location,
-            hwa_list
+        ssa_list = parse_json_list(
+            incois_data.get("SSAJson")
         )
 
-        ssa_district = find_matching_district(
-            location,
-            ssa_list
-        )
+        # -------------------------------------------------
+        # MATCH INCOIS WARNINGS LOCALLY
+        # -------------------------------------------------
 
-        high_wave_warning = None
+        for node in nodes:
 
-        if hwa_district:
+            node_id = node["node_id"]
 
-            for alert in hwa_list:
+            location = locations.get(
+                node_id,
+                {}
+            )
 
-                districts = [
-                    normalize(d)
-                    for d in str(
-                        alert.get("District", "")
-                    ).split(",")
-                ]
+            high_wave_warning = find_matching_warning(
+                location,
+                hwa_list
+            )
 
-                if (
-                    hwa_district in districts
-                    and normalize(
-                        alert.get("STATE")
-                    )
-                    == normalize(
-                        location.get("state")
-                    )
-                ):
-                    high_wave_warning = alert
-                    break
+            swell_surge_warning = find_matching_warning(
+                location,
+                ssa_list
+            )
 
-        swell_surge_warning = None
+            result = all_results[node_id]
 
-        if ssa_district:
+            result["high_wave_warning"] = high_wave_warning
 
-            for alert in ssa_list:
+            result["swell_surge_warning"] = swell_surge_warning
 
-                districts = [
-                    normalize(d)
-                    for d in str(
-                        alert.get("District", "")
-                    ).split(",")
-                ]
+            result["warning"] = bool(
+                high_wave_warning
+                or swell_surge_warning
+            )
 
-                if (
-                    ssa_district in districts
-                    and normalize(
-                        alert.get("STATE")
-                    )
-                    == normalize(
-                        location.get("state")
-                    )
-                ):
-                    swell_surge_warning = alert
-                    break
-
-        return node["node_id"], {
-            "high_wave_warning": high_wave_warning,
-            "swell_surge_warning": swell_surge_warning
-        }
-
-    results = await asyncio.gather(
-        *[
-            process_node(node)
-            for node in nodes
-        ]
-    )
-
-    return dict(results)
-
+    return all_results
