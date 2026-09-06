@@ -312,23 +312,28 @@ def get_pfz_candidates(
 
 def select_pfz(
     pfz_candidates: dict[str, Any],
-    pfz_id: str
+    pfz_name: str
 ) -> dict[str, Any] | None:
     """
-    Select one PFZ from the returned PFZ dictionary.
+    Select one PFZ using its actual PFZ/coastal reference name.
 
     Example:
-        select_pfz(result["pfz_zones"], "pfz1")
+        select_pfz(result["pfz_zones"], "Pondicherry")
     """
 
     if not pfz_candidates:
         return None
 
-    pfz_id = pfz_id.lower().strip()
+    requested_name = pfz_name.strip().lower()
 
-    return pfz_candidates.get(
-        pfz_id
-    )
+    for pfz in pfz_candidates.values():
+
+        candidate_name = pfz.get("name", "")
+
+        if candidate_name.strip().lower() == requested_name:
+            return pfz
+
+    return None
 
 def get_live_pfz_data():
     """
