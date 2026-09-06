@@ -1,5 +1,6 @@
 import sys
 import os
+import asyncio
 
 sys.path.insert(
     0,
@@ -13,7 +14,6 @@ sys.path.insert(
 )
 
 from ai.tools.risk_helper import process_grid
-
 
 k7_input = {
     "nodes": [
@@ -31,10 +31,9 @@ k7_input = {
     "time": "2026-09-05T08:00:00"
 }
 
-
 print("\nTEST STARTED\n")
 
-result = process_grid(k7_input)
+result = asyncio.run(process_grid(k7_input))
 
 print("RISK HELPER RESULT\n")
 
