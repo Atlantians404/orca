@@ -6,37 +6,98 @@ from .geometry import (
 )
 
 
+# =========================================================
+# NODE
+# =========================================================
+
 @dataclass
 class Node:
+    """
+    Represents one geographic node in the
+    marine routing grid.
+    """
+
     id: str
     latitude: float
     longitude: float
 
 
+# =========================================================
+# EDGE
+# =========================================================
+
 @dataclass
 class Edge:
+    """
+    Represents a connection between two nodes.
+
+    Weight:
+        Haversine distance in kilometres.
+    """
+
     source: str
     target: str
     weight: float
 
 
+# =========================================================
+# MARINE GRAPH
+# =========================================================
+
 class MarineGraph:
 
     def __init__(self):
+
         self.nodes: dict[str, Node] = {}
+
         self.edges: dict[str, list[Edge]] = {}
 
+    # -----------------------------------------------------
+    # ADD NODE
+    # -----------------------------------------------------
+
     def add_node(self, node: Node):
+
         self.nodes[node.id] = node
-        self.edges.setdefault(node.id, [])
+
+        self.edges.setdefault(
+            node.id,
+            []
+        )
+
+    # -----------------------------------------------------
+    # ADD EDGE
+    # -----------------------------------------------------
 
     def add_edge(self, edge: Edge):
-        self.edges.setdefault(edge.source, [])
-        self.edges[edge.source].append(edge)
 
-    def get_neighbors(self, node_id: str) -> list[Edge]:
-        return self.edges.get(node_id, [])
+        self.edges.setdefault(
+            edge.source,
+            []
+        )
 
+        self.edges[edge.source].append(
+            edge
+        )
+
+    # -----------------------------------------------------
+    # GET NEIGHBORS
+    # -----------------------------------------------------
+
+    def get_neighbors(
+        self,
+        node_id: str
+    ) -> list[Edge]:
+
+        return self.edges.get(
+            node_id,
+            []
+        )
+
+
+# =========================================================
+# CREATE GRID
+# =========================================================
 
 def create_grid(
     start_latitude: float,
@@ -47,11 +108,21 @@ def create_grid(
     longitude_step: float
 ) -> MarineGraph:
     """
-    Create a geographic grid of nodes.
+    Create a geographic grid of marine nodes.
 
-    Each node represents a location
-    in the marine area.
+    Each node represents a possible location
+    through which the route can travel.
     """
+
+    if rows < 1:
+        raise ValueError(
+            "rows must be at least 1"
+        )
+
+    if columns < 1:
+        raise ValueError(
+            "columns must be at least 1"
+        )
 
     graph = MarineGraph()
 
@@ -86,6 +157,10 @@ def create_grid(
     return graph
 
 
+# =========================================================
+# CONNECT GRID
+# =========================================================
+
 def connect_grid(
     graph: MarineGraph,
     rows: int,
@@ -99,7 +174,10 @@ def connect_grid(
         - vertical
         - diagonal
 
-    Edge weight = Haversine distance in km.
+    Every connection is bidirectional.
+
+    Edge weight:
+        Haversine distance in kilometres.
     """
 
     from .engine import RouteEngine
@@ -108,8 +186,14 @@ def connect_grid(
         source_id: str,
         target_id: str
     ):
-        source_node = graph.nodes[source_id]
-        target_node = graph.nodes[target_id]
+
+        source_node = graph.nodes[
+            source_id
+        ]
+
+        target_node = graph.nodes[
+            target_id
+        ]
 
         distance = RouteEngine.calculate_distance(
             (
@@ -122,6 +206,7 @@ def connect_grid(
             )
         )
 
+        # Source -> Target
         graph.add_edge(
             Edge(
                 source=source_id,
@@ -130,6 +215,7 @@ def connect_grid(
             )
         )
 
+        # Target -> Source
         graph.add_edge(
             Edge(
                 source=target_id,
@@ -146,9 +232,9 @@ def connect_grid(
                 f"N{row * columns + column + 1}"
             )
 
-            # ------------------------------------------
-            # Horizontal: right
-            # ------------------------------------------
+            # -------------------------------------------------
+            # Horizontal
+            # -------------------------------------------------
 
             if column < columns - 1:
 
@@ -161,9 +247,9 @@ def connect_grid(
                     right_id
                 )
 
-            # ------------------------------------------
-            # Vertical: below
-            # ------------------------------------------
+            # -------------------------------------------------
+            # Vertical
+            # -------------------------------------------------
 
             if row < rows - 1:
 
@@ -176,9 +262,9 @@ def connect_grid(
                     below_id
                 )
 
-            # ------------------------------------------
-            # Diagonal: down-right
-            # ------------------------------------------
+            # -------------------------------------------------
+            # Diagonal: Down Right
+            # -------------------------------------------------
 
             if (
                 row < rows - 1
@@ -194,9 +280,9 @@ def connect_grid(
                     diagonal_id
                 )
 
-            # ------------------------------------------
-            # Diagonal: down-left
-            # ------------------------------------------
+            # -------------------------------------------------
+            # Diagonal: Down Left
+            # -------------------------------------------------
 
             if (
                 row < rows - 1
@@ -215,24 +301,46 @@ def connect_grid(
     return graph
 
 
+# =========================================================
+# APPLY ZONE CONSTRAINTS
+# =========================================================
+
 def apply_zone_constraints(
     graph: MarineGraph,
     restricted_polygon
 ) -> MarineGraph:
     """
     Remove graph edges that intersect
-    a restricted polygon.
+    a restricted/protected polygon.
+
+    This is kept in the Route Engine so that
+    restricted and protected marine areas can
+    be enabled when the real zone data is used.
+
+    Currently, if no zones are supplied,
+    the graph remains unchanged.
     """
 
-    for source_id in list(graph.edges.keys()):
+    if restricted_polygon is None:
+        return graph
+
+    for source_id in list(
+        graph.edges.keys()
+    ):
 
         valid_edges = []
 
-        source_node = graph.nodes[source_id]
+        source_node = graph.nodes[
+            source_id
+        ]
 
-        for edge in graph.edges[source_id]:
+        for edge in graph.edges[
+            source_id
+        ]:
 
-            target_node = graph.nodes[edge.target]
+            target_node = graph.nodes[
+                edge.target
+            ]
 
             route_segment = create_linestring(
                 [
@@ -251,12 +359,50 @@ def apply_zone_constraints(
                 route_segment,
                 restricted_polygon
             ):
-                valid_edges.append(edge)
 
-        graph.edges[source_id] = valid_edges
+                valid_edges.append(
+                    edge
+                )
+
+        graph.edges[
+            source_id
+        ] = valid_edges
 
     return graph
 
+
+# =========================================================
+# APPLY MULTIPLE ZONE CONSTRAINTS
+# =========================================================
+
+def apply_zone_constraints_list(
+    graph: MarineGraph,
+    polygons: list
+) -> MarineGraph:
+    """
+    Apply multiple restricted/protected polygons
+    to the routing graph.
+
+    This is useful when marine_data.json contains
+    multiple restricted or protected areas.
+    """
+
+    if not polygons:
+        return graph
+
+    for polygon in polygons:
+
+        graph = apply_zone_constraints(
+            graph,
+            polygon
+        )
+
+    return graph
+
+
+# =========================================================
+# PATH TO COORDINATES
+# =========================================================
 
 def path_to_coordinates(
     graph: MarineGraph,
@@ -272,11 +418,14 @@ def path_to_coordinates(
     for node_id in path:
 
         if node_id not in graph.nodes:
+
             raise ValueError(
                 f"Unknown node: {node_id}"
             )
 
-        node = graph.nodes[node_id]
+        node = graph.nodes[
+            node_id
+        ]
 
         coordinates.append(
             (
@@ -287,6 +436,10 @@ def path_to_coordinates(
 
     return coordinates
 
+
+# =========================================================
+# FIND NEAREST NODE
+# =========================================================
 
 def find_nearest_node(
     graph: MarineGraph,
@@ -299,32 +452,45 @@ def find_nearest_node(
     """
 
     if not graph.nodes:
+
         raise ValueError(
             "Graph contains no nodes"
         )
 
     nearest_node_id = None
-    shortest_distance = float("inf")
+
+    shortest_distance = float(
+        "inf"
+    )
 
     from .engine import RouteEngine
 
-    for node_id, node in graph.nodes.items():
+    for node_id, node in (
+        graph.nodes.items()
+    ):
 
-        distance = RouteEngine.calculate_distance(
-            (latitude, longitude),
-            (
-                node.latitude,
-                node.longitude
+        distance = (
+            RouteEngine.calculate_distance(
+                (latitude, longitude),
+                (
+                    node.latitude,
+                    node.longitude
+                )
             )
         )
 
         if distance < shortest_distance:
 
             shortest_distance = distance
+
             nearest_node_id = node_id
 
     return nearest_node_id
 
+
+# =========================================================
+# CREATE ROUTE GRID
+# =========================================================
 
 def create_route_grid(
     start_latitude: float,
@@ -336,15 +502,17 @@ def create_route_grid(
 ) -> MarineGraph:
     """
     Create a geographic grid covering the area
-    between the start and destination.
+    between the start location and destination.
     """
 
     if rows < 2:
+
         raise ValueError(
             "rows must be at least 2"
         )
 
     if columns < 2:
+
         raise ValueError(
             "columns must be at least 2"
         )
@@ -369,22 +537,34 @@ def create_route_grid(
         goal_longitude
     )
 
-    latitude_range = max_lat - min_lat
-    longitude_range = max_lon - min_lon
+    latitude_range = (
+        max_lat - min_lat
+    )
 
+    longitude_range = (
+        max_lon - min_lon
+    )
+
+    # -----------------------------------------------------
     # Prevent zero-size grids
+    # -----------------------------------------------------
+
     if latitude_range == 0:
+
         latitude_range = 0.01
 
     if longitude_range == 0:
+
         longitude_range = 0.01
 
     latitude_step = (
-        latitude_range / (rows - 1)
+        latitude_range
+        / (rows - 1)
     )
 
     longitude_step = (
-        longitude_range / (columns - 1)
+        longitude_range
+        / (columns - 1)
     )
 
     return create_grid(
@@ -395,3 +575,71 @@ def create_route_grid(
         latitude_step=latitude_step,
         longitude_step=longitude_step,
     )
+
+
+# =========================================================
+# APPLY RISK CONSTRAINTS
+# =========================================================
+
+def apply_risk_constraints(
+    graph: MarineGraph,
+    routing_risk: dict
+) -> MarineGraph:
+    """
+    Remove unsafe nodes and their connected edges
+    from the routing graph.
+
+    routing_risk format:
+
+        {
+            "N1": {
+                "risk_score": 20,
+                "safe": True
+            },
+            "N2": {
+                "risk_score": 75,
+                "safe": False
+            }
+        }
+
+    Unsafe nodes are removed before
+    route generation.
+    """
+
+    unsafe_nodes = {
+        node_id
+        for node_id, data
+        in routing_risk.items()
+        if not data["safe"]
+    }
+
+    # -----------------------------------------------------
+    # Remove unsafe nodes
+    # -----------------------------------------------------
+
+    for node_id in unsafe_nodes:
+
+        graph.nodes.pop(
+            node_id,
+            None
+        )
+
+        graph.edges.pop(
+            node_id,
+            None
+        )
+
+    # -----------------------------------------------------
+    # Remove edges pointing to unsafe nodes
+    # -----------------------------------------------------
+
+    for node_id in graph.edges:
+
+        graph.edges[node_id] = [
+            edge
+            for edge in graph.edges[node_id]
+            if edge.target
+            not in unsafe_nodes
+        ]
+
+    return graph

@@ -3,6 +3,10 @@ import heapq
 from .graph import MarineGraph
 
 
+# =========================================================
+# DIJKSTRA
+# =========================================================
+
 def dijkstra(
     graph: MarineGraph,
     start: str,
@@ -32,10 +36,10 @@ def dijkstra(
         for node_id in graph.nodes
     }
 
-    distances[start] = 0
+    distances[start] = 0.0
 
     priority_queue = [
-        (0, start)
+        (0.0, start)
     ]
 
     while priority_queue:
@@ -91,13 +95,17 @@ def dijkstra(
     return path, distances[goal]
 
 
+# =========================================================
+# A*
+# =========================================================
+
 def astar(
     graph: MarineGraph,
     start: str,
     goal: str
 ) -> tuple[list[str], float]:
     """
-    Find the shortest path using A*.
+    Find the shortest path using normal A*.
     """
 
     if start not in graph.nodes:
@@ -122,7 +130,7 @@ def astar(
         for node_id in graph.nodes
     }
 
-    distances[start] = 0
+    distances[start] = 0.0
 
     start_node = graph.nodes[start]
     goal_node = graph.nodes[goal]
@@ -213,6 +221,172 @@ def astar(
 
 
 # =========================================================
+# RISK-AWARE A*
+# =========================================================
+
+def astar_with_risk(
+    graph: MarineGraph,
+    start: str,
+    goal: str,
+    risk_scores: dict[str, float],
+    risk_weight: float = 1.0
+) -> tuple[list[str], float]:
+    """
+    Find a route using both geographic distance
+    and Risk Engine scores.
+
+    Cost of moving to a node:
+
+        edge distance
+        +
+        risk score * risk_weight
+
+    Lower total cost is preferred.
+
+    risk_scores format:
+
+        {
+            "N1": 20.0,
+            "N2": 45.0,
+            "N3": 80.0
+        }
+
+    The physical distance is NOT replaced by risk.
+    Risk is added as an additional routing cost.
+    """
+
+    if start not in graph.nodes:
+        raise ValueError(
+            f"Unknown start node: {start}"
+        )
+
+    if goal not in graph.nodes:
+        raise ValueError(
+            f"Unknown goal node: {goal}"
+        )
+
+    if risk_weight < 0:
+        raise ValueError(
+            "risk_weight cannot be negative"
+        )
+
+    from .engine import RouteEngine
+
+    distances = {
+        node_id: float("inf")
+        for node_id in graph.nodes
+    }
+
+    previous = {
+        node_id: None
+        for node_id in graph.nodes
+    }
+
+    distances[start] = 0.0
+
+    goal_node = graph.nodes[goal]
+
+    start_node = graph.nodes[start]
+
+    heuristic = RouteEngine.calculate_distance(
+        (
+            start_node.latitude,
+            start_node.longitude
+        ),
+        (
+            goal_node.latitude,
+            goal_node.longitude
+        )
+    )
+
+    priority_queue = [
+        (heuristic, start)
+    ]
+
+    while priority_queue:
+
+        _, current_node = heapq.heappop(
+            priority_queue
+        )
+
+        if current_node == goal:
+            break
+
+        current_distance = distances[current_node]
+
+        for edge in graph.get_neighbors(current_node):
+
+            node_risk = risk_scores.get(
+                edge.target,
+                0.0
+            )
+
+            risk_cost = (
+                node_risk * risk_weight
+            )
+
+            new_distance = (
+                current_distance
+                + edge.weight
+                + risk_cost
+            )
+
+            if new_distance < distances[edge.target]:
+
+                distances[edge.target] = new_distance
+
+                previous[edge.target] = current_node
+
+                neighbor = graph.nodes[
+                    edge.target
+                ]
+
+                heuristic = RouteEngine.calculate_distance(
+                    (
+                        neighbor.latitude,
+                        neighbor.longitude
+                    ),
+                    (
+                        goal_node.latitude,
+                        goal_node.longitude
+                    )
+                )
+
+                priority = (
+                    new_distance
+                    + heuristic
+                )
+
+                heapq.heappush(
+                    priority_queue,
+                    (
+                        priority,
+                        edge.target
+                    )
+                )
+
+    if distances[goal] == float("inf"):
+        raise ValueError(
+            f"No risk-aware path found "
+            f"from {start} to {goal}"
+        )
+
+    path = []
+
+    current = goal
+
+    while current is not None:
+
+        path.append(current)
+
+        current = previous[current]
+
+    path.reverse()
+
+    return path, distances[goal]
+
+
+# =========================================================
 # PATH DISTANCE
 # =========================================================
 
@@ -221,7 +395,9 @@ def calculate_path_distance(
     path: list[str]
 ) -> float:
     """
-    Calculate the total distance of a graph path.
+    Calculate the physical distance of a graph path.
+
+    Risk scores are NOT included here.
     """
 
     if len(path) < 2:
@@ -237,7 +413,8 @@ def calculate_path_distance(
         edge = next(
             (
                 edge
-                for edge in graph.get_neighbors(source)
+                for edge
+                in graph.get_neighbors(source)
                 if edge.target == target
             ),
             None
@@ -266,18 +443,10 @@ def generate_candidate_paths(
     """
     Generate multiple candidate paths.
 
-    The first route is the shortest A* route.
+    The first route is the shortest normal A* route.
 
-    Additional routes are created by temporarily
-    removing edges from the shortest path and
-    running A* again.
-
-    Returns:
-        [
-            (path, distance),
-            (path, distance),
-            ...
-        ]
+    Additional routes are generated by temporarily
+    removing edges from previous paths.
     """
 
     if max_routes < 1:
@@ -295,9 +464,9 @@ def generate_candidate_paths(
             f"Unknown goal node: {goal}"
         )
 
-    # ---------------------------------------------
-    # First route: shortest A* route
-    # ---------------------------------------------
+    # -----------------------------------------------------
+    # FIRST ROUTE
+    # -----------------------------------------------------
 
     first_path, first_distance = astar(
         graph,
@@ -316,9 +485,9 @@ def generate_candidate_paths(
         tuple(first_path)
     }
 
-    # ---------------------------------------------
-    # Work on a copy of the graph
-    # ---------------------------------------------
+    # -----------------------------------------------------
+    # SAVE ORIGINAL GRAPH
+    # -----------------------------------------------------
 
     original_edges = {
         node_id: list(edges)
@@ -327,10 +496,6 @@ def generate_candidate_paths(
     }
 
     try:
-
-        # -----------------------------------------
-        # Generate alternatives
-        # -----------------------------------------
 
         for _ in range(max_routes - 1):
 
@@ -341,8 +506,10 @@ def generate_candidate_paths(
 
             alternative_found = False
 
-            # Try removing different edges from
-            # the previous route.
+            # -------------------------------------------------
+            # REMOVE DIFFERENT EDGES
+            # -------------------------------------------------
+
             for index in range(
                 len(previous_path) - 1
             ):
@@ -350,7 +517,6 @@ def generate_candidate_paths(
                 source = previous_path[index]
                 target = previous_path[index + 1]
 
-                # Remove the edge in both directions
                 graph.edges[source] = [
                     edge
                     for edge in graph.edges[source]
@@ -388,9 +554,6 @@ def generate_candidate_paths(
 
                         alternative_found = True
 
-                        # Restore graph before
-                        # trying to generate the
-                        # next candidate.
                         graph.edges = {
                             node_id: list(edges)
                             for node_id, edges
@@ -402,7 +565,7 @@ def generate_candidate_paths(
                 except ValueError:
                     pass
 
-                # Restore the removed edge
+                # Restore graph
                 graph.edges = {
                     node_id: list(edges)
                     for node_id, edges
@@ -414,7 +577,6 @@ def generate_candidate_paths(
 
     finally:
 
-        # Always restore original graph
         graph.edges = {
             node_id: list(edges)
             for node_id, edges
