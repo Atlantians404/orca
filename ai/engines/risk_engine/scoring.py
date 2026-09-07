@@ -8,6 +8,9 @@ Individual factor:
     2 = moderate
     3 = high
 
+Factor scores may be fractional to provide
+more granular risk differentiation.
+
 Normalization:
     normalized_score = factor_score / 3
 
@@ -22,80 +25,36 @@ Overall:
 No ML is used.
 """
 
-
-# ============================================================
-# DOMAIN WEIGHTS
-# ============================================================
-
 DOMAIN_WEIGHTS = {
-
     "weather": 0.30,
-
     "marine": 0.50,
-
     "geo": 0.20
 }
 
-
-# ============================================================
-# PRIMARY FACTOR WEIGHTS
-# ============================================================
-#
-# These are the factors that directly contribute
-# to the risk calculation.
-#
-# Supporting information such as direction,
-# temperature etc. is validated but does not
-# directly contribute to risk at this stage.
-# ============================================================
-
-
 WEATHER_WEIGHTS = {
-
     "wind_speed": 0.30,
-
     "wave_height": 0.20,
-
     "visibility": 0.20,
-
     "precipitation": 0.10,
-
     "lightning": 0.20
 }
 
-
 MARINE_WEIGHTS = {
-
     "wave_height": 0.30,
-
     "swell_wave_height": 0.20,
-
     "ocean_current_velocity": 0.15,
-
     "marine_warning": 0.35
 }
 
-
 GEO_WEIGHTS = {
-
     "restricted_area": 0.60,
-
     "protected_area": 0.40
 }
 
-
-# ============================================================
-# MARINE WARNING SCORES
-# ============================================================
-
 MARINE_WARNING_SCORES = {
-
     "NONE": 0,
-
     "ADVISORY": 1,
-
     "WARNING": 2,
-
     "SEVERE": 3
 }
 
@@ -104,123 +63,134 @@ MARINE_WARNING_SCORES = {
 # NORMALIZATION
 # ============================================================
 
-def normalize_score(score: int) -> float:
-
+def normalize_score(score: float) -> float:
     return score / 3.0
+
+
+# ============================================================
+# GENERIC CONTINUOUS SCORING
+# ============================================================
+
+def interpolate_score(
+    value: float,
+    points: list[tuple[float, float]]
+) -> float:
+
+    if value <= points[0][0]:
+        return points[0][1]
+
+    for i in range(len(points) - 1):
+
+        x1, y1 = points[i]
+        x2, y2 = points[i + 1]
+
+        if value <= x2:
+
+            score = y1 + (
+                (value - x1)
+                * (y2 - y1)
+                / (x2 - x1)
+            )
+
+            return round(score, 4)
+
+    return points[-1][1]
 
 
 # ============================================================
 # WEATHER FACTOR SCORING
 # ============================================================
 
-def score_wind_speed(value: float) -> int:
+def score_wind_speed(value: float) -> float:
 
-    if value < 8:
-        return 0
-
-    elif value < 12:
-        return 1
-
-    elif value < 17:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (0, 0),
+            (8, 1),
+            (12, 2),
+            (17, 3)
+        ]
+    )
 
 
-def score_wave_height(value: float) -> int:
+def score_wave_height(value: float) -> float:
 
-    if value < 1.0:
-        return 0
-
-    elif value < 2.0:
-        return 1
-
-    elif value < 3.0:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (0, 0),
+            (1, 1),
+            (2, 2),
+            (3, 3)
+        ]
+    )
 
 
-def score_visibility(value: float) -> int:
+def score_visibility(value: float) -> float:
 
-    if value >= 10:
-        return 0
-
-    elif value >= 5:
-        return 1
-
-    elif value >= 2:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (10, 0),
+            (5, 1),
+            (2, 2),
+            (0, 3)
+        ]
+    )
 
 
-def score_precipitation(value: float) -> int:
+def score_precipitation(value: float) -> float:
 
-    if value < 20:
-        return 0
-
-    elif value < 50:
-        return 1
-
-    elif value < 80:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (0, 0),
+            (20, 1),
+            (50, 2),
+            (80, 3)
+        ]
+    )
 
 
-def score_lightning(value: bool) -> int:
+def score_lightning(value: bool) -> float:
 
-    if value:
-
-        return 3
-
-    return 0
+    return 3.0 if value else 0.0
 
 
 # ============================================================
 # MARINE FACTOR SCORING
 # ============================================================
 
-def score_swell_wave_height(value: float) -> int:
+def score_swell_wave_height(value: float) -> float:
 
-    if value < 0.5:
-        return 0
-
-    elif value < 1.0:
-        return 1
-
-    elif value < 2.0:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (0, 0),
+            (0.5, 1),
+            (1.0, 2),
+            (2.0, 3)
+        ]
+    )
 
 
-def score_ocean_current_velocity(value: float) -> int:
+def score_ocean_current_velocity(value: float) -> float:
 
-    if value < 0.5:
-        return 0
-
-    elif value < 1.0:
-        return 1
-
-    elif value < 1.5:
-        return 2
-
-    else:
-        return 3
+    return interpolate_score(
+        value,
+        [
+            (0, 0),
+            (0.5, 1),
+            (1.0, 2),
+            (1.5, 3)
+        ]
+    )
 
 
-def score_marine_warning(value: str) -> int:
+def score_marine_warning(value: str) -> float:
 
-    warning = str(
-        value
-    ).strip().upper()
+    warning = str(value).strip().upper()
 
     return MARINE_WARNING_SCORES.get(
         warning,
@@ -232,22 +202,14 @@ def score_marine_warning(value: str) -> int:
 # GEO FACTOR SCORING
 # ============================================================
 
-def score_restricted_area(value: bool) -> int:
+def score_restricted_area(value: bool) -> float:
 
-    if value:
-
-        return 3
-
-    return 0
+    return 3.0 if value else 0.0
 
 
-def score_protected_area(value: bool) -> int:
+def score_protected_area(value: bool) -> float:
 
-    if value:
-
-        return 1
-
-    return 0
+    return 1.0 if value else 0.0
 
 
 # ============================================================
@@ -259,14 +221,9 @@ def calculate_domain_score(
     weights: dict
 ) -> float:
 
-    total_weight = sum(
-        weights.values()
-    )
+    total_weight = sum(weights.values())
 
-    if abs(
-        total_weight - 1.0
-    ) > 0.0001:
-
+    if abs(total_weight - 1.0) > 0.0001:
         raise ValueError(
             "Factor weights must sum to 1.0"
         )
@@ -290,10 +247,7 @@ def calculate_domain_score(
             * 100
         )
 
-    return round(
-        domain_score,
-        2
-    )
+    return round(domain_score, 2)
 
 
 # ============================================================
@@ -303,7 +257,6 @@ def calculate_domain_score(
 def calculate_weather_score(weather):
 
     factor_scores = {
-
         "wind_speed":
             score_wind_speed(
                 weather.wind_speed
@@ -348,7 +301,6 @@ def calculate_weather_score(weather):
 def calculate_marine_score(marine):
 
     factor_scores = {
-
         "wave_height":
             score_wave_height(
                 marine.wave_height
@@ -388,7 +340,6 @@ def calculate_marine_score(marine):
 def calculate_geo_score(geo):
 
     factor_scores = {
-
         "restricted_area":
             score_restricted_area(
                 geo.restricted_area
@@ -422,7 +373,6 @@ def calculate_interaction_score(
 
     interaction = 0.0
 
-    # High wind + high waves
     wind = normalize_score(
         weather_factors["wind_speed"]
     )
@@ -437,7 +387,6 @@ def calculate_interaction_score(
         * wave
     )
 
-    # Lightning + marine warning
     lightning = normalize_score(
         weather_factors["lightning"]
     )
@@ -470,43 +419,29 @@ def calculate_critical_floor(
 
     critical_floor = 0.0
 
-    # Restricted area
     if geo.restricted_area:
-
         critical_floor = max(
             critical_floor,
             100.0
         )
 
-    # Severe marine warning
-    if (
-        marine_factors["marine_warning"]
-        == 3
-    ):
-
+    if marine_factors["marine_warning"] == 3:
         critical_floor = max(
             critical_floor,
             80.0
         )
 
-    # Extreme waves
-    if (
-        marine_factors["wave_height"]
-        == 3
-    ):
-
+    if marine_factors["wave_height"] >= 3:
         critical_floor = max(
             critical_floor,
             70.0
         )
 
-    # Lightning + high wind
     if (
-        weather_factors["lightning"] == 3
+        weather_factors["lightning"] >= 3
         and
         weather_factors["wind_speed"] >= 2
     ):
-
         critical_floor = max(
             critical_floor,
             70.0
@@ -528,29 +463,16 @@ def calculate_overall_risk(
     geo
 ):
 
-    # --------------------------------------------------------
-    # Weighted domain score
-    # --------------------------------------------------------
-
     base_score = (
-
         weather_score
         * DOMAIN_WEIGHTS["weather"]
-
         +
-
         marine_score
         * DOMAIN_WEIGHTS["marine"]
-
         +
-
         geo_score
         * DOMAIN_WEIGHTS["geo"]
     )
-
-    # --------------------------------------------------------
-    # Interaction
-    # --------------------------------------------------------
 
     interaction_score = (
         calculate_interaction_score(
@@ -563,10 +485,6 @@ def calculate_overall_risk(
         base_score
         + interaction_score
     )
-
-    # --------------------------------------------------------
-    # Critical floor
-    # --------------------------------------------------------
 
     critical_floor = (
         calculate_critical_floor(
@@ -596,24 +514,18 @@ def calculate_overall_risk(
 # RISK LEVEL
 # ============================================================
 
-def get_risk_level(
-    score: float
-) -> str:
+def get_risk_level(score: float) -> str:
 
     if score < 30:
-
         return "LOW"
 
     elif score < 60:
-
         return "MEDIUM"
 
     elif score < 80:
-
         return "HIGH"
 
     else:
-
         return "CRITICAL"
 
 
@@ -642,22 +554,15 @@ def calculate_risk(data):
     )
 
     risk_score = calculate_overall_risk(
-
         weather_score,
-
         marine_score,
-
         geo_score,
-
         weather_factors,
-
         marine_factors,
-
         data.geo
     )
 
     return {
-
         "weather_score":
             weather_score,
 
