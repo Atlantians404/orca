@@ -1,11 +1,6 @@
 {
-  "Chennai East PFZ": {
+  "PFZ03": {
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "TEST01",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.3,
         "wave_period": 7,
