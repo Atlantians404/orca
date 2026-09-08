@@ -61,7 +61,7 @@ mock_risk_data = {
 
     "node_201": {"risk_score": 15},
     "node_202": {"risk_score": 20},
-    "node_203": {"risk_score": 25}
+    "node_203": {"risk_score": 75}
 }
 
 result = select_best_route(k7_input, mock_risk_data)
