@@ -187,9 +187,7 @@ Rules:
         return REQUIRED_TOOL_NAMES.copy()
 
 
-# ============================================================
-# COLLECT DATA FOR ONE PFZ + ONE TIME
-# ============================================================
+
 
 async def collect_for_pfz_time(
     pfz: dict,
@@ -246,12 +244,7 @@ async def collect_for_pfz_time(
             collected[tool_name] = result
 
         except Exception as e:
-            print(
-                f"Tool failed: {tool_name} -> {type(e).__name__}: {e}"
-            )
-
-            # One external failure must not stop the
-            # entire PFZ/time collection.
+           
             collected[tool_name] = None
 
     # ========================================================
@@ -397,14 +390,7 @@ async def data_collection_agent(
 
     selected_tools = await select_required_tools()
 
-    print(
-        "\nAI selected tools:",
-        selected_tools
-    )
-
-    # ========================================================
-    # COLLECT DATA
-    # ========================================================
+    
 
     collected_data = {}
 
