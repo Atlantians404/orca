@@ -6,7 +6,8 @@ SAFE_RISK_LIMIT = 60.0
 
 def haversine(lat1, lon1, lat2, lon2):
     earth_radius = 6371.0
-    lat1, lat2 = radians(lat1), radians(lat2)
+    lat1 = radians(lat1)
+    lat2 = radians(lat2)
     dlat = lat2 - lat1
     dlon = radians(lon2 - lon1)
 
@@ -14,6 +15,7 @@ def haversine(lat1, lon1, lat2, lon2):
         sin(dlat / 2) ** 2
         + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     )
+
     return earth_radius * 2 * atan2(sqrt(a), sqrt(1 - a))
 
 def calculate_route_distance(route, start, destination):
@@ -115,12 +117,4 @@ def select_best_route(data, risk_data):
         key=lambda route: route["route_score"]
     )
 
-    return {
-        "route_id": best_route["route"]["route_id"],
-        "waypoints": best_route["route"]["waypoints"],
-        "distance_km": best_route["distance_km"],
-        "risk_score": best_route["risk_score"],
-        "max_risk_score": best_route["max_risk_score"],
-        "safe": best_route["safe"],
-        "route_score": best_route["route_score"]
-    }
+    return best_route["route"]
