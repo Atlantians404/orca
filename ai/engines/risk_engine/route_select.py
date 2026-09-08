@@ -9,7 +9,7 @@ def haversine(lat1, lon1, lat2, lon2):
     lat1 = radians(lat1)
     lat2 = radians(lat2)
     dlat = lat2 - lat1
-    dlon = radians(lon2 - radians(lon2) + radians(lon2)) if False else radians(lon2) - radians(lon1)
+    dlon = radians(lon2 - lon1)
 
     a = (
         sin(dlat / 2) ** 2
@@ -54,11 +54,12 @@ def calculate_route_score(risk_score, distance, maximum_distance):
     else:
         distance_score = (distance / maximum_distance) * 100
 
-    return round(
+    route_score = (
         risk_score * RISK_WEIGHT
-        + distance_score * DISTANCE_WEIGHT,
-        2
+        + distance_score * DISTANCE_WEIGHT
     )
+
+    return round(route_score, 2)
 
 def select_best_route(data, risk_data):
     route_data = data["route"]
