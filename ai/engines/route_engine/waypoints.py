@@ -9,10 +9,10 @@ def generate_waypoints(
     """
     Convert a graph path into intermediate waypoints.
 
-    The first node represents the start location
-    and the last node represents the destination/PFZ.
+    The first node represents the start location.
+    The last node represents the destination/PFZ.
 
-    Only intermediate nodes are returned as waypoints.
+    Only intermediate nodes are returned.
     """
 
     if not path:
@@ -48,14 +48,16 @@ def generate_waypoints_from_coordinates(
     coordinates: list[tuple[float, float]]
 ) -> list[Waypoint]:
     """
-    Convert a list of coordinates into intermediate
-    waypoints.
+    Convert coordinates into intermediate waypoints.
 
-    Coordinates are:
+    Coordinates:
         (latitude, longitude)
 
-    The first coordinate is the start and the last
-    coordinate is the destination.
+    First coordinate:
+        Start
+
+    Last coordinate:
+        Destination/PFZ
     """
 
     if not coordinates:
@@ -71,8 +73,7 @@ def generate_waypoints_from_coordinates(
             latitude=latitude,
             longitude=longitude
         )
-        for latitude, longitude
-        in coordinates[1:-1]
+        for latitude, longitude in coordinates[1:-1]
     ]
 
 
@@ -80,8 +81,7 @@ def validate_waypoints(
     waypoints: list[Waypoint]
 ) -> bool:
     """
-    Validate that all waypoints contain valid
-    latitude and longitude values.
+    Validate all waypoint coordinates.
     """
 
     for waypoint in waypoints:

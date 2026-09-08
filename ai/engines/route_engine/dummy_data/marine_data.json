@@ -1,68 +1,336 @@
 {
-  "ports": [
-    {
-      "id": "PORT001",
-      "name": "Chennai Port",
-      "latitude": 13.0827,
-      "longitude": 80.2707
-    },
-    {
-      "id": "PORT002",
-      "name": "Port B",
-      "latitude": 12.9000,
-      "longitude": 80.3500
-    },
-    {
-      "id": "PORT003",
-      "name": "Port C",
-      "latitude": 12.7000,
-      "longitude": 80.5000
-    }
-  ],
+  "source": "INCOIS",
+  "sector": "North Tamil Nadu",
+  "retrieved_at": "2026-09-04T14:10:17.271035",
+  "count": 15,
+
   "pfz_locations": [
     {
-      "id": "PFZ001",
-      "latitude": 13.1400,
-      "longitude": 80.4300,
-      "depth_m": 42.0
+      "coastal_reference": "Kathivakkam Chinnakuppam",
+      "direction": "NE",
+      "bearing_deg": 11,
+      "distance_km": {
+        "min": 33,
+        "max": 38
+      },
+      "depth_m": {
+        "min": 211,
+        "max": 216
+      },
+      "latitude": 13.494444,
+      "longitude": 80.379444
     },
     {
-      "id": "PFZ002",
-      "latitude": 13.0000,
-      "longitude": 80.5500,
-      "depth_m": 55.0
+      "coastal_reference": "Kathivakkam Periakuppam",
+      "direction": "NE",
+      "bearing_deg": 13,
+      "distance_km": {
+        "min": 30,
+        "max": 35
+      },
+      "depth_m": {
+        "min": 219,
+        "max": 224
+      },
+      "latitude": 13.472222,
+      "longitude": 80.385278
     },
     {
-      "id": "PFZ003",
-      "latitude": 12.8500,
-      "longitude": 80.4000,
-      "depth_m": 48.0
+      "coastal_reference": "Thazankuppam",
+      "direction": "NE",
+      "bearing_deg": 18,
+      "distance_km": {
+        "min": 41,
+        "max": 46
+      },
+      "depth_m": {
+        "min": 662,
+        "max": 667
+      },
+      "latitude": 13.453889,
+      "longitude": 80.398889
     },
     {
-      "id": "PFZ004",
-      "latitude": 12.7000,
-      "longitude": 80.6500,
-      "depth_m": 60.0
+      "coastal_reference": "Ennorekuppam",
+      "direction": "NE",
+      "bearing_deg": 24,
+      "distance_km": {
+        "min": 59,
+        "max": 64
+      },
+      "depth_m": {
+        "min": 2570,
+        "max": 2575
+      },
+      "latitude": 13.435556,
+      "longitude": 80.410556
     },
     {
-      "id": "PFZ005",
-      "latitude": 13.3000,
-      "longitude": 80.7000,
-      "depth_m": 35.0
+      "coastal_reference": "Arambakkam",
+      "direction": "SE",
+      "bearing_deg": 136,
+      "distance_km": {
+        "min": 25,
+        "max": 30
+      },
+      "depth_m": {
+        "min": 120,
+        "max": 125
+      },
+      "latitude": 13.412778,
+      "longitude": 80.413611
+    },
+    {
+      "coastal_reference": "Periyamangodu",
+      "direction": "SE",
+      "bearing_deg": 129,
+      "distance_km": {
+        "min": 30,
+        "max": 35
+      },
+      "depth_m": {
+        "min": 150,
+        "max": 155
+      },
+      "latitude": 13.3925,
+      "longitude": 80.424722
+    },
+    {
+      "coastal_reference": "Annamalaichery",
+      "direction": "SE",
+      "bearing_deg": 128,
+      "distance_km": {
+        "min": 35,
+        "max": 40
+      },
+      "depth_m": {
+        "min": 180,
+        "max": 185
+      },
+      "latitude": 13.371389,
+      "longitude": 80.434167
+    },
+    {
+      "coastal_reference": "Coromandel",
+      "direction": "SE",
+      "bearing_deg": 130,
+      "distance_km": {
+        "min": 38,
+        "max": 43
+      },
+      "depth_m": {
+        "min": 200,
+        "max": 205
+      },
+      "latitude": 13.349167,
+      "longitude": 80.430556
+    },
+    {
+      "coastal_reference": "Pulicat",
+      "direction": "SE",
+      "bearing_deg": 136,
+      "distance_km": {
+        "min": 40,
+        "max": 45
+      },
+      "depth_m": {
+        "min": 220,
+        "max": 225
+      },
+      "latitude": 13.327778,
+      "longitude": 80.422222
+    },
+    {
+      "coastal_reference": "Ennore Mugathuvarakuppan",
+      "direction": "NE",
+      "bearing_deg": 51,
+      "distance_km": {
+        "min": 27,
+        "max": 32
+      },
+      "depth_m": {
+        "min": 211,
+        "max": 216
+      },
+      "latitude": 13.305,
+      "longitude": 80.419444
+    },
+    {
+      "coastal_reference": "Kasiviswanathar koil Kuppam",
+      "direction": "NE",
+      "bearing_deg": 74,
+      "distance_km": {
+        "min": 54,
+        "max": 59
+      },
+      "depth_m": {
+        "min": 2532,
+        "max": 2537
+      },
+      "latitude": 13.193611,
+      "longitude": 80.4225
+    },
+    {
+      "coastal_reference": "Ernavoorkuppam",
+      "direction": "SE",
+      "bearing_deg": 108,
+      "distance_km": {
+        "min": 36,
+        "max": 41
+      },
+      "depth_m": {
+        "min": 246,
+        "max": 251
+      },
+      "latitude": 13.169167,
+      "longitude": 80.422222
+    },
+    {
+      "coastal_reference": "Palagaithottikuppam",
+      "direction": "SE",
+      "bearing_deg": 100,
+      "distance_km": {
+        "min": 50,
+        "max": 55
+      },
+      "depth_m": {
+        "min": 2164,
+        "max": 2169
+      },
+      "latitude": 13.145,
+      "longitude": 80.425833
+    },
+    {
+      "coastal_reference": "Kasikoilkuppam",
+      "direction": "SE",
+      "bearing_deg": 110,
+      "distance_km": {
+        "min": 45,
+        "max": 50
+      },
+      "depth_m": {
+        "min": 1346,
+        "max": 1351
+      },
+      "latitude": 13.1225,
+      "longitude": 80.434167
+    },
+    {
+      "coastal_reference": "Chennai",
+      "direction": "SE",
+      "bearing_deg": 108,
+      "distance_km": {
+        "min": 19,
+        "max": 24
+      },
+      "depth_m": {
+        "min": 64,
+        "max": 69
+      },
+      "latitude": 13.075,
+      "longitude": 80.442222
     }
   ],
+
+  "protected_zones": [
+    {
+      "name": "Gahirmatha Marine Wildlife Sanctuary",
+      "state": "Odisha",
+      "type": "PROTECTED_AREA",
+      "restriction_level": "RESTRICTED",
+      "description": "Marine sanctuary protecting the Olive Ridley turtle breeding and nesting grounds.",
+      "latitude": 20.5714,
+      "longitude": 87.01,
+      "source": "WII / Government of Odisha / NCCR",
+      "last_verified": "2026-09-04"
+    },
+    {
+      "name": "Gulf of Mannar Marine National Park",
+      "state": "Tamil Nadu",
+      "type": "PROTECTED_AREA",
+      "restriction_level": "RESTRICTED",
+      "description": "Marine National Park covering offshore islands, coral reefs, seagrass ecosystems and associated marine habitats.",
+      "latitude": 9.1375,
+      "longitude": 79.4725,
+      "source": "WII / Government of Tamil Nadu / MoEFCC",
+      "last_verified": "2026-09-04"
+    },
+    {
+      "name": "Point Calimere Wildlife Sanctuary",
+      "state": "Tamil Nadu",
+      "type": "PROTECTED_AREA",
+      "restriction_level": "RESTRICTED",
+      "description": "Coastal and wetland protected area at Point Calimere. Fishing and resource activities are restricted.",
+      "latitude": 10.31,
+      "longitude": 79.86,
+      "source": "WII / Government of Tamil Nadu",
+      "last_verified": "2026-09-04"
+    },
+    {
+      "name": "Pulicat Lake Wildlife Sanctuary",
+      "state": "Tamil Nadu",
+      "type": "PROTECTED_AREA",
+      "restriction_level": "RESTRICTED",
+      "description": "Protected coastal lagoon ecosystem shared with Andhra Pradesh. Fishing and resource activities are restricted.",
+      "latitude": 13.567,
+      "longitude": 80.315,
+      "source": "WII / Government of Tamil Nadu",
+      "last_verified": "2026-09-04"
+    }
+  ],
+
   "restricted_zones": [
-  {
-    "id": "ZONE001",
-    "name": "Restricted Zone A",
-    "coordinates": [
-      [12.95, 80.32],
-      [12.95, 80.42],
-      [13.05, 80.42],
-      [13.05, 80.32],
-      [12.95, 80.32]
-    ]
-  }
-],
-  "protected_areas": []
+    {
+      "name": "Gujarat Traditional Fishing Reserved Zone",
+      "state": "Gujarat",
+      "type": "TRADITIONAL_FISHING_ZONE",
+      "restriction_level": "RESTRICTED_FOR_MECHANISED_VESSELS",
+      "distance_from_shore_nm": 9,
+      "zone_rule": "up_to_9_nm_from_shore",
+      "restricted_vessels": [
+        "MECHANISED_VESSELS"
+      ],
+      "allowed_vessels": [
+        "TRADITIONAL_FISHING_CRAFT",
+        "NON_MECHANISED_VESSELS"
+      ],
+      "description": "Area up to 9 nautical miles from shore reserved for traditional fishing.",
+      "source": "Government of India, Ministry of Fisheries, PIB",
+      "last_verified": "2026-09-04"
+    },
+    {
+      "name": "Goa Traditional Fishing Reserved Zone",
+      "state": "Goa",
+      "type": "TRADITIONAL_FISHING_ZONE",
+      "restriction_level": "RESTRICTED_FOR_MECHANISED_VESSELS",
+      "distance_from_shore_nm": 2.7,
+      "zone_rule": "up_to_2.7_nm_from_coastline",
+      "restricted_vessels": [
+        "MECHANISED_VESSELS"
+      ],
+      "allowed_vessels": [
+        "TRADITIONAL_FISHING_CRAFT",
+        "NON_MECHANISED_VESSELS"
+      ],
+      "description": "Area up to 2.7 nautical miles from the coastline reserved for traditional fishing.",
+      "source": "Government of India, Ministry of Fisheries, PIB",
+      "last_verified": "2026-09-04"
+    },
+    {
+      "name": "Karnataka Traditional Fishing Reserved Zone",
+      "state": "Karnataka",
+      "type": "TRADITIONAL_FISHING_ZONE",
+      "restriction_level": "RESTRICTED_FOR_MECHANISED_VESSELS",
+      "zone_rule": "3.23_nm_or_4_fathoms_whichever_is_farther",
+      "restricted_vessels": [
+        "MECHANISED_VESSELS"
+      ],
+      "allowed_vessels": [
+        "TRADITIONAL_FISHING_CRAFT"
+      ],
+      "description": "Area reserved for traditional crafts up to the specified distance from shore.",
+      "source": "Government of India, Ministry of Fisheries, PIB",
+      "last_verified": "2026-09-04"
+    }
+  ]
 }

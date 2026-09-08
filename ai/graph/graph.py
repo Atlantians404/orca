@@ -2,8 +2,10 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from ai.agent_state import AgentState
+
 from ai.orchestrator import orchestrate
 from ai.graph.routing import route_query
+
 from ai.graph.nodes import (
     general_node,
     safety_node,
@@ -11,6 +13,7 @@ from ai.graph.nodes import (
     location_node,
     time_node,
     pfz_node,
+    pfz_selection_node,
 )
 
 
@@ -18,32 +21,62 @@ def build_graph():
 
     graph = StateGraph(AgentState)
 
-    # -------------------------
-    # Nodes
-    # -------------------------
+    # =====================================================
+    # NODES
+    # =====================================================
 
-    graph.add_node("orchestrator", orchestrate)
+    graph.add_node(
+        "orchestrator",
+        orchestrate
+    )
 
-    graph.add_node("general", general_node)
-    graph.add_node("safety", safety_node)
-    graph.add_node("planning", planning_node)
+    graph.add_node(
+        "general",
+        general_node
+    )
 
-    graph.add_node("location", location_node)
-    graph.add_node("time", time_node)
-    graph.add_node("pfz", pfz_node)
+    graph.add_node(
+        "safety",
+        safety_node
+    )
 
-    # -------------------------
-    # START → Orchestrator
-    # -------------------------
+    graph.add_node(
+        "planning",
+        planning_node
+    )
+
+    graph.add_node(
+        "location",
+        location_node
+    )
+
+    graph.add_node(
+        "time",
+        time_node
+    )
+
+    graph.add_node(
+        "pfz",
+        pfz_node
+    )
+
+    graph.add_node(
+        "pfz_selection",
+        pfz_selection_node
+    )
+
+    # =====================================================
+    # START → ORCHESTRATOR
+    # =====================================================
 
     graph.add_edge(
         START,
         "orchestrator"
     )
 
-    # -------------------------
-    # Orchestrator → Router
-    # -------------------------
+    # =====================================================
+    # ORCHESTRATOR → ROUTER
+    # =====================================================
 
     graph.add_conditional_edges(
         "orchestrator",
@@ -55,46 +88,55 @@ def build_graph():
         },
     )
 
-    # -------------------------
-    # General → END
-    # -------------------------
+    # =====================================================
+    # GENERAL → END
+    # =====================================================
 
     graph.add_edge(
         "general",
         END
     )
 
-    # -------------------------
-    # Location → Time
-    # -------------------------
+    # =====================================================
+    # LOCATION → TIME
+    # =====================================================
 
     graph.add_edge(
         "location",
         "time"
     )
 
-    # -------------------------
-    # Time → PFZ
-    # -------------------------
+    # =====================================================
+    # TIME → PFZ
+    # =====================================================
 
     graph.add_edge(
         "time",
         "pfz"
     )
 
-    # -------------------------
-    # PFZ → END
-    # -------------------------
+    # =====================================================
+    # PFZ → PFZ SELECTION
+    # =====================================================
 
     graph.add_edge(
         "pfz",
+        "pfz_selection"
+    )
+
+    # =====================================================
+    # PFZ SELECTION → END
+    # =====================================================
+
+    graph.add_edge(
+        "pfz_selection",
         END
     )
 
-    # -------------------------
-    # Checkpointer
-    # Required for interrupt/resume
-    # -------------------------
+    # =====================================================
+    # CHECKPOINTER
+    # Required for interrupt / resume
+    # =====================================================
 
     checkpointer = MemorySaver()
 
@@ -103,8 +145,8 @@ def build_graph():
     )
 
 
-# -------------------------
-# Compiled application graph
-# -------------------------
+# =========================================================
+# COMPILED APPLICATION GRAPH
+# =========================================================
 
 app_graph = build_graph()
