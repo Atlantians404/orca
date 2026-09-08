@@ -1,84 +1,44 @@
+import asyncio
 from ai.engines.risk_engine.main import run_risk_engine
+from services.risk_engine_service.weather_batch import get_weather_data_batch
+from services.risk_engine_service.marine_batch import get_marine_batch
 from services.location.marine_zones import is_protected, is_restricted
 
-from services.weather_data import (
-    get_wind_speed,
-    get_wind_direction,
-    get_visibility,
-    get_precipitation,
-    get_weather_condition,
-    get_thunderstorm
-)
+async def get_geo_data_batch(nodes):
+    async def process_node(node):
+        lat = node["latitude"]
+        lon = node["longitude"]
+        restricted, protected = await asyncio.gather(
+            is_restricted(lat, lon),
+            is_protected(lat, lon)
+        )
+        return node["node_id"], {
+            "latitude": lat,
+            "longitude": lon,
+            "restricted_area": restricted,
+            "protected_area": protected
+        }
 
-from services.marine_data import (
-    get_wave_height,
-    get_wave_direction,
-    get_wave_period,
-    get_swell_wave_height,
-    get_swell_wave_direction,
-    get_swell_wave_period,
-    get_ocean_current_velocity,
-    get_ocean_current_direction,
-    get_sea_surface_temperature,
-    get_sea_level_height,
-    get_marine_warning_level
-)
-
-def get_geo_data(latitude, longitude):
-    return {
-        "latitude": latitude,
-        "longitude": longitude,
-        "restricted_area": is_restricted(latitude, longitude),
-        "protected_area": is_protected(latitude, longitude)
-    }
-
-
-def build_risk_input(node, time):
-    latitude = node["latitude"]
-    longitude = node["longitude"]
-
-    marine_warning = get_marine_warning_level(
-        latitude,
-        longitude
+    results = await asyncio.gather(
+        *(process_node(node) for node in nodes)
     )
+    return dict(results)
 
-    if marine_warning is None:
-        marine_warning = "NONE"
-    else:
-        marine_warning = marine_warning.upper()
-
+def build_risk_input(node, time, weather, marine, geo):
+    node_id = node["node_id"]
     return {
-        "request": {
-            "request_id": node["node_id"],
-            "requires_route": False,
-            "forecast_hours": 24
-        },
-        "marine": {
-            "wave_height": get_wave_height(latitude, longitude, time),
-            "wave_period": get_wave_period(latitude, longitude, time),
-            "wave_direction": get_wave_direction(latitude, longitude, time),
-            "swell_wave_height": get_swell_wave_height(latitude, longitude, time),
-            "swell_wave_period": get_swell_wave_period(latitude, longitude, time),
-            "swell_wave_direction": get_swell_wave_direction(latitude, longitude, time),
-            "ocean_current_velocity": get_ocean_current_velocity(latitude, longitude, time),
-            "ocean_current_direction": get_ocean_current_direction(latitude, longitude, time),
-            "sea_surface_temperature": get_sea_surface_temperature(latitude, longitude, time),
-            "sea_level_height_msl": get_sea_level_height(latitude, longitude, time),
-            "marine_warning": marine_warning
-        },
+        "marine": marine[node_id],
         "weather": {
-            "wind_speed": get_wind_speed(latitude, longitude, time),
-            "wind_direction": get_wind_direction(latitude, longitude, time),
-            "wave_height": get_wave_height(latitude, longitude, time),
-            "visibility": get_visibility(latitude, longitude, time),
-            "precipitation": get_precipitation(latitude, longitude, time),
-            "lightning": get_thunderstorm(latitude, longitude, time),
-            "condition": get_weather_condition(latitude, longitude, time)
+            **weather[node_id],
+            "wave_height": marine[node_id]["wave_height"]
         },
-        "geo": get_geo_data(latitude, longitude)
+        "geo": geo[node_id]
     }
-def evaluate_node(node, time):
-    risk_input = build_risk_input(node, time)
+
+async def evaluate_node(node, time, weather, marine, geo):
+    risk_input = build_risk_input(
+        node, time, weather, marine, geo
+    )
 
     agent_data = {
         node["node_id"]: {
@@ -87,22 +47,28 @@ def evaluate_node(node, time):
     }
 
     result = run_risk_engine(agent_data)
-
-    risk_result = result["ranked_results"][0]
-    risk_score = risk_result["risk_score"]
+    risk = result["ranked_results"][0]
 
     return {
         "node_id": node["node_id"],
-        "risk_score": risk_score,
-        "safe": risk_score <= 60
+        "risk_score": risk["risk_score"],
+        "safe": risk["risk_score"] <= 60
     }
-def process_grid(k7_input):
-    results = []
 
+async def process_grid(k7_input):
+    nodes = k7_input["nodes"]
     time = k7_input["time"]
 
-    for node in k7_input["nodes"]:
-        result = evaluate_node(node, time)
-        results.append(result)
+    weather, marine, geo = await asyncio.gather(
+        get_weather_data_batch(nodes, time),
+        get_marine_batch(nodes, time),
+        get_geo_data_batch(nodes)
+    )
 
-    return results
+    results = await asyncio.gather(
+        *(evaluate_node(
+            node, time, weather, marine, geo
+        ) for node in nodes)
+    )
+
+    return list(results)

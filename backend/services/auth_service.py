@@ -2,7 +2,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from backend.models.users import User
-from backend.schemas.auth import RegisterRequest, LoginRequest
+from backend.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+)
 
 from backend.utils.auth_util import (
     hash_password,
@@ -16,12 +19,15 @@ from backend.core.exceptions import (
 )
 
 
+# ==================================================
+# REGISTER USER
+# ==================================================
+
 async def register_user(
     data: RegisterRequest,
     db: AsyncSession
 ) -> User:
 
-    # Check whether email already exists
     result = await db.execute(
         select(User).where(User.email == data.email)
     )
@@ -31,12 +37,12 @@ async def register_user(
     if existing_user:
         conflict("Email already registered")
 
-    # Create user
     user = User(
         username=data.username,
         email=data.email,
         hashed_password=hash_password(data.password),
-        role="USER"
+        role="USER",
+        language="en"
     )
 
     db.add(user)
@@ -47,12 +53,15 @@ async def register_user(
     return user
 
 
+# ==================================================
+# LOGIN USER
+# ==================================================
+
 async def login_user(
     data: LoginRequest,
     db: AsyncSession
 ) -> str:
 
-    # Find user
     result = await db.execute(
         select(User).where(User.email == data.email)
     )
@@ -62,14 +71,12 @@ async def login_user(
     if not user:
         unauthorized("Invalid email or password")
 
-    # Verify password
     if not verify_password(
         data.password,
         user.hashed_password
     ):
         unauthorized("Invalid email or password")
 
-    # Create JWT
     token = create_access_token(
         {
             "sub": str(user.id),
@@ -79,3 +86,29 @@ async def login_user(
     )
 
     return token
+
+
+# ==================================================
+# GET CURRENT USER
+# ==================================================
+
+async def get_me(
+    current_user: User
+) -> User:
+
+    return current_user
+
+
+# ==================================================
+# LOGOUT USER
+# ==================================================
+
+async def logout_user(
+    current_user: User
+) -> None:
+
+    # Currently using stateless JWT.
+    # There is no server-side token/session to delete.
+    # The frontend removes the access token.
+
+    return None

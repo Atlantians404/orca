@@ -2,7 +2,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.sessions import Session
-from backend.schemas.session import SessionCreate
+from backend.schemas.session import (
+    SessionCreate,
+    SessionUpdate,
+)
+
 from backend.core.exceptions import not_found
 
 
@@ -59,3 +63,56 @@ async def get_session(
         not_found("Session")
 
     return session
+
+
+async def update_session(
+    session_id: int,
+    data: SessionUpdate,
+    user_id: int,
+    db: AsyncSession
+) -> Session:
+
+    result = await db.execute(
+        select(Session)
+        .where(
+            Session.id == session_id,
+            Session.user_id == user_id
+        )
+    )
+
+    session = result.scalar_one_or_none()
+
+    if not session:
+        not_found("Session")
+
+    if data.title is not None:
+        session.title = data.title
+
+    await db.commit()
+    await db.refresh(session)
+
+    return session
+
+
+async def delete_session(
+    session_id: int,
+    user_id: int,
+    db: AsyncSession
+) -> None:
+
+    result = await db.execute(
+        select(Session)
+        .where(
+            Session.id == session_id,
+            Session.user_id == user_id
+        )
+    )
+
+    session = result.scalar_one_or_none()
+
+    if not session:
+        not_found("Session")
+
+    await db.delete(session)
+
+    await db.commit()

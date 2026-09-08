@@ -1,12 +1,18 @@
-from fastapi import Header, HTTPException
+from fastapi import Header, HTTPException, Depends
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 import os
+
+from backend.database.database import get_db
+from backend.models.users import User
 
 
 load_dotenv()
+
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("ALGORITHM")
@@ -18,6 +24,10 @@ pwd_context = CryptContext(
     deprecated="auto"
 )
 
+
+# ==================================================
+# PASSWORD
+# ==================================================
 
 def hash_password(password: str) -> str:
     return pwd_context.hash(password)
@@ -32,6 +42,10 @@ def verify_password(
         hashed_password
     )
 
+
+# ==================================================
+# CREATE JWT
+# ==================================================
 
 def create_access_token(
     data: dict,
@@ -62,6 +76,10 @@ def create_access_token(
     return token
 
 
+# ==================================================
+# VERIFY JWT
+# ==================================================
+
 def verify_token(
     authorization: str = Header(...)
 ):
@@ -87,3 +105,37 @@ def verify_token(
             status_code=401,
             detail="Invalid token"
         )
+
+
+# ==================================================
+# GET CURRENT USER
+# ==================================================
+
+async def get_current_user(
+    payload: dict = Depends(verify_token),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+
+    user_id = payload.get("sub")
+
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid token payload"
+        )
+
+    result = await db.execute(
+        select(User).where(
+            User.id == int(user_id)
+        )
+    )
+
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="User not found"
+        )
+
+    return user
