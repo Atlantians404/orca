@@ -5,6 +5,10 @@ class SessionCreate(BaseModel):
     title: str
 
 
+class SessionUpdate(BaseModel):
+    title: str | None = None
+
+
 class SessionResponse(BaseModel):
     id: int
     title: str

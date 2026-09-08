@@ -6,8 +6,24 @@ from pydantic import BaseModel, Field
 # =========================================================
 
 class Coordinate(BaseModel):
-    latitude: float
-    longitude: float
+    """
+    Geographic coordinate.
+
+    Latitude  : -90 to 90
+    Longitude : -180 to 180
+    """
+
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
 
 
 # =========================================================
@@ -24,8 +40,19 @@ class PFZ(BaseModel):
     """
 
     coastal_reference: str
-    latitude: float
-    longitude: float
+
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
+
     depth_m: float | None = None
 
 
@@ -37,17 +64,28 @@ class RestrictedZone(BaseModel):
     """
     Marine protected or restricted area.
 
-    This information comes from the restricted/protected
-    area collection and is used to prevent routes from
-    entering restricted regions.
+    This information comes from MongoDB and is used
+    by the Route Engine to avoid unsafe zones.
     """
 
     name: str
     state: str
     type: str
     restriction_level: str
-    latitude: float
-    longitude: float
+
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
+
+    geometry: dict | None = None
 
 
 # =========================================================
@@ -60,8 +98,18 @@ class RouteDestination(BaseModel):
     """
 
     coastal_reference: str
-    latitude: float
-    longitude: float
+
+    latitude: float = Field(
+        ...,
+        ge=-90,
+        le=90,
+    )
+
+    longitude: float = Field(
+        ...,
+        ge=-180,
+        le=180,
+    )
 
 
 # =========================================================
@@ -92,6 +140,10 @@ class RouteRequest(BaseModel):
     start: Coordinate
 
     destination: RouteDestination
+
+    # Time context used for route generation
+    # and later risk evaluation.
+    time: str | None = None
 
     constraints: RouteConstraints = Field(
         default_factory=RouteConstraints
