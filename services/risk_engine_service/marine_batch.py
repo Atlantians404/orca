@@ -15,13 +15,18 @@ INCOIS_API_URL = (
     "incoismobileappdata/rest/incois/hwassalatestdata"
 )
 
-BATCH_SIZE = 50
-MAX_CONCURRENT_REQUESTS = 2
-MAX_RETRIES = 4
-BATCH_DELAY = 1
 
+
+BATCH_SIZE = 50
+
+MAX_CONCURRENT_REQUESTS = 1
+
+MAX_RETRIES = 6
+
+BATCH_DELAY = 3
 
 def normalize(value):
+
     if value is None:
         return ""
 
@@ -35,14 +40,21 @@ def normalize(value):
     ]
 
     for suffix in suffixes:
+
         if value.endswith(suffix):
-            value = value[:-len(suffix)].strip()
+
+            value = value[
+                :-len(suffix)
+            ].strip()
+
             break
 
     return " ".join(value.split())
 
 
+
 def parse_json_list(value):
+
     if value is None:
         return []
 
@@ -50,7 +62,9 @@ def parse_json_list(value):
         return value
 
     if isinstance(value, str):
+
         try:
+
             parsed = json.loads(value)
 
             if isinstance(parsed, list):
@@ -60,12 +74,14 @@ def parse_json_list(value):
                 return [parsed]
 
         except json.JSONDecodeError:
+
             return []
 
     return []
 
 
 def find_warning(location, alerts):
+
     district = normalize(
         location.get("district")
     )
@@ -94,17 +110,22 @@ def find_warning(location, alerts):
         ]
 
         if district in districts:
+
             return alert
 
     return None
 
-
 def coordinate_key(node):
+
     return (
         round(float(node["latitude"]), 4),
         round(float(node["longitude"]), 4)
     )
 
+
+# -------------------------------------------------
+# FETCH ONE MARINE BATCH
+# -------------------------------------------------
 
 async def fetch_marine_batch(
     client,
@@ -112,9 +133,6 @@ async def fetch_marine_batch(
     time,
     semaphore
 ):
-    """
-    Fetch marine data for one batch.
-    """
 
     latitudes = ",".join(
         str(node["latitude"])
@@ -127,8 +145,11 @@ async def fetch_marine_batch(
     )
 
     params = {
+
         "latitude": latitudes,
+
         "longitude": longitudes,
+
         "hourly": ",".join([
             "wave_height",
             "wave_direction",
@@ -141,8 +162,11 @@ async def fetch_marine_batch(
             "sea_surface_temperature",
             "sea_level_height_msl"
         ]),
+
         "timezone": "auto",
+
         "forecast_hours": 1,
+
         "cell_selection": "sea"
     }
 
@@ -157,9 +181,14 @@ async def fetch_marine_batch(
                     params=params
                 )
 
+                # ---------------------------------
+                # RATE LIMIT
+                # ---------------------------------
+
                 if response.status_code == 429:
 
                     if attempt == MAX_RETRIES - 1:
+
                         response.raise_for_status()
 
                     retry_after = response.headers.get(
@@ -167,9 +196,17 @@ async def fetch_marine_batch(
                     )
 
                     if retry_after:
-                        wait_time = float(retry_after)
+
+                        wait_time = float(
+                            retry_after
+                        )
+
                     else:
-                        wait_time = 2 ** attempt
+
+                        wait_time = min(
+                            5 * (2 ** attempt),
+                            60
+                        )
 
                     await asyncio.sleep(
                         wait_time
@@ -177,11 +214,14 @@ async def fetch_marine_batch(
 
                     continue
 
+
                 response.raise_for_status()
+
 
                 data = response.json()
 
                 if isinstance(data, dict):
+
                     data = [data]
 
                 return data
@@ -189,30 +229,36 @@ async def fetch_marine_batch(
             except httpx.RequestError:
 
                 if attempt == MAX_RETRIES - 1:
+
                     raise
 
-                wait_time = 2 ** attempt
+                wait_time = min(
+                    5 * (2 ** attempt),
+                    60
+                )
 
                 await asyncio.sleep(
                     wait_time
                 )
 
-    return []
+    raise RuntimeError(
+        "Marine API failed after retries"
+    )
+
+
 
 
 async def get_marine_batch(nodes, time):
 
-    # ---------------------------------------------
-    # 1. GET DISTRICT / STATE FROM MONGODB
-    # ---------------------------------------------
+    if not nodes:
+        return {}
 
-    locations = await get_locations_batch(nodes)
+
+    locations = await get_locations_batch(
+        nodes
+    )
 
     results = {}
-
-    # ---------------------------------------------
-    # 2. REMOVE DUPLICATE COORDINATES
-    # ---------------------------------------------
 
     unique_nodes = {}
 
@@ -221,18 +267,21 @@ async def get_marine_batch(nodes, time):
         key = coordinate_key(node)
 
         if key not in unique_nodes:
+
             unique_nodes[key] = node
 
     unique_nodes = list(
         unique_nodes.values()
     )
 
-    # ---------------------------------------------
-    # 3. CREATE MARINE API BATCHES
-    # ---------------------------------------------
+ 
 
     batches = [
-        unique_nodes[start:start + BATCH_SIZE]
+
+        unique_nodes[
+            start:start + BATCH_SIZE
+        ]
+
         for start in range(
             0,
             len(unique_nodes),
@@ -240,16 +289,15 @@ async def get_marine_batch(nodes, time):
         )
     ]
 
+   
+
     semaphore = asyncio.Semaphore(
         MAX_CONCURRENT_REQUESTS
     )
 
     marine_data = {}
 
-    # ---------------------------------------------
-    # 4. FETCH MARINE DATA
-    # ---------------------------------------------
-
+    
     async with httpx.AsyncClient(
         timeout=30
     ) as client:
@@ -268,20 +316,19 @@ async def get_marine_batch(nodes, time):
             for index, node in enumerate(batch):
 
                 if index >= len(data):
+
                     continue
 
                 marine_data[
                     coordinate_key(node)
                 ] = data[index]
 
-            if batch_number < len(batches):
+
+            if batch_number < len(batches) - 1:
+
                 await asyncio.sleep(
                     BATCH_DELAY
                 )
-
-        # -----------------------------------------
-        # 5. PROCESS MARINE RESULTS
-        # -----------------------------------------
 
         for node in nodes:
 
@@ -311,10 +358,14 @@ async def get_marine_batch(nodes, time):
                     node["longitude"],
 
                 "district":
-                    location.get("district"),
+                    location.get(
+                        "district"
+                    ),
 
                 "state":
-                    location.get("state"),
+                    location.get(
+                        "state"
+                    ),
 
                 "wave_height":
                     hourly.get(
@@ -377,10 +428,6 @@ async def get_marine_batch(nodes, time):
                     )[0]
             }
 
-        # -----------------------------------------
-        # 6. FETCH INCOIS ONCE
-        # -----------------------------------------
-
         response = await client.get(
             INCOIS_API_URL
         )
@@ -390,16 +437,16 @@ async def get_marine_batch(nodes, time):
         incois_data = response.json()
 
         hwa_list = parse_json_list(
-            incois_data.get("HWAJson")
+            incois_data.get(
+                "HWAJson"
+            )
         )
 
         ssa_list = parse_json_list(
-            incois_data.get("SSAJson")
+            incois_data.get(
+                "SSAJson"
+            )
         )
-
-        # -----------------------------------------
-        # 7. MATCH INCOIS WARNINGS LOCALLY
-        # -----------------------------------------
 
         for node in nodes:
 
@@ -410,29 +457,52 @@ async def get_marine_batch(nodes, time):
                 {}
             )
 
+
             high_wave_warning = find_warning(
                 location,
                 hwa_list
             )
+
 
             swell_surge_warning = find_warning(
                 location,
                 ssa_list
             )
 
-            results[node_id][
-                "high_wave_warning"
-            ] = high_wave_warning
+            alerts = [
+                high_wave_warning,
+                swell_surge_warning
+            ]
 
-            results[node_id][
-                "swell_surge_warning"
-            ] = swell_surge_warning
+            alert_text = " ".join(
+                str(alert).lower()
+                for alert in alerts
+                if alert
+            )
+
+
+            if "severe" in alert_text:
+
+                warning_level = "severe"
+
+            elif "warning" in alert_text:
+
+                warning_level = "warning"
+
+            elif "advisory" in alert_text:
+
+                warning_level = "advisory"
+
+            else:
+
+                warning_level = None
+
+            # -------------------------------------
+            # ONLY ONE WARNING FIELD
+            # -------------------------------------
 
             results[node_id][
                 "warning"
-            ] = bool(
-                high_wave_warning
-                or swell_surge_warning
-            )
+            ] = warning_level
 
     return results
