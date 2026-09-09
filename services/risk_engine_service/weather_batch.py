@@ -197,20 +197,4 @@ async def get_weather_data_batch(nodes, time):
             {}
         )
 
-<<<<<<< HEAD
-                    "condition": get_weather_condition(
-                        weather_code
-                    ),
-
-                    "lightning": is_thunderstorm(
-                        weather_code
-                    )
-                }
-
-    return {
-        node["node_id"]: results[node["node_id"]]
-        for node in nodes
-    }
-=======
     return final_results
->>>>>>> origin/main
