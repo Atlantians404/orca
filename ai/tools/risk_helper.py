@@ -8,10 +8,12 @@ async def get_geo_data_batch(nodes):
     async def process_node(node):
         lat = node["latitude"]
         lon = node["longitude"]
+
         restricted, protected = await asyncio.gather(
             is_restricted(lat, lon),
             is_protected(lat, lon)
         )
+
         return node["node_id"], {
             "latitude": lat,
             "longitude": lon,
@@ -22,19 +24,26 @@ async def get_geo_data_batch(nodes):
     results = await asyncio.gather(
         *(process_node(node) for node in nodes)
     )
+
     return dict(results)
 
 def build_risk_input(node, time, weather, marine, geo):
     node_id = node["node_id"]
+    marine_data = marine[node_id].copy()
+
+    if "warning" in marine_data:
+        marine_data["marine_warning"] = str(
+            marine_data.pop("warning")
+        )
+
     return {
-        "marine": marine[node_id],
+        "marine": marine_data,
         "weather": {
             **weather[node_id],
-            "wave_height": marine[node_id]["wave_height"]
+            "wave_height": marine_data["wave_height"]
         },
         "geo": geo[node_id]
     }
-
 async def evaluate_node(node, time, weather, marine, geo):
     risk_input = build_risk_input(
         node, time, weather, marine, geo
@@ -64,7 +73,9 @@ async def process_grid(k7_input):
         get_marine_batch(nodes, time),
         get_geo_data_batch(nodes)
     )
-
+    print("\nMARINE DATA")
+    for node_id, data in marine.items():
+        print(node_id, data)
     results = await asyncio.gather(
         *(evaluate_node(
             node, time, weather, marine, geo
