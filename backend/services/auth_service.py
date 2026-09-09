@@ -7,6 +7,8 @@ from backend.schemas.auth import (
     LoginRequest,
 )
 
+from backend.models.profiles import Profile
+
 from backend.utils.auth_util import (
     hash_password,
     verify_password,
@@ -23,10 +25,7 @@ from backend.core.exceptions import (
 # REGISTER USER
 # ==================================================
 
-async def register_user(
-    data: RegisterRequest,
-    db: AsyncSession
-) -> User:
+async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
 
     result = await db.execute(
         select(User).where(User.email == data.email)
@@ -41,11 +40,21 @@ async def register_user(
         username=data.username,
         email=data.email,
         hashed_password=hash_password(data.password),
-        role="USER",
-        language="en"
+        role="USER"
     )
 
     db.add(user)
+
+    # Generate user.id before commit
+    await db.flush()
+
+    profile = Profile(
+        user_id=user.id,
+        display_name=data.username,
+        language="en"
+    )
+
+    db.add(profile)
 
     await db.commit()
     await db.refresh(user)

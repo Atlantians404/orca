@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.sessions import Session
@@ -31,16 +31,43 @@ async def create_session(
 
 async def get_user_sessions(
     user_id: int,
+    page: int,
+    limit: int,
     db: AsyncSession
-) -> list[Session]:
+):
+    # Get total number of sessions
+    count_result = await db.execute(
+        select(func.count())
+        .select_from(Session)
+        .where(Session.user_id == user_id)
+    )
 
+    total = count_result.scalar_one()
+
+    # Calculate offset
+    offset = (page - 1) * limit
+
+    # Get paginated sessions
     result = await db.execute(
         select(Session)
         .where(Session.user_id == user_id)
         .order_by(Session.id.desc())
+        .offset(offset)
+        .limit(limit)
     )
 
-    return list(result.scalars().all())
+    sessions = list(result.scalars().all())
+
+    # Calculate total pages
+    pages = (total + limit - 1) // limit
+
+    return {
+        "items": sessions,
+        "page": page,
+        "limit": limit,
+        "total": total,
+        "pages": pages,
+    }
 
 
 async def get_session(
