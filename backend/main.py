@@ -12,6 +12,7 @@ import time
 from backend.routes.auth import router as auth_router
 from backend.routes.session import router as session_router
 from backend.routes.chat import router as chat_router
+from backend.routes.profile import router as profile_router
 
 
 @asynccontextmanager
@@ -75,3 +76,5 @@ app.include_router(auth_router)
 app.include_router(session_router)
 
 app.include_router(chat_router)
+
+app.include_router(profile_router)
