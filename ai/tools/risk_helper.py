@@ -4,6 +4,8 @@ from services.risk_engine_service.weather_batch import get_weather_data_batch
 from services.risk_engine_service.marine_batch import get_marine_batch
 from services.location.marine_zones import is_protected, is_restricted
 
+RISK_MAX_CONCURRENT = 5
+
 async def get_geo_data_batch(nodes):
     async def process_node(node):
         lat = node["latitude"]
@@ -44,25 +46,38 @@ def build_risk_input(node, time, weather, marine, geo):
         },
         "geo": geo[node_id]
     }
-async def evaluate_node(node, time, weather, marine, geo):
-    risk_input = build_risk_input(
-        node, time, weather, marine, geo
-    )
 
-    agent_data = {
-        node["node_id"]: {
-            time: risk_input
+async def evaluate_node(
+    node,
+    time,
+    weather,
+    marine,
+    geo,
+    semaphore
+):
+    async with semaphore:
+        risk_input = build_risk_input(
+            node,
+            time,
+            weather,
+            marine,
+            geo
+        )
+
+        agent_data = {
+            node["node_id"]: {
+                time: risk_input
+            }
         }
-    }
 
-    result = run_risk_engine(agent_data)
-    risk = result["ranked_results"][0]
+        result = run_risk_engine(agent_data)
+        risk = result["ranked_results"][0]
 
-    return {
-        "node_id": node["node_id"],
-        "risk_score": risk["risk_score"],
-        "safe": risk["risk_score"] <= 60
-    }
+        return {
+            "node_id": node["node_id"],
+            "risk_score": risk["risk_score"],
+            "safe": risk["risk_score"] <= 60
+        }
 
 async def process_grid(k7_input):
     nodes = k7_input["nodes"]
@@ -73,13 +88,21 @@ async def process_grid(k7_input):
         get_marine_batch(nodes, time),
         get_geo_data_batch(nodes)
     )
-    print("\nMARINE DATA")
-    for node_id, data in marine.items():
-        print(node_id, data)
+
+    semaphore = asyncio.Semaphore(RISK_MAX_CONCURRENT)
+
     results = await asyncio.gather(
-        *(evaluate_node(
-            node, time, weather, marine, geo
-        ) for node in nodes)
+        *(
+            evaluate_node(
+                node,
+                time,
+                weather,
+                marine,
+                geo,
+                semaphore
+            )
+            for node in nodes
+        )
     )
 
     return list(results)
