@@ -68,7 +68,7 @@ async def root():
 def scalar():
     return get_scalar_api_reference(
         openapi_url=app.openapi_url,
-        title="Scalar API"
+        title="ORCA API Documentation",
     )
 
 app.include_router(auth_router)
