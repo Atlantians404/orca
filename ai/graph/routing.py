@@ -14,3 +14,10 @@ def route_query(state: AgentState) -> str:
         return "planning"
 
     return "general"
+
+def route_after_pfz_selection(state: AgentState) -> str:
+
+    if state.get("route_required", False):
+        return "route"
+
+    return "final_response"

@@ -10,7 +10,7 @@ from ai.tools.weather_tools import (
     weather_condition_tool,
     thunderstorm_tool,
 )
-from ai.state import AgentState
+from ai.agent_state import AgentState
 
 
 weather_tools = [
