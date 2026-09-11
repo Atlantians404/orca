@@ -1,11 +1,14 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, field_validator, Field
 
 
 class RegisterRequest(BaseModel):
-    username: str
+    username: str = Field(min_length=1)
     email: EmailStr
-    password: str
-
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+        pattern=r"^(?=.*[A-Za-z])(?=.*\d).*$"
+    )
 
 class LoginRequest(BaseModel):
     email: EmailStr
