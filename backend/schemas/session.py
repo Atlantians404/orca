@@ -16,3 +16,11 @@ class SessionResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class SessionListResponse(BaseModel):
+    items: list[SessionResponse]
+    page: int
+    limit: int
+    total: int
+    pages: int

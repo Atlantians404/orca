@@ -31,9 +31,3 @@ class User(Base):
         String,
         default="USER"
     )
-
-    language = Column(
-        String,
-        default="en",
-        nullable=False
-    )

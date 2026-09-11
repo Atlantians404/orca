@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database.database import get_db
@@ -6,7 +6,8 @@ from backend.database.database import get_db
 from backend.schemas.session import (
     SessionCreate,
     SessionUpdate,
-    SessionResponse
+    SessionResponse,
+    SessionListResponse,
 )
 
 from backend.services.session_service import (
@@ -14,7 +15,7 @@ from backend.services.session_service import (
     get_user_sessions,
     get_session,
     update_session,
-    delete_session
+    delete_session,
 )
 
 from backend.utils.auth_util import verify_token
@@ -59,14 +60,23 @@ async def create(
 
 
 # ==================================================
-# GET ALL
+# GET ALL - PAGINATED
 # ==================================================
 
 @router.get(
     "",
-    response_model=list[SessionResponse]
+    response_model=SessionListResponse
 )
 async def get_all(
+    page: int = Query(
+        default=1,
+        ge=1
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(verify_token)
 ):
@@ -74,6 +84,8 @@ async def get_all(
 
     return await get_user_sessions(
         user_id,
+        page,
+        limit,
         db
     )
 

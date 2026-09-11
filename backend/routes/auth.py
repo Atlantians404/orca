@@ -37,7 +37,8 @@ router = APIRouter(
 
 @router.post(
     "/register",
-    status_code=status.HTTP_201_CREATED
+    status_code=status.HTTP_201_CREATED,
+    response_model=MessageResponse
 )
 async def register(
     data: RegisterRequest,
@@ -59,8 +60,7 @@ async def register(
     )
 
     return {
-        "message": "User registered successfully",
-        "user_id": user.id
+        "message": "User registered successfully"
     }
 
 
