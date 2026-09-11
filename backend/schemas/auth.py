@@ -1,14 +1,25 @@
-from pydantic import BaseModel, EmailStr, field_validator, Field
-
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 class RegisterRequest(BaseModel):
     username: str = Field(min_length=1)
     email: EmailStr
-    password: str = Field(
-        min_length=8,
-        max_length=128,
-        pattern=r"^(?=.*[A-Za-z])(?=.*\d).*$"
-    )
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Username cannot be empty")
+        return value
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, value: str) -> str:
+        if not any(char.isalpha() for char in value):
+            raise ValueError("Password must contain at least one letter")
+        if not any(char.isdigit() for char in value):
+            raise ValueError("Password must contain at least one number")
+        return value
 
 class LoginRequest(BaseModel):
     email: EmailStr
