@@ -1,384 +1,264 @@
 import asyncio
+import json
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
 
-from ai.agent_state import AgentState
-
-from ai.graph.nodes import (
-    location_node,
-    time_node,
-    pfz_node,
-    data_collection_node,
-)
+from ai.graph.graph import build_graph
 
 
-def build_test_graph():
-
-    graph = StateGraph(AgentState)
-
-    # Only the nodes we want to test
-    graph.add_node("location", location_node)
-    graph.add_node("time", time_node)
-    graph.add_node("pfz", pfz_node)
-    graph.add_node("data_collection", data_collection_node)
-
-    # ---------------------------------------------------------
-    # Graph path
-    # ---------------------------------------------------------
-
-    graph.add_edge(START, "location")
-    graph.add_edge("location", "time")
-    graph.add_edge("time", "pfz")
-    graph.add_edge("pfz", "data_collection")
-    graph.add_edge("data_collection", END)
-
-    checkpointer = MemorySaver()
-
-    return graph.compile(
-        checkpointer=checkpointer
-    )
+SESSION_ID = "test-route-flow-001"
 
 
-app_graph = build_test_graph()
-
-
-async def run_test(
-    test_name,
-    location,
-    time_response,
-):
-
-    print("\n")
-    print("=" * 70)
-    print(f"TEST: {test_name}")
+async def main():
+    print("\n" + "=" * 70)
+    print("ORCA FULL ROUTE FLOW TEST")
     print("=" * 70)
 
-    thread_id = f"test-{test_name}"
+    graph = build_graph()
 
     config = {
         "configurable": {
-            "thread_id": thread_id
+            "thread_id": SESSION_ID
         }
     }
 
-    # ---------------------------------------------------------
-    # Initial state
-    # ---------------------------------------------------------
+    # ============================================================
+    # STEP 1 — Initial request
+    # ============================================================
 
-    initial_state = {
-        "thread_id": thread_id,
+    print("\n[STEP 1] User:")
+    print("Plan a Trip with route")
 
-        "prompt": "Find marine conditions for fishing.",
-
-        "conversation_summary": None,
-
-        "query_type": "planning",
-
-        "location": None,
-
-        "time_context": None,
-
-        "distance_km": 50.0,
-
-        "pfz_candidates": {},
-
-        "selected_pfz_name": None,
-
-        "selected_pfz": None,
-
-        "agent_data": {},
-
-        "risk_result": None,
-
-        "route_required": False,
-
-        "route_result": None,
-
-        "response": None,
-
-        "pending_action": None,
-
-        "workflow_status": "STARTED",
-    }
-
-    # ---------------------------------------------------------
-    # Start graph
-    # ---------------------------------------------------------
-
-    await app_graph.ainvoke(
-        initial_state,
-        config=config
+    result = await graph.ainvoke(
+        {
+            "prompt": "Plan a Trip with route",
+        },
+        config=config,
     )
 
-    # ---------------------------------------------------------
-    # Handle HITL
-    # ---------------------------------------------------------
+    print("\n[STEP 1] Graph response:")
+    print(json.dumps(result, indent=2, default=str))
 
-    while True:
-
-        state = await app_graph.aget_state(config)
-
-        if not state.interrupts:
-            break
-
-        interrupt_data = state.interrupts[0].value
-
-        action = interrupt_data.get("action")
-
-        print(f"\nHITL: {action}")
-
-        # -----------------------------------------------------
-        # Location
-        # -----------------------------------------------------
-
-        if action == "GET_LOCATION":
-
-            print(
-                "→ Providing test location:"
-            )
-
-            print(location)
-
-            user_response = location
-
-        # -----------------------------------------------------
-        # Time
-        # -----------------------------------------------------
-
-        elif action == "GET_TIME":
-
-            print(
-                "→ Providing test time:"
-            )
-
-            print(time_response)
-
-            user_response = time_response
-
-        # -----------------------------------------------------
-        # Anything after Data Collection is NOT expected
-        # -----------------------------------------------------
-
-        else:
-
-            print(
-                f"\n❌ Unexpected HITL action: {action}"
-            )
-
-            return
-
-        # -----------------------------------------------------
-        # Resume
-        # -----------------------------------------------------
-
-        await app_graph.ainvoke(
-            Command(
-                resume=user_response
-            ),
-            config=config
-        )
-
-    # ---------------------------------------------------------
-    # Get final state
-    # ---------------------------------------------------------
-
-    state = await app_graph.aget_state(config)
-
-    values = state.values
-
-    # ---------------------------------------------------------
-    # Print location
-    # ---------------------------------------------------------
+    # ============================================================
+    # STEP 2 — Resume GET_LOCATION
+    # ============================================================
 
     print("\n" + "-" * 70)
-    print("LOCATION")
+    print("[STEP 2] Providing location...")
     print("-" * 70)
 
-    print(values.get("location"))
-
-    # ---------------------------------------------------------
-    # Print time
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("TIME")
-    print("-" * 70)
-
-    print(values.get("time_context"))
-
-    # ---------------------------------------------------------
-    # Print PFZ candidates
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("PFZ CANDIDATES")
-    print("-" * 70)
-
-    pfz_candidates = values.get(
-        "pfz_candidates",
-        {}
+    result = await graph.ainvoke(
+        Command(
+            resume={
+                "latitude": 13.0827,
+                "longitude": 80.2707,
+            }
+        ),
+        config=config,
     )
+
+    print("\n[STEP 2] Graph response:")
+    print(json.dumps(result, indent=2, default=str))
+
+    # ============================================================
+    # STEP 3 — Resume GET_TIME
+    # ============================================================
+
+    print("\n" + "-" * 70)
+    print("[STEP 3] Providing fishing time...")
+    print("-" * 70)
+
+    result = await graph.ainvoke(
+        Command(
+            resume="tomorrow at 6 AM"
+        ),
+        config=config,
+    )
+
+    print("\n[STEP 3] Graph response:")
+    print(json.dumps(result, indent=2, default=str))
+
+    # ============================================================
+    # STEP 4 — Resume SELECT_PFZ
+    # ============================================================
+
+    print("\n" + "-" * 70)
+    print("[STEP 4] Selecting PFZ...")
+    print("-" * 70)
+
+    result = await graph.ainvoke(
+        Command(
+            resume="Coromandel"
+        ),
+        config=config,
+    )
+
+    print("\n[STEP 4] FINAL GRAPH RESPONSE:")
+    print(json.dumps(result, indent=2, default=str))
+
+    # ============================================================
+    # STEP 5 — Inspect final state
+    # ============================================================
+
+    print("\n" + "=" * 70)
+    print("FINAL STATE INSPECTION")
+    print("=" * 70)
+
+    final_state = await graph.aget_state(config)
 
     print(
-        f"Total PFZs: {len(pfz_candidates)}"
+        json.dumps(
+            final_state.values,
+            indent=2,
+            default=str,
+        )
     )
 
-    for name, pfz in pfz_candidates.items():
+    # ============================================================
+    # ROUTE RESULT
+    # ============================================================
 
-        print(f"\n{name}")
+    route_result = final_state.values.get(
+        "route_result"
+    )
 
-        print(
-            f"  Latitude: "
-            f"{pfz.get('latitude')}"
+    print("\n" + "=" * 70)
+    print("ROUTE RESULT")
+    print("=" * 70)
+
+    if not route_result:
+        print("❌ route_result is missing")
+        return
+
+    print(
+        json.dumps(
+            route_result,
+            indent=2,
+            default=str,
         )
+    )
 
+    # ============================================================
+    # CANDIDATE ROUTES
+    # ============================================================
+
+    candidate_routes = route_result.get(
+        "candidate_routes",
+        [],
+    )
+
+    print("\n" + "=" * 70)
+    print(
+        f"CANDIDATE ROUTES: {len(candidate_routes)}"
+    )
+    print("=" * 70)
+
+    for route in candidate_routes:
+
+        print("\nRoute:")
         print(
-            f"  Longitude: "
-            f"{pfz.get('longitude')}"
+            f"  ID: {route.get('route_id')}"
         )
 
         print(
             f"  Distance: "
-            f"{pfz.get('distance_from_source_km')}"
+            f"{route.get('distance_km')} km"
         )
 
         print(
-            f"  Direction: "
-            f"{pfz.get('direction')}"
+            f"  Risk: "
+            f"{route.get('risk_score')}"
         )
 
-    # ---------------------------------------------------------
-    # Print Data Collection
-    # ---------------------------------------------------------
+        print(
+            f"  Safe: "
+            f"{route.get('safe')}"
+        )
+
+        waypoints = route.get(
+            "waypoints",
+            [],
+        )
+
+        print(
+            f"  Waypoints: "
+            f"{len(waypoints)}"
+        )
+
+        print(
+            "  GeoJSON: "
+            + (
+                "YES"
+                if route.get("geojson")
+                else "NO"
+            )
+        )
+
+        nodes = route.get(
+            "nodes",
+            [],
+        )
+
+        print(
+            f"  Risk nodes: "
+            f"{len(nodes)}"
+        )
+
+    # ============================================================
+    # SAFE ROUTE
+    # ============================================================
+
+    safe_route = route_result.get(
+        "safe_route"
+    )
 
     print("\n" + "=" * 70)
-    print("DATA COLLECTION AGENT")
+    print("SAFE ROUTE")
     print("=" * 70)
 
-    agent_data = values.get(
-        "agent_data",
-        {}
-    )
-
-    if not agent_data:
-
-        print("\n❌ No agent_data returned.")
-
-        return
-
-    print(
-        f"\nPFZs collected: "
-        f"{len(agent_data)}"
-    )
-
-    for pfz_name, time_data in agent_data.items():
-
-        print("\n" + "-" * 60)
+    if safe_route:
 
         print(
-            f"PFZ: {pfz_name}"
+            f"Route ID: "
+            f"{safe_route.get('route_id')}"
         )
 
-        print("-" * 60)
-
-        for collection_time, data in time_data.items():
-
-            print(
-                f"\nTime: {collection_time}"
-            )
-
-            print("\nMarine:")
-
-            print(
-                data.get("marine")
-            )
-
-            print("\nWeather:")
-
-            print(
-                data.get("weather")
-            )
-
-            print("\nGeo:")
-
-            print(
-                data.get("geo")
-            )
-
-    # ---------------------------------------------------------
-    # Verify Risk Engine did NOT run
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("STOP CHECK")
-    print("-" * 70)
-
-    if values.get("risk_result"):
+        print(
+            f"Distance: "
+            f"{safe_route.get('distance_km')} km"
+        )
 
         print(
-            "❌ Risk Engine was executed!"
+            f"Risk Score: "
+            f"{safe_route.get('risk_score')}"
+        )
+
+        print(
+            f"Safe: "
+            f"{safe_route.get('safe')}"
+        )
+
+        print(
+            f"Waypoints: "
+            f"{len(safe_route.get('waypoints', []))}"
+        )
+
+        print(
+            "GeoJSON: "
+            + (
+                "YES"
+                if safe_route.get("geojson")
+                else "NO"
+            )
         )
 
     else:
-
-        print(
-            "✅ Risk Engine was NOT executed."
-        )
+        print("⚠️ No safe route was found.")
 
     print("\n" + "=" * 70)
-
-    print(
-        f"✅ {test_name} FINISHED"
-    )
-
+    print("TEST COMPLETE")
     print("=" * 70)
 
 
-async def main():
-
-    # =========================================================
-    # CASE 1
-    # One location / one time
-    # =========================================================
-
-    await run_test(
-        test_name="one-pfz-one-time",
-
-        location={
-            "latitude": 13.08,
-            "longitude": 80.27,
-        },
-
-        time_response={
-            "date": "2026-08-30",
-            "start_time": "08:00",
-            "end_time": None,
-        },
-    )
-
-    # =========================================================
-    # CASE 2
-    # Different time
-    # =========================================================
-
-    await run_test(
-        test_name="one-pfz-different-time",
-
-        location={
-            "latitude": 13.08,
-            "longitude": 80.27,
-        },
-
-        time_response={
-            "date": "2026-08-30",
-            "start_time": "12:00",
-            "end_time": None,
-        },
-    )
-
-
 if __name__ == "__main__":
-
     asyncio.run(main())

@@ -52,8 +52,10 @@ def format_data(
             "sea_level_height_msl": marine_data.get(
                 "sea_level_height_msl"
             ),
-            "marine_warning": marine_data.get(
-                "warning"
+            "marine_warning": (
+                marine_data.get("high_wave_warning")
+                or marine_data.get("swell_surge_warning")
+                or "None"
             )
         },
         "weather": {
