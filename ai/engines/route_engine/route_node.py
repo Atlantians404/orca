@@ -14,10 +14,46 @@ from .zone_repository import get_route_zones
 from ai.tools.risk_helper import process_grid
 
 
+def _get_value(obj: Any, key: str, default=None):
+    if isinstance(obj, dict):
+        return obj.get(key, default)
+
+    return getattr(obj, key, default)
+
+
+def _get_route_time(time_context: Any) -> str | None:
+    if not time_context:
+        return None
+
+    specific_time = _get_value(time_context, "specific_time")
+
+    if specific_time:
+        return specific_time
+
+    time_value = _get_value(time_context, "time")
+
+    if time_value:
+        return time_value
+
+    slots = _get_value(time_context, "slots", [])
+
+    if slots:
+        first_slot = slots[0]
+
+        date = _get_value(first_slot, "date")
+        start_time = _get_value(first_slot, "start_time")
+
+        if date and start_time:
+            return f"{date}T{start_time}:00"
+
+    return None
+
+
 async def _build_route_request(
     state: dict[str, Any],
     restricted_zones: list[dict[str, Any]],
 ) -> RouteRequest:
+
     location = state.get("location")
     selected_pfz = state.get("selected_pfz")
     time_context = state.get("time_context")
@@ -31,15 +67,37 @@ async def _build_route_request(
     if not time_context:
         raise ValueError("Route node requires time_context")
 
+    latitude = _get_value(location, "latitude")
+    longitude = _get_value(location, "longitude")
+
+    if latitude is None or longitude is None:
+        raise ValueError(
+            "Route node requires valid location coordinates"
+        )
+
+    pfz_latitude = _get_value(selected_pfz, "latitude")
+    pfz_longitude = _get_value(selected_pfz, "longitude")
+
+    if pfz_latitude is None or pfz_longitude is None:
+        raise ValueError(
+            "Selected PFZ requires valid coordinates"
+        )
+
+    coastal_reference = _get_value(
+        selected_pfz,
+        "coastal_reference",
+        _get_value(selected_pfz, "name", "Selected PFZ"),
+    )
+
     start = Coordinate(
-        latitude=location["latitude"],
-        longitude=location["longitude"],
+        latitude=latitude,
+        longitude=longitude,
     )
 
     destination = RouteDestination(
-        coastal_reference=selected_pfz["coastal_reference"],
-        latitude=selected_pfz["latitude"],
-        longitude=selected_pfz["longitude"],
+        coastal_reference=coastal_reference,
+        latitude=pfz_latitude,
+        longitude=pfz_longitude,
     )
 
     converted_zones = []
@@ -49,7 +107,10 @@ async def _build_route_request(
             RestrictedZone(
                 name=zone.get("name", "Unknown"),
                 state=zone.get("state", ""),
-                type=zone.get("type", "MARINE_RESTRICTED_AREA"),
+                type=zone.get(
+                    "type",
+                    "MARINE_RESTRICTED_AREA",
+                ),
                 restriction_level=zone.get(
                     "restriction_level",
                     "RESTRICTED",
@@ -62,11 +123,12 @@ async def _build_route_request(
             )
         )
 
+    route_time = _get_route_time(time_context)
+
     return RouteRequest(
         start=start,
         destination=destination,
-        time=time_context.get("specific_time")
-        or time_context.get("time"),
+        time=route_time,
         constraints=RouteConstraints(
             avoid_restricted_zones=True,
             restricted_zones=converted_zones,
@@ -74,16 +136,21 @@ async def _build_route_request(
     )
 
 
-async def _build_risk_nodes(route: Any) -> list[dict[str, Any]]:
+async def _build_risk_nodes(
+    route: Any,
+) -> list[dict[str, Any]]:
+
     nodes = []
 
     for waypoint in route.waypoints:
         nodes.append(
             {
-                "node_id": waypoint.node_id
-                or (
-                    f"{waypoint.latitude}:"
-                    f"{waypoint.longitude}"
+                "node_id": (
+                    waypoint.node_id
+                    or (
+                        f"{waypoint.latitude}:"
+                        f"{waypoint.longitude}"
+                    )
                 ),
                 "latitude": waypoint.latitude,
                 "longitude": waypoint.longitude,
@@ -97,6 +164,7 @@ async def _evaluate_route(
     route: Any,
     time: str,
 ) -> dict[str, Any]:
+
     nodes = await _build_risk_nodes(route)
 
     if not nodes:
@@ -147,14 +215,15 @@ async def _evaluate_routes(
     routes: list[Any],
     time: str,
 ) -> list[dict[str, Any]]:
-    results = await asyncio.gather(
-        *(
-            _evaluate_route(route, time)
-            for route in routes
+
+    return list(
+        await asyncio.gather(
+            *(
+                _evaluate_route(route, time)
+                for route in routes
+            )
         )
     )
-
-    return list(results)
 
 
 async def _select_safest_route(
@@ -183,10 +252,6 @@ async def route_node(
     state: dict[str, Any],
 ) -> dict[str, Any]:
 
-    # --------------------------------------------------
-    # 1. Load real MongoDB marine zones
-    # --------------------------------------------------
-
     zones = await get_route_zones()
 
     restricted_zones = zones.get(
@@ -199,10 +264,6 @@ async def route_node(
         [],
     )
 
-    # --------------------------------------------------
-    # 2. Build RouteRequest
-    # --------------------------------------------------
-
     request = await _build_route_request(
         state,
         restricted_zones,
@@ -213,10 +274,6 @@ async def route_node(
             "Route node requires a valid time"
         )
 
-    # --------------------------------------------------
-    # 3. Generate up to 3 candidate routes
-    # --------------------------------------------------
-
     engine = RouteEngine()
 
     candidate_routes = engine.generate_routes(
@@ -226,26 +283,35 @@ async def route_node(
 
     routes = candidate_routes.routes
 
-    # --------------------------------------------------
-    # 4. Evaluate all routes with Risk Helper
-    # --------------------------------------------------
+    if not routes:
+        return {
+            "route_result": {
+                "coastal_reference": (
+                    request.destination.coastal_reference
+                ),
+                "candidate_routes": [],
+                "safe_route": None,
+                "zones": {
+                    "restricted": restricted_zones,
+                    "protected": protected_zones,
+                },
+            },
+            "risk_result": {
+                "routes": [],
+                "selected_route_id": None,
+                "safe_route_found": False,
+            },
+            "workflow_status": "no_routes_found",
+        }
 
     route_risk_results = await _evaluate_routes(
         routes,
         request.time,
     )
 
-    # --------------------------------------------------
-    # 5. Select safest route
-    # --------------------------------------------------
-
     safest_route = await _select_safest_route(
         route_risk_results
     )
-
-    # --------------------------------------------------
-    # 6. Prepare candidate route response
-    # --------------------------------------------------
 
     candidate_route_data = []
 
@@ -271,10 +337,6 @@ async def route_node(
             }
         )
 
-    # --------------------------------------------------
-    # 7. Build final route_result
-    # --------------------------------------------------
-
     route_result = {
         "coastal_reference": (
             request.destination.coastal_reference
@@ -287,10 +349,6 @@ async def route_node(
         },
     }
 
-    # --------------------------------------------------
-    # 8. Build risk_result
-    # --------------------------------------------------
-
     risk_result = {
         "routes": route_risk_results,
         "selected_route_id": (
@@ -302,10 +360,6 @@ async def route_node(
             safest_route is not None
         ),
     }
-
-    # --------------------------------------------------
-    # 9. Return AgentState updates
-    # --------------------------------------------------
 
     return {
         "route_result": route_result,

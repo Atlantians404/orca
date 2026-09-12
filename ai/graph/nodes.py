@@ -402,8 +402,12 @@ async def route_node(state: AgentState) -> dict:
 
     return {
         "route_result": result.get("route_result"),
+        "risk_result": result.get("risk_result"),
         "pending_action": None,
-        "workflow_status": "IN_PROGRESS",
+        "workflow_status": result.get(
+            "workflow_status",
+            "IN_PROGRESS",
+        ),
     }
 
 
