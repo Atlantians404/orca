@@ -51,7 +51,7 @@ TIME_CONTEXT = TimeContext(
 def mock_data_services(monkeypatch):
 
     module = (
-        "ai.agents.data_collection_agent.data_collection_agent"
+        "ai.agents.data_collection_engine.data_collection_engine"
     )
 
     monkeypatch.setattr(

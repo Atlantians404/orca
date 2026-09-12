@@ -10,16 +10,35 @@ from ai.prompts.time_prompt import TIME_PROMPT
 
 from ai.agents.general_agent.general_agent import general_agent
 
+from ai.engines.risk_engine.risk_node import risk_engine_node
+
 from services.location.place_to_coordinate import get_coordinates
 from services.location.pfz_to_coordinate import get_pfz_coordinates
 
 from services.time.time_parser import (
     build_specific_time,
-    build_generic_time,
+    build_generic_time
 )
 
 from services.marine_data_sources import get_pfz_candidates
 
+from ai.engines.data_collection_engine.data_collection_engine import (
+    data_collection_engine
+)
+
+# =========================================================
+# ROUTE ENGINE
+# CHANGE THIS IMPORT IF YOUR ROUTE ENGINE STRUCTURE DIFFERS
+# =========================================================
+
+from ai.engines.route_engine.route_node import (
+    route_node as route_engine_node
+)
+
+
+# =========================================================
+# CONSTANTS
+# =========================================================
 
 DEFAULT_RADIUS_KM = 50.0
 MAX_PFZ_CANDIDATES = 20
@@ -31,14 +50,12 @@ MAX_PFZ_CANDIDATES = 20
 
 async def general_node(state: AgentState) -> dict:
 
-    result = await general_agent.ainvoke({
-        "messages": [
-            {
-                "role": "user",
-                "content": state["prompt"]
-            }
-        ]
-    })
+    result = await general_agent([
+        {
+            "role": "user",
+            "content": state["prompt"],
+        }
+    ])
 
     messages = result["messages"]
 
@@ -46,9 +63,9 @@ async def general_node(state: AgentState) -> dict:
 
     return {
         "response": {
-            "message": final_message
+            "message": final_message,
         },
-        "workflow_status": "COMPLETED"
+        "workflow_status": "COMPLETED",
     }
 
 
@@ -60,9 +77,9 @@ async def safety_node(state: AgentState) -> dict:
 
     return {
         "response": {
-            "message": "This is a safety assessment request."
+            "message": "This is a safety assessment request.",
         },
-        "workflow_status": "COMPLETED"
+        "workflow_status": "COMPLETED",
     }
 
 
@@ -74,9 +91,9 @@ async def planning_node(state: AgentState) -> dict:
 
     return {
         "response": {
-            "message": "This is a fishing trip planning request."
+            "message": "This is a fishing trip planning request.",
         },
-        "workflow_status": "COMPLETED"
+        "workflow_status": "IN_PROGRESS",
     }
 
 
@@ -110,7 +127,7 @@ async def location_node(state: AgentState) -> dict:
 
     if location and location.place:
 
-        coordinates = get_coordinates(
+        coordinates = await get_coordinates(
             location.place
         )
 
@@ -182,7 +199,7 @@ async def time_node(state: AgentState) -> dict:
 
     user_time = interrupt({
         "action": "GET_TIME",
-        "message": "When would you like to go fishing?"
+        "message": "When would you like to go fishing?",
     })
 
     # -----------------------------------------------------
@@ -197,17 +214,22 @@ async def time_node(state: AgentState) -> dict:
 
     content = response.content.strip()
 
+    # -----------------------------------------------------
     # Remove markdown code fences
+    # -----------------------------------------------------
+
     if content.startswith("```"):
 
         content = content.replace(
             "```json",
-            ""
+            "",
+            1,
         )
 
         content = content.replace(
             "```",
-            ""
+            "",
+            1,
         )
 
         content = content.strip()
@@ -295,14 +317,14 @@ async def pfz_node(state: AgentState) -> dict:
     )
 
     # -----------------------------------------------------
-    # 1. User directly specified PFZ name
+    # 1. PFZ already directly selected
     # -----------------------------------------------------
 
     if selected_pfz_name:
 
         try:
 
-            pfz = get_pfz_coordinates(
+            pfz = await get_pfz_coordinates(
                 selected_pfz_name
             )
 
@@ -375,7 +397,7 @@ async def pfz_node(state: AgentState) -> dict:
 
     candidates = result.get(
         "pfz_zones",
-        {}
+        {},
     )
 
     # -----------------------------------------------------
@@ -390,7 +412,7 @@ async def pfz_node(state: AgentState) -> dict:
             "response": {
                 "message": result.get(
                     "message",
-                    "No PFZ zones found."
+                    "No PFZ zones found.",
                 )
             },
         }
@@ -407,11 +429,74 @@ async def pfz_node(state: AgentState) -> dict:
 
 
 # =========================================================
-# PFZ SELECTION NODE
+# DATA COLLECTION NODE
+# =========================================================
+
+async def data_collection_node(state: AgentState) -> dict:
+    """
+    Adapter between the main graph PFZ structure and
+    the Data Collection Engine.
+
+    Main graph:
+        pfz_candidates -> dict
+
+    Data Collection Engine:
+        pfz_candidates -> list of PFZ dictionaries
+    """
+
+    pfz_candidates = state.get("pfz_candidates", {})
+
+    # Convert PFZ dictionary to list for Data Collection Engine
+    if isinstance(pfz_candidates, dict):
+        pfz_list = list(pfz_candidates.values())
+    elif isinstance(pfz_candidates, list):
+        pfz_list = pfz_candidates
+    else:
+        pfz_list = []
+
+    # Create a temporary state for the Data Collection Engine
+    collection_state = {
+        **state,
+        "pfz_candidates": pfz_list,
+    }
+
+    updated_state = await data_collection_engine(
+        collection_state
+    )
+
+    return {
+        "agent_data": updated_state.get(
+            "agent_data",
+            {}
+        ),
+        "workflow_status": "IN_PROGRESS",
+    }
+
+# =========================================================
+# RISK NODE
+# Existing Risk Engine
+# =====================================================
+
+async def risk_node(
+    state: AgentState,
+) -> dict:
+
+    result = await risk_engine_node(state)
+
+    return {
+        "risk_result": result["risk_result"],
+        "pending_action": None,
+        "workflow_status": "IN_PROGRESS",
+    }
+
+
+# =========================================================
+# PFZ SELECTION HITL
+# Risk results are shown before user selects
 # =========================================================
 
 async def pfz_selection_node(
-    state: AgentState
+    state: AgentState,
 ) -> dict:
 
     # -----------------------------------------------------
@@ -426,57 +511,128 @@ async def pfz_selection_node(
 
         return {
             "pending_action": None,
-            "workflow_status": "IN_PROGRESS"
+            "workflow_status": "IN_PROGRESS",
         }
 
     # -----------------------------------------------------
-    # 2. Get candidates
+    # 2. Get risk result
     # -----------------------------------------------------
 
-    candidates = state.get(
-        "pfz_candidates",
-        {}
+    risk_result = state.get(
+        "risk_result",
+        {},
     )
 
-    if not candidates:
+    ranked_results = risk_result.get(
+        "ranked_results",
+        [],
+    )
+
+    if not ranked_results:
 
         return {
-            "workflow_status": "COMPLETED"
+            "workflow_status": "COMPLETED",
+            "response": {
+                "message": "No risk results were available.",
+            },
         }
 
     # -----------------------------------------------------
-    # 3. Extract actual PFZ names
+    # 3. Build UI options
     # -----------------------------------------------------
 
-    pfz_names = []
+    pfz_options = []
 
-    for candidate in candidates.values():
+    for result in ranked_results:
 
-        name = candidate.get(
-            "name"
+        pfz_name = result.get(
+            "pfz_name"
         )
 
-        if name:
-            pfz_names.append(name)
+        if not pfz_name:
+            continue
+
+        pfz_options.append({
+            "pfz_name": pfz_name,
+            "risk_score": result.get("risk_score"),
+            "risk_level": result.get("risk_level"),
+        })
+
+    if not pfz_options:
+
+        return {
+            "workflow_status": "COMPLETED",
+            "response": {
+                "message": "No valid PFZ options were found.",
+            },
+        }
 
     # -----------------------------------------------------
-    # 4. Ask user to select PFZ
+    # 4. HITL
     # -----------------------------------------------------
 
     selected_name = interrupt({
         "action": "SELECT_PFZ",
-        "message": "Please select a PFZ.",
-        "options": pfz_names
+        "message": (
+            "Select a PFZ based on the risk assessment."
+        ),
+        "options": pfz_options,
     })
 
     # -----------------------------------------------------
-    # 5. Validate user selection
+    # 5. Validate input
     # -----------------------------------------------------
 
-    selected_name = (
+    if not isinstance(selected_name, str):
+
+        return {
+            "pending_action": "SELECT_PFZ",
+            "workflow_status": "WAITING_FOR_USER",
+        }
+
+    requested_name = (
         selected_name
         .strip()
-        .lower()
+        .casefold()
+    )
+
+    selected_result = None
+
+    for result in ranked_results:
+
+        pfz_name = result.get(
+            "pfz_name",
+            "",
+        )
+
+        if (
+            pfz_name
+            .strip()
+            .casefold()
+            == requested_name
+        ):
+
+            selected_result = result
+            break
+
+    # -----------------------------------------------------
+    # 6. Invalid selection
+    # -----------------------------------------------------
+
+    if selected_result is None:
+
+        return {
+            "pending_action": "SELECT_PFZ",
+            "workflow_status": "WAITING_FOR_USER",
+        }
+
+    # -----------------------------------------------------
+    # 7. Find original PFZ candidate
+    # -----------------------------------------------------
+
+    candidates = state.get(
+        "pfz_candidates",
+        {},
     )
 
     selected_pfz = None
@@ -485,88 +641,163 @@ async def pfz_selection_node(
 
         candidate_name = candidate.get(
             "name",
-            ""
+            "",
         )
 
         if (
             candidate_name
             .strip()
-            .lower()
-            == selected_name
+            .casefold()
+            == requested_name
         ):
 
             selected_pfz = candidate
             break
 
     # -----------------------------------------------------
-    # 6. Invalid PFZ selection
+    # 8. Store selected PFZ
     # -----------------------------------------------------
 
-    if selected_pfz is None:
-
-        return {
-            "pending_action": "SELECT_PFZ",
-            "workflow_status": "WAITING_FOR_USER"
-        }
-
-    # -----------------------------------------------------
-    # 7. Store selected PFZ
-    # -----------------------------------------------------
-
-    actual_name = selected_pfz.get(
-        "name"
+    actual_name = selected_result.get(
+        "pfz_name"
     )
 
     return {
         "selected_pfz_name": actual_name,
-        "selected_pfz": selected_pfz,
+        "selected_pfz": selected_pfz or selected_result,
         "pending_action": None,
-        "workflow_status": "IN_PROGRESS"
+        "workflow_status": "IN_PROGRESS",
     }
 
 
 # =========================================================
-# SELECT PFZ HELPER
+# ROUTE NODE
+# Existing Route Engine
 # =========================================================
 
-def select_pfz(
-    pfz_candidates: dict,
-    pfz_name: str
-) -> dict | None:
-    """
-    Select a PFZ using its actual name.
+async def route_node(
+    state: AgentState,
+) -> dict:
 
-    Example:
+    result = await route_node(state)
 
-        select_pfz(
-            candidates,
-            "Pondicherry"
-        )
-    """
+    return {
+        "route_result": result.get(
+            "route_result"
+        ),
+        "pending_action": None,
+        "workflow_status": "IN_PROGRESS",
+    }
 
-    if not pfz_candidates:
-        return None
 
-    requested_name = (
-        pfz_name
-        .strip()
-        .lower()
+# =========================================================
+# FINAL RESPONSE NODE
+# =========================================================
+
+async def final_response_node(
+    state: AgentState,
+) -> dict:
+
+    risk_result = state.get(
+        "risk_result"
     )
 
-    for pfz in pfz_candidates.values():
+    selected_pfz = state.get(
+        "selected_pfz"
+    )
 
-        candidate_name = pfz.get(
-            "name",
-            ""
+    route_result = state.get(
+        "route_result"
+    )
+
+    # -----------------------------------------------------
+    # Risk result available
+    # -----------------------------------------------------
+
+    if risk_result:
+
+        ranked_results = risk_result.get(
+            "ranked_results",
+            [],
         )
 
-        if (
-            candidate_name
-            .strip()
-            .lower()
-            == requested_name
-        ):
+        # Case 1 / Case 2 / Case 4
+        if ranked_results:
 
-            return pfz
+            if selected_pfz:
 
-    return None
+                selected_name = (
+                    state.get(
+                        "selected_pfz_name"
+                    )
+                )
+
+                selected_risk = None
+
+                for result in ranked_results:
+
+                    if (
+                        result.get("pfz_name", "")
+                        .strip()
+                        .casefold()
+                        == selected_name
+                        .strip()
+                        .casefold()
+                    ):
+
+                        selected_risk = result
+                        break
+
+                if selected_risk:
+
+                    message = (
+                        f"Selected PFZ: {selected_name}\n"
+                        f"Risk Score: "
+                        f"{selected_risk.get('risk_score')}\n"
+                        f"Risk Level: "
+                        f"{selected_risk.get('risk_level')}"
+                    )
+
+                else:
+
+                    message = (
+                        f"Selected PFZ: {selected_name}"
+                    )
+
+            else:
+
+                message = (
+                    "Risk assessment completed."
+                )
+
+        # Case 3
+        else:
+
+            message = (
+                "Risk assessment completed for "
+                "the requested PFZs and times."
+            )
+
+    else:
+
+        message = (
+            "Your ORCA request has been completed."
+        )
+
+    # -----------------------------------------------------
+    # Add route information
+    # -----------------------------------------------------
+
+    if route_result:
+
+        message += (
+            "\n\nRoute generation completed."
+        )
+
+    return {
+        "response": {
+            "message": message,
+        },
+        "pending_action": None,
+        "workflow_status": "COMPLETED",
+    }
