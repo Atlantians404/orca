@@ -12,6 +12,7 @@ from services.marine_data import (
     get_sea_surface_temperature,
     get_sea_level_height,
     is_marine_warning,
+    get_marine_warning_level,
     get_high_wave_alert,
     get_high_wave_warning_message,
     get_high_wave_warning_color,
@@ -98,6 +99,14 @@ async def sea_level_height_tool(
 async def marine_warning_tool(latitude: float, longitude: float) -> bool:
     """Check whether a marine warning exists at a location."""
     return await is_marine_warning(latitude, longitude)
+
+@tool
+async def marine_warning_level_tool(
+    latitude: float,
+    longitude: float,
+) -> str | None:
+    """Get the marine warning level at a location."""
+    return await get_marine_warning_level(latitude, longitude)
 
 
 @tool
