@@ -7,27 +7,23 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).resolve().parents[2]
 load_dotenv(ROOT_DIR / ".env")
 
-# MongoDB connection
-mongo_uri = os.getenv("MONGO_URI")
-
-if not mongo_uri:
-    raise ValueError("MONGO_URI not found.")
-
-client = AsyncIOMotorClient(mongo_uri)
-db = client["ORCA"]
-
-protected_collection = db["protected_zones"]
-restricted_collection = db["restricted_zones"]
+def get_db():
+    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")
+    if not mongo_uri:
+        raise ValueError("MONGO_URI not found.")
+    client = AsyncIOMotorClient(mongo_uri)
+    return client["ORCA"]
 
 
 async def is_protected(latitude: float, longitude: float) -> bool:
 
+    db = get_db()
     point = {
         "type": "Point",
         "coordinates": [longitude, latitude]
     }
 
-    result = await protected_collection.find_one({
+    result = await db["protected_zones"].find_one({
         "geometry": {
             "$geoIntersects": {
                 "$geometry": point
@@ -40,12 +36,13 @@ async def is_protected(latitude: float, longitude: float) -> bool:
 
 async def is_restricted(latitude: float, longitude: float) -> bool:
 
+    db = get_db()
     point = {
         "type": "Point",
         "coordinates": [longitude, latitude]
     }
 
-    result = await restricted_collection.find_one({
+    result = await db["restricted_zones"].find_one({
         "geometry": {
             "$geoIntersects": {
                 "$geometry": point
