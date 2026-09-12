@@ -4,7 +4,10 @@ from langgraph.checkpoint.memory import MemorySaver
 from ai.agent_state import AgentState
 
 from ai.orchestrator import orchestrate
-from ai.graph.routing import route_query
+from ai.graph.routing import (
+    route_query,
+    route_after_pfz_selection,
+)
 
 from ai.graph.nodes import (
     general_node,
@@ -13,7 +16,11 @@ from ai.graph.nodes import (
     location_node,
     time_node,
     pfz_node,
+    data_collection_node,
+    risk_node,
     pfz_selection_node,
+    route_node,
+    final_response_node,
 )
 
 
@@ -27,42 +34,62 @@ def build_graph():
 
     graph.add_node(
         "orchestrator",
-        orchestrate
+        orchestrate,
     )
 
     graph.add_node(
         "general",
-        general_node
+        general_node,
     )
 
     graph.add_node(
         "safety",
-        safety_node
+        safety_node,
     )
 
     graph.add_node(
         "planning",
-        planning_node
+        planning_node,
     )
 
     graph.add_node(
         "location",
-        location_node
+        location_node,
     )
 
     graph.add_node(
         "time",
-        time_node
+        time_node,
     )
 
     graph.add_node(
         "pfz",
-        pfz_node
+        pfz_node,
+    )
+
+    graph.add_node(
+        "data_collection",
+        data_collection_node,
+    )
+
+    graph.add_node(
+        "risk",
+        risk_node,
     )
 
     graph.add_node(
         "pfz_selection",
-        pfz_selection_node
+        pfz_selection_node,
+    )
+
+    graph.add_node(
+        "route",
+        route_node,
+    )
+
+    graph.add_node(
+        "final_response",
+        final_response_node,
     )
 
     # =====================================================
@@ -71,7 +98,7 @@ def build_graph():
 
     graph.add_edge(
         START,
-        "orchestrator"
+        "orchestrator",
     )
 
     # =====================================================
@@ -94,7 +121,7 @@ def build_graph():
 
     graph.add_edge(
         "general",
-        END
+        END,
     )
 
     # =====================================================
@@ -103,7 +130,7 @@ def build_graph():
 
     graph.add_edge(
         "location",
-        "time"
+        "time",
     )
 
     # =====================================================
@@ -112,36 +139,76 @@ def build_graph():
 
     graph.add_edge(
         "time",
-        "pfz"
+        "pfz",
     )
 
     # =====================================================
-    # PFZ → PFZ SELECTION
+    # PFZ → DATA COLLECTION
     # =====================================================
 
     graph.add_edge(
         "pfz",
-        "pfz_selection"
+        "data_collection",
     )
 
     # =====================================================
-    # PFZ SELECTION → END
+    # DATA COLLECTION → RISK
     # =====================================================
 
     graph.add_edge(
+        "data_collection",
+        "risk",
+    )
+
+    # =====================================================
+    # RISK → PFZ SELECTION HITL
+    # =====================================================
+
+    graph.add_edge(
+        "risk",
         "pfz_selection",
-        END
+    )
+
+    # =====================================================
+    # PFZ SELECTION → ROUTE / FINAL RESPONSE
+    # =====================================================
+
+    graph.add_conditional_edges(
+        "pfz_selection",
+        route_after_pfz_selection,
+        {
+            "route": "route",
+            "final_response": "final_response",
+        },
+    )
+
+    # =====================================================
+    # ROUTE → FINAL RESPONSE
+    # =====================================================
+
+    graph.add_edge(
+        "route",
+        "final_response",
+    )
+
+    # =====================================================
+    # FINAL RESPONSE → END
+    # =====================================================
+
+    graph.add_edge(
+        "final_response",
+        END,
     )
 
     # =====================================================
     # CHECKPOINTER
-    # Required for interrupt / resume
+    # Required for HITL interrupt / resume
     # =====================================================
 
     checkpointer = MemorySaver()
 
     return graph.compile(
-        checkpointer=checkpointer
+        checkpointer=checkpointer,
     )
 
 
