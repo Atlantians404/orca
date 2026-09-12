@@ -13,7 +13,7 @@ from backend.routes.auth import router as auth_router
 from backend.routes.session import router as session_router
 from backend.routes.chat import router as chat_router
 from backend.routes.profile import router as profile_router
-
+from backend.routes.maps import router as maps_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -78,3 +78,5 @@ app.include_router(session_router)
 app.include_router(chat_router)
 
 app.include_router(profile_router)
+
+app.include_router(maps_router)
