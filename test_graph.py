@@ -1,384 +1,111 @@
 import asyncio
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.checkpoint.memory import MemorySaver
-from langgraph.types import Command
-
 from ai.agent_state import AgentState
-
-from ai.graph.nodes import (
-    location_node,
-    time_node,
-    pfz_node,
-    data_collection_node,
-)
+from ai.engines.risk_engine.risk_node import risk_engine_node
 
 
-def build_test_graph():
-
-    graph = StateGraph(AgentState)
-
-    # Only the nodes we want to test
-    graph.add_node("location", location_node)
-    graph.add_node("time", time_node)
-    graph.add_node("pfz", pfz_node)
-    graph.add_node("data_collection", data_collection_node)
-
-    # ---------------------------------------------------------
-    # Graph path
-    # ---------------------------------------------------------
-
-    graph.add_edge(START, "location")
-    graph.add_edge("location", "time")
-    graph.add_edge("time", "pfz")
-    graph.add_edge("pfz", "data_collection")
-    graph.add_edge("data_collection", END)
-
-    checkpointer = MemorySaver()
-
-    return graph.compile(
-        checkpointer=checkpointer
-    )
-
-
-app_graph = build_test_graph()
-
-
-async def run_test(
-    test_name,
-    location,
-    time_response,
-):
+async def test_risk_engine():
 
     print("\n")
     print("=" * 70)
-    print(f"TEST: {test_name}")
+    print("RISK ENGINE TEST")
     print("=" * 70)
 
-    thread_id = f"test-{test_name}"
+    # --------------------------------------------------------
+    # Data collected from your Data Collection Agent
+    # --------------------------------------------------------
 
-    config = {
-        "configurable": {
-            "thread_id": thread_id
+    agent_data = {
+        "Egattur Karikattukuppam": {
+            "2026-09-13 12:00": {
+                "marine": {
+                    "wave_height": 0.94,
+                    "wave_period": 7.9,
+                    "wave_direction": 148,
+                    "swell_wave_height": 0.72,
+                    "swell_wave_period": 7.65,
+                    "swell_wave_direction": 145,
+                    "ocean_current_velocity": 2.5,
+                    "ocean_current_direction": 4,
+                    "sea_surface_temperature": 29.5,
+                    "sea_level_height_msl": 0.4,
+                    "marine_warning": "None",
+                },
+                "weather": {
+                    "wind_speed": 22.1,
+                    "wind_direction": 159,
+                    "visibility": 15940.0,
+                    "precipitation": 0.0,
+                    "lightning": False,
+                    "condition": "Overcast",
+                },
+                "geo": {
+                    "latitude": 13.371389,
+                    "longitude": 80.434167,
+                    "restricted_area": False,
+                    "protected_area": False,
+                },
+            }
         }
     }
 
-    # ---------------------------------------------------------
-    # Initial state
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
+    # Build AgentState
+    # --------------------------------------------------------
 
-    initial_state = {
-        "thread_id": thread_id,
-
-        "prompt": "Find marine conditions for fishing.",
-
-        "conversation_summary": None,
-
-        "query_type": "planning",
-
-        "location": None,
-
-        "time_context": None,
-
-        "distance_km": 50.0,
-
-        "pfz_candidates": {},
-
-        "selected_pfz_name": None,
-
-        "selected_pfz": None,
-
-        "agent_data": {},
-
-        "risk_result": None,
-
-        "route_required": False,
-
-        "route_result": None,
-
-        "response": None,
-
-        "pending_action": None,
-
-        "workflow_status": "STARTED",
+    state: AgentState = {
+        "agent_data": agent_data,
+        "workflow_status": "IN_PROGRESS",
     }
 
-    # ---------------------------------------------------------
-    # Start graph
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
+    # Execute Risk Engine Node
+    # --------------------------------------------------------
 
-    await app_graph.ainvoke(
-        initial_state,
-        config=config
-    )
+    result = await risk_engine_node(state)
 
-    # ---------------------------------------------------------
-    # Handle HITL
-    # ---------------------------------------------------------
+    # --------------------------------------------------------
+    # Print result
+    # --------------------------------------------------------
 
-    while True:
-
-        state = await app_graph.aget_state(config)
-
-        if not state.interrupts:
-            break
-
-        interrupt_data = state.interrupts[0].value
-
-        action = interrupt_data.get("action")
-
-        print(f"\nHITL: {action}")
-
-        # -----------------------------------------------------
-        # Location
-        # -----------------------------------------------------
-
-        if action == "GET_LOCATION":
-
-            print(
-                "→ Providing test location:"
-            )
-
-            print(location)
-
-            user_response = location
-
-        # -----------------------------------------------------
-        # Time
-        # -----------------------------------------------------
-
-        elif action == "GET_TIME":
-
-            print(
-                "→ Providing test time:"
-            )
-
-            print(time_response)
-
-            user_response = time_response
-
-        # -----------------------------------------------------
-        # Anything after Data Collection is NOT expected
-        # -----------------------------------------------------
-
-        else:
-
-            print(
-                f"\n❌ Unexpected HITL action: {action}"
-            )
-
-            return
-
-        # -----------------------------------------------------
-        # Resume
-        # -----------------------------------------------------
-
-        await app_graph.ainvoke(
-            Command(
-                resume=user_response
-            ),
-            config=config
-        )
-
-    # ---------------------------------------------------------
-    # Get final state
-    # ---------------------------------------------------------
-
-    state = await app_graph.aget_state(config)
-
-    values = state.values
-
-    # ---------------------------------------------------------
-    # Print location
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("LOCATION")
-    print("-" * 70)
-
-    print(values.get("location"))
-
-    # ---------------------------------------------------------
-    # Print time
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("TIME")
-    print("-" * 70)
-
-    print(values.get("time_context"))
-
-    # ---------------------------------------------------------
-    # Print PFZ candidates
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("PFZ CANDIDATES")
-    print("-" * 70)
-
-    pfz_candidates = values.get(
-        "pfz_candidates",
-        {}
-    )
-
-    print(
-        f"Total PFZs: {len(pfz_candidates)}"
-    )
-
-    for name, pfz in pfz_candidates.items():
-
-        print(f"\n{name}")
-
-        print(
-            f"  Latitude: "
-            f"{pfz.get('latitude')}"
-        )
-
-        print(
-            f"  Longitude: "
-            f"{pfz.get('longitude')}"
-        )
-
-        print(
-            f"  Distance: "
-            f"{pfz.get('distance_from_source_km')}"
-        )
-
-        print(
-            f"  Direction: "
-            f"{pfz.get('direction')}"
-        )
-
-    # ---------------------------------------------------------
-    # Print Data Collection
-    # ---------------------------------------------------------
-
-    print("\n" + "=" * 70)
-    print("DATA COLLECTION AGENT")
+    print("\n")
+    print("=" * 70)
+    print("RISK RESULT")
     print("=" * 70)
 
-    agent_data = values.get(
-        "agent_data",
-        {}
-    )
+    print(result.get("risk_result"))
 
-    if not agent_data:
+    # --------------------------------------------------------
+    # Assertions
+    # --------------------------------------------------------
 
-        print("\n❌ No agent_data returned.")
-
-        return
-
-    print(
-        f"\nPFZs collected: "
-        f"{len(agent_data)}"
-    )
-
-    for pfz_name, time_data in agent_data.items():
-
-        print("\n" + "-" * 60)
-
-        print(
-            f"PFZ: {pfz_name}"
-        )
-
-        print("-" * 60)
-
-        for collection_time, data in time_data.items():
-
-            print(
-                f"\nTime: {collection_time}"
-            )
-
-            print("\nMarine:")
-
-            print(
-                data.get("marine")
-            )
-
-            print("\nWeather:")
-
-            print(
-                data.get("weather")
-            )
-
-            print("\nGeo:")
-
-            print(
-                data.get("geo")
-            )
-
-    # ---------------------------------------------------------
-    # Verify Risk Engine did NOT run
-    # ---------------------------------------------------------
-
-    print("\n" + "-" * 70)
-    print("STOP CHECK")
-    print("-" * 70)
-
-    if values.get("risk_result"):
-
-        print(
-            "❌ Risk Engine was executed!"
-        )
-
-    else:
-
-        print(
-            "✅ Risk Engine was NOT executed."
-        )
-
-    print("\n" + "=" * 70)
-
-    print(
-        f"✅ {test_name} FINISHED"
-    )
-
+    print("\n")
+    print("=" * 70)
+    print("RUNNING ASSERTIONS")
     print("=" * 70)
 
-
-async def main():
-
-    # =========================================================
-    # CASE 1
-    # One location / one time
-    # =========================================================
-
-    await run_test(
-        test_name="one-pfz-one-time",
-
-        location={
-            "latitude": 13.08,
-            "longitude": 80.27,
-        },
-
-        time_response={
-            "date": "2026-08-30",
-            "start_time": "08:00",
-            "end_time": None,
-        },
+    # Risk result must exist
+    assert "risk_result" in result, (
+        "risk_result missing from node output"
     )
 
-    # =========================================================
-    # CASE 2
-    # Different time
-    # =========================================================
+    risk_result = result["risk_result"]
 
-    await run_test(
-        test_name="one-pfz-different-time",
-
-        location={
-            "latitude": 13.08,
-            "longitude": 80.27,
-        },
-
-        time_response={
-            "date": "2026-08-30",
-            "start_time": "12:00",
-            "end_time": None,
-        },
+    assert risk_result is not None, (
+        "risk_result is None"
     )
+
+    # Workflow status
+    assert result["workflow_status"] == "IN_PROGRESS"
+
+    print("\n✅ risk_result exists")
+    print("✅ workflow_status is correct")
+
+    print("\n")
+    print("=" * 70)
+    print("✅ RISK ENGINE TEST PASSED")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
-
-    asyncio.run(main())
+    asyncio.run(test_risk_engine())
