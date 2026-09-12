@@ -17,7 +17,6 @@ class MarineData(BaseModel):
 class WeatherData(BaseModel):
     wind_speed: float = Field(ge=0)
     wind_direction: float = Field(ge=0, lt=360)
-    wave_height: float = Field(ge=0)
     visibility: float = Field(ge=0)
     precipitation: float = Field(ge=0, le=100)
     lightning: bool

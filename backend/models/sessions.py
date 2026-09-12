@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, String, Text, ForeignKey
+
 from backend.database.database import Base
 
 
@@ -14,7 +15,8 @@ class Session(Base):
     user_id = Column(
         Integer,
         ForeignKey("users.id"),
-        nullable=False
+        nullable=False,
+        index=True
     )
 
     title = Column(
