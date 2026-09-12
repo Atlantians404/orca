@@ -1,4 +1,5 @@
-from typing import Any
+from datetime import datetime
+
 
 from .engine import RouteEngine
 from .schemas import RouteRequest
@@ -7,7 +8,6 @@ from .schemas import RouteRequest
 def _build_route_request(state) -> RouteRequest:
     """
     Build a RouteRequest using:
-
     - user's current location as route start
     - selected PFZ as route destination
     - selected fishing time from time_context
@@ -26,62 +26,30 @@ def _build_route_request(state) -> RouteRequest:
             "A selected PFZ is required to generate a route."
         )
 
-    # ---------------------------------------------------------
-    # Start coordinates
-    # ---------------------------------------------------------
-
     start_latitude = location.latitude
     start_longitude = location.longitude
-
-    # ---------------------------------------------------------
-    # Destination coordinates
-    # ---------------------------------------------------------
 
     destination_latitude = selected_pfz.get("latitude")
     destination_longitude = selected_pfz.get("longitude")
 
-    # Fallback: coordinates object
-    if (
-        destination_latitude is None
-        or destination_longitude is None
-    ):
+    if destination_latitude is None or destination_longitude is None:
         coordinates = selected_pfz.get("coordinates")
 
         if isinstance(coordinates, dict):
-            destination_latitude = coordinates.get(
-                "latitude"
-            )
-            destination_longitude = coordinates.get(
-                "longitude"
-            )
+            destination_latitude = coordinates.get("latitude")
+            destination_longitude = coordinates.get("longitude")
 
-    # ---------------------------------------------------------
-    # Validate coordinates
-    # ---------------------------------------------------------
-
-    if (
-        start_latitude is None
-        or start_longitude is None
-    ):
+    if start_latitude is None or start_longitude is None:
         raise ValueError(
             "Start location coordinates are missing."
         )
 
-    if (
-        destination_latitude is None
-        or destination_longitude is None
-    ):
+    if destination_latitude is None or destination_longitude is None:
         raise ValueError(
             "Selected PFZ coordinates are missing."
         )
 
-    # ---------------------------------------------------------
-    # Coastal reference
-    # ---------------------------------------------------------
-
-    coastal_reference = selected_pfz.get(
-        "coastal_reference"
-    )
+    coastal_reference = selected_pfz.get("coastal_reference")
 
     if not coastal_reference:
         coastal_reference = selected_pfz.get("name")
@@ -91,10 +59,6 @@ def _build_route_request(state) -> RouteRequest:
 
     if not coastal_reference:
         coastal_reference = "Selected PFZ"
-
-    # ---------------------------------------------------------
-    # Fishing time
-    # ---------------------------------------------------------
 
     time_context = state.get("time_context")
 
@@ -116,10 +80,6 @@ def _build_route_request(state) -> RouteRequest:
         raise ValueError(
             "Fishing start time is missing."
         )
-
-    # ---------------------------------------------------------
-    # Build RouteRequest
-    # ---------------------------------------------------------
 
     return RouteRequest(
         start={
@@ -136,45 +96,23 @@ def _build_route_request(state) -> RouteRequest:
 
 
 def _build_risk_nodes(route) -> list[dict]:
-    """
-    Convert route waypoints into nodes that can be
-    evaluated by the risk engine.
-    """
-
     risk_nodes = []
 
     for waypoint in route.waypoints:
-
-        risk_nodes.append(
-            {
-                "node_id": (
-                    waypoint.node_id
-                    or f"{waypoint.latitude}:{waypoint.longitude}"
-                ),
-                "latitude": waypoint.latitude,
-                "longitude": waypoint.longitude,
-            }
-        )
+        risk_nodes.append({
+            "node_id": (
+                waypoint.node_id
+                or f"{waypoint.latitude}:{waypoint.longitude}"
+            ),
+            "latitude": waypoint.latitude,
+            "longitude": waypoint.longitude,
+        })
 
     return risk_nodes
 
 
-async def _evaluate_route(
-    route,
-    state,
-) -> dict:
-    """
-    Evaluate risk at every waypoint in a route.
-
-    Route risk is the maximum risk encountered
-    anywhere along the route.
-    """
-
+async def _evaluate_route(route, state) -> dict:
     risk_nodes = _build_risk_nodes(route)
-
-    # ---------------------------------------------------------
-    # No waypoints
-    # ---------------------------------------------------------
 
     if not risk_nodes:
         return {
@@ -186,10 +124,6 @@ async def _evaluate_route(
             "geojson": route.geojson,
             "nodes": [],
         }
-
-    # ---------------------------------------------------------
-    # Get fishing time
-    # ---------------------------------------------------------
 
     time_context = state.get("time_context")
 
@@ -206,35 +140,61 @@ async def _evaluate_route(
         )
 
     fishing_time = slots[0].start_time
+    fishing_date = slots[0].date
 
     if not fishing_time:
         raise ValueError(
             "Fishing start time is missing."
         )
 
-    # ---------------------------------------------------------
-    # Import here to avoid circular imports
-    # ---------------------------------------------------------
+    if not fishing_date:
+        raise ValueError(
+            "Fishing date is missing."
+        )
+
+    # Convert ORCA date format:
+    # "29 Aug 2026"
+    #
+    # into Open-Meteo compatible date:
+    # "2026-08-29"
+    try:
+        weather_date = datetime.strptime(
+            fishing_date,
+            "%d %b %Y"
+        ).strftime("%Y-%m-%d")
+    except ValueError:
+        # If the date is already ISO formatted,
+        # keep it as-is.
+        try:
+            weather_date = datetime.strptime(
+                fishing_date,
+                "%Y-%m-%d"
+            ).strftime("%Y-%m-%d")
+        except ValueError:
+            raise ValueError(
+                f"Unsupported date format: {fishing_date}"
+            )
+
+    # Keep the original ORCA time for the Risk Engine
+    # and Marine Batch.
+    #
+    # Send a full ISO datetime specifically for Weather Batch
+    # because Open-Meteo requires a complete date + time.
+    weather_time = (
+        f"{weather_date}T{fishing_time}"
+    )
 
     from ai.tools.risk_helper import process_grid
-
-    # ---------------------------------------------------------
-    # Build input expected by process_grid()
-    # ---------------------------------------------------------
 
     risk_input = {
         "nodes": risk_nodes,
         "time": fishing_time,
+        "weather_time": weather_time,
     }
 
-    # process_grid() is async
     risk_results = await process_grid(
         risk_input
     )
-
-    # ---------------------------------------------------------
-    # Risk engine returned nothing
-    # ---------------------------------------------------------
 
     if not risk_results:
         return {
@@ -254,30 +214,16 @@ async def _evaluate_route(
             "nodes": risk_nodes,
         }
 
-    # ---------------------------------------------------------
-    # Overall route risk
-    # ---------------------------------------------------------
-
+    # Route risk = highest-risk waypoint
     route_risk_score = max(
-        result.get(
-            "risk_score",
-            100.0,
-        )
+        result.get("risk_score", 100.0)
         for result in risk_results
     )
 
-    # Route is safe only when every waypoint is safe.
     route_safe = all(
-        result.get(
-            "safe",
-            False,
-        )
+        result.get("safe", False)
         for result in risk_results
     )
-
-    # ---------------------------------------------------------
-    # Preserve original waypoint coordinates
-    # ---------------------------------------------------------
 
     waypoints = [
         {
@@ -288,23 +234,13 @@ async def _evaluate_route(
         for waypoint in route.waypoints
     ]
 
-    # ---------------------------------------------------------
-    # Build evaluated route
-    # ---------------------------------------------------------
-
     return {
         "route_id": route.route_id,
         "distance_km": route.distance_km,
         "risk_score": route_risk_score,
         "safe": route_safe,
-
-        # Intermediate route points
         "waypoints": waypoints,
-
-        # Ready for frontend map rendering
         "geojson": route.geojson,
-
-        # Risk information for every waypoint
         "nodes": [
             {
                 **node,
@@ -324,16 +260,8 @@ async def _evaluate_route(
 
 
 def _select_safest_route(
-    evaluated_routes: list[dict],
+    evaluated_routes: list[dict]
 ) -> dict | None:
-    """
-    Select the safest route.
-
-    Only routes marked safe are considered.
-
-    If multiple safe routes exist, the route with
-    the lowest maximum risk score is selected.
-    """
 
     safe_routes = [
         route
@@ -348,52 +276,22 @@ def _select_safest_route(
         safe_routes,
         key=lambda route: route.get(
             "risk_score",
-            float("inf"),
+            float("inf")
         ),
     )
 
 
 async def route_node(state) -> dict:
-    """
-    Generate and evaluate candidate routes.
-
-    The result contains:
-
-    - candidate_routes
-    - safe_route
-    - waypoints
-    - GeoJSON
-    - route risk
-    """
 
     try:
-
-        # ---------------------------------------------------------
-        # Build route request
-        # ---------------------------------------------------------
-
-        request = _build_route_request(
-            state
-        )
-
-        # ---------------------------------------------------------
-        # Create route engine
-        # ---------------------------------------------------------
+        request = _build_route_request(state)
 
         engine = RouteEngine()
-
-        # ---------------------------------------------------------
-        # Generate candidate routes
-        # ---------------------------------------------------------
 
         candidate_routes = engine.generate_routes(
             request,
             max_routes=3,
         )
-
-        # ---------------------------------------------------------
-        # No routes generated
-        # ---------------------------------------------------------
 
         if not candidate_routes.routes:
             return {
@@ -404,14 +302,9 @@ async def route_node(state) -> dict:
                 "workflow_status": "COMPLETED",
             }
 
-        # ---------------------------------------------------------
-        # Evaluate every candidate route
-        # ---------------------------------------------------------
-
         evaluated_routes = []
 
         for route in candidate_routes.routes:
-
             evaluation = await _evaluate_route(
                 route,
                 state,
@@ -421,62 +314,28 @@ async def route_node(state) -> dict:
                 evaluation
             )
 
-        # ---------------------------------------------------------
-        # Select safest route
-        # ---------------------------------------------------------
-
         safe_route = _select_safest_route(
             evaluated_routes
         )
 
-        # ---------------------------------------------------------
-        # Build candidate route response
-        # ---------------------------------------------------------
-
         formatted_candidate_routes = []
 
         for route in evaluated_routes:
-
-            formatted_candidate_routes.append(
-                {
-                    "route_id": route.get(
-                        "route_id"
-                    ),
-
-                    "distance_km": route.get(
-                        "distance_km"
-                    ),
-
-                    "risk_score": route.get(
-                        "risk_score"
-                    ),
-
-                    "safe": route.get(
-                        "safe"
-                    ),
-
-                    # Waypoints for frontend
-                    "waypoints": route.get(
-                        "waypoints",
-                        [],
-                    ),
-
-                    # GeoJSON LineString
-                    "geojson": route.get(
-                        "geojson"
-                    ),
-
-                    # Risk at each waypoint
-                    "nodes": route.get(
-                        "nodes",
-                        [],
-                    ),
-                }
-            )
-
-        # ---------------------------------------------------------
-        # Final route result
-        # ---------------------------------------------------------
+            formatted_candidate_routes.append({
+                "route_id": route.get("route_id"),
+                "distance_km": route.get("distance_km"),
+                "risk_score": route.get("risk_score"),
+                "safe": route.get("safe"),
+                "waypoints": route.get(
+                    "waypoints",
+                    []
+                ),
+                "geojson": route.get("geojson"),
+                "nodes": route.get(
+                    "nodes",
+                    []
+                ),
+            })
 
         route_result = {
             "candidate_routes": formatted_candidate_routes,
@@ -489,12 +348,7 @@ async def route_node(state) -> dict:
             "workflow_status": "IN_PROGRESS",
         }
 
-    # ---------------------------------------------------------
-    # Expected route/request errors
-    # ---------------------------------------------------------
-
     except ValueError as exc:
-
         return {
             "route_result": {
                 "candidate_routes": [],
@@ -505,12 +359,7 @@ async def route_node(state) -> dict:
             "workflow_status": "COMPLETED",
         }
 
-    # ---------------------------------------------------------
-    # Unexpected errors
-    # ---------------------------------------------------------
-
     except Exception as exc:
-
         return {
             "route_result": {
                 "candidate_routes": [],
