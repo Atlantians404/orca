@@ -1,405 +1,318 @@
+import asyncio
 from typing import Any
-
-from ai.agent_state import AgentState
 
 from .engine import RouteEngine
 from .schemas import (
     Coordinate,
-    RouteDestination,
     RouteConstraints,
+    RouteDestination,
     RouteRequest,
     RestrictedZone,
 )
+from .zone_repository import get_route_zones
 
-from services.location.marine_zones import (
-    restricted_collection,
-    protected_collection,
-)
+from ai.tools.risk_helper import process_grid
 
 
-# =========================================================
-# HELPERS
-# =========================================================
+async def _build_route_request(
+    state: dict[str, Any],
+    restricted_zones: list[dict[str, Any]],
+) -> RouteRequest:
+    location = state.get("location")
+    selected_pfz = state.get("selected_pfz")
+    time_context = state.get("time_context")
 
-async def get_marine_zones() -> list[dict[str, Any]]:
-    """
-    Fetch restricted and protected marine zones
-    from MongoDB.
+    if not location:
+        raise ValueError("Route node requires location")
 
-    Both collections are stored inside:
+    if not selected_pfz:
+        raise ValueError("Route node requires selected_pfz")
 
-        ORCA.protected_zones
-        ORCA.restricted_zones
-    """
-
-    zones = []
-
-    # -----------------------------------------------------
-    # RESTRICTED ZONES
-    # -----------------------------------------------------
-
-    async for zone in restricted_collection.find({}):
-
-        zones.append(
-            {
-                "name": zone.get(
-                    "name",
-                    "Unknown Restricted Zone",
-                ),
-                "state": zone.get(
-                    "state",
-                    "",
-                ),
-                "type": zone.get(
-                    "type",
-                    "MARINE_RESTRICTED_AREA",
-                ),
-                "restriction_level": zone.get(
-                    "restriction_level",
-                    "RESTRICTED",
-                ),
-                "latitude": zone.get(
-                    "latitude",
-                    0.0,
-                ),
-                "longitude": zone.get(
-                    "longitude",
-                    0.0,
-                ),
-                "geometry": zone.get(
-                    "geometry"
-                ),
-            }
-        )
-
-    # -----------------------------------------------------
-    # PROTECTED ZONES
-    # -----------------------------------------------------
-
-    async for zone in protected_collection.find({}):
-
-        zones.append(
-            {
-                "name": zone.get(
-                    "name",
-                    "Unknown Protected Zone",
-                ),
-                "state": zone.get(
-                    "state",
-                    "",
-                ),
-                "type": zone.get(
-                    "type",
-                    "MARINE_PROTECTED_AREA",
-                ),
-                "restriction_level": zone.get(
-                    "restriction_level",
-                    "PROTECTED",
-                ),
-                "latitude": zone.get(
-                    "latitude",
-                    0.0,
-                ),
-                "longitude": zone.get(
-                    "longitude",
-                    0.0,
-                ),
-                "geometry": zone.get(
-                    "geometry"
-                ),
-            }
-        )
-
-    return zones
-
-
-# =========================================================
-# BUILD ROUTE ZONES
-# =========================================================
-
-def build_route_zones(
-    zones: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """
-    Convert MongoDB zone documents into the coordinate
-    format expected by the Route Engine.
-
-    The geometry is kept because the Route Engine needs
-    the actual boundary to avoid the zone.
-    """
-
-    route_zones = []
-
-    for zone in zones:
-
-        geometry = zone.get("geometry")
-
-        # -------------------------------------------------
-        # Skip zones without usable geometry
-        # -------------------------------------------------
-
-        if not geometry:
-            continue
-
-        route_zones.append(
-            {
-                "name": zone.get(
-                    "name",
-                    "Unknown Zone",
-                ),
-                "state": zone.get(
-                    "state",
-                    "",
-                ),
-                "type": zone.get(
-                    "type",
-                    "MARINE_ZONE",
-                ),
-                "restriction_level": zone.get(
-                    "restriction_level",
-                    "RESTRICTED",
-                ),
-                "latitude": zone.get(
-                    "latitude",
-                    0.0,
-                ),
-                "longitude": zone.get(
-                    "longitude",
-                    0.0,
-                ),
-                "geometry": geometry,
-            }
-        )
-
-    return route_zones
-
-
-# =========================================================
-# EXTRACT TIME
-# =========================================================
-
-def get_route_time(
-    state: AgentState,
-) -> str:
-    """
-    Extract the first requested time slot from AgentState.
-    """
-
-    time_context = state.get(
-        "time_context"
-    )
-
-    if (
-        time_context is None
-        or not time_context.slots
-    ):
-        raise ValueError(
-            "Route Engine requires a time context"
-        )
-
-    slot = time_context.slots[0]
-
-    requested_time = slot.date
-
-    if slot.start_time:
-        requested_time += (
-            f"T{slot.start_time}:00"
-        )
-
-    return requested_time
-
-
-# =========================================================
-# ROUTE ENGINE NODE
-# =========================================================
-
-async def route_engine_node(
-    state: AgentState,
-) -> dict:
-    """
-    Route Engine LangGraph node.
-
-    Reads from AgentState:
-
-        location
-        selected_pfz
-        time_context
-
-    Reads marine zones from MongoDB:
-
-        protected_zones
-        restricted_zones
-
-    Sends the complete RouteRequest to RouteEngine.
-
-    Stores the generated routes in:
-
-        route_result
-    """
-
-    # =====================================================
-    # 1. GET USER LOCATION
-    # =====================================================
-
-    location = state.get(
-        "location"
-    )
-
-    if location is None:
-
-        return {
-            "pending_action": "GET_LOCATION",
-            "workflow_status": "WAITING_FOR_USER",
-        }
-
-    if (
-        location.latitude is None
-        or location.longitude is None
-    ):
-
-        return {
-            "pending_action": "GET_LOCATION",
-            "workflow_status": "WAITING_FOR_USER",
-        }
-
-    # =====================================================
-    # 2. GET SELECTED PFZ
-    # =====================================================
-
-    selected_pfz = state.get(
-        "selected_pfz"
-    )
-
-    if selected_pfz is None:
-
-        return {
-            "pending_action": "SELECT_PFZ",
-            "workflow_status": "WAITING_FOR_USER",
-        }
-
-    # =====================================================
-    # 3. VALIDATE PFZ COORDINATES
-    # =====================================================
-
-    if (
-        selected_pfz.get("latitude") is None
-        or selected_pfz.get("longitude") is None
-    ):
-
-        raise ValueError(
-            "Selected PFZ does not contain valid coordinates"
-        )
-
-    coastal_reference = selected_pfz.get(
-        "coastal_reference"
-    )
-
-    if not coastal_reference:
-
-        raise ValueError(
-            "Selected PFZ does not contain coastal_reference"
-        )
-
-    # =====================================================
-    # 4. GET TIME
-    # =====================================================
-
-    requested_time = get_route_time(
-        state
-    )
-
-    # =====================================================
-    # 5. CREATE START COORDINATE
-    # =====================================================
+    if not time_context:
+        raise ValueError("Route node requires time_context")
 
     start = Coordinate(
-        latitude=location.latitude,
-        longitude=location.longitude,
+        latitude=location["latitude"],
+        longitude=location["longitude"],
     )
 
-    # =====================================================
-    # 6. CREATE PFZ DESTINATION
-    # =====================================================
-
     destination = RouteDestination(
-        coastal_reference=coastal_reference,
+        coastal_reference=selected_pfz["coastal_reference"],
         latitude=selected_pfz["latitude"],
         longitude=selected_pfz["longitude"],
     )
 
-    # =====================================================
-    # 7. GET MONGODB MARINE ZONES
-    # =====================================================
+    converted_zones = []
 
-    zones = await get_marine_zones()
-
-    route_zones = build_route_zones(
-        zones
-    )
-
-    # =====================================================
-    # 8. BUILD ROUTE CONSTRAINTS
-    # =====================================================
-
-    restricted_zones = []
-
-    for zone in route_zones:
-
-        # -------------------------------------------------
-        # The current Route Engine schema uses
-        # RestrictedZone for both protected and restricted
-        # marine areas.
-        # -------------------------------------------------
-
-        restricted_zones.append(
+    for zone in restricted_zones:
+        converted_zones.append(
             RestrictedZone(
-                name=zone["name"],
-                state=zone["state"],
-                type=zone["type"],
-                restriction_level=zone["restriction_level"],
+                name=zone.get("name", "Unknown"),
+                state=zone.get("state", ""),
+                type=zone.get("type", "MARINE_RESTRICTED_AREA"),
+                restriction_level=zone.get(
+                    "restriction_level",
+                    "RESTRICTED",
+                ),
                 latitude=zone["latitude"],
                 longitude=zone["longitude"],
-                geometry=zone["geometry"],
+                geometry=zone.get("geometry"),
+                id=zone.get("id"),
+                coordinates=zone.get("coordinates"),
             )
         )
 
-    constraints = RouteConstraints(
-        avoid_restricted_zones=True,
-        restricted_zones=restricted_zones,
-    )
-
-    # =====================================================
-    # 9. CREATE ROUTE REQUEST
-    # =====================================================
-
-    request = RouteRequest(
+    return RouteRequest(
         start=start,
         destination=destination,
-        constraints=constraints,
+        time=time_context.get("specific_time")
+        or time_context.get("time"),
+        constraints=RouteConstraints(
+            avoid_restricted_zones=True,
+            restricted_zones=converted_zones,
+        ),
     )
 
-    # =====================================================
-    # 10. RUN ROUTE ENGINE
-    # =====================================================
+
+async def _build_risk_nodes(route: Any) -> list[dict[str, Any]]:
+    nodes = []
+
+    for waypoint in route.waypoints:
+        nodes.append(
+            {
+                "node_id": waypoint.node_id
+                or (
+                    f"{waypoint.latitude}:"
+                    f"{waypoint.longitude}"
+                ),
+                "latitude": waypoint.latitude,
+                "longitude": waypoint.longitude,
+            }
+        )
+
+    return nodes
+
+
+async def _evaluate_route(
+    route: Any,
+    time: str,
+) -> dict[str, Any]:
+    nodes = await _build_risk_nodes(route)
+
+    if not nodes:
+        return {
+            "route_id": route.route_id,
+            "distance_km": route.distance_km,
+            "risk_score": 100.0,
+            "safe": False,
+            "nodes": [],
+        }
+
+    risk_results = await process_grid(
+        {
+            "nodes": nodes,
+            "time": time,
+        }
+    )
+
+    if not risk_results:
+        return {
+            "route_id": route.route_id,
+            "distance_km": route.distance_km,
+            "risk_score": 100.0,
+            "safe": False,
+            "nodes": [],
+        }
+
+    route_risk_score = max(
+        result["risk_score"]
+        for result in risk_results
+    )
+
+    route_safe = all(
+        result["safe"]
+        for result in risk_results
+    )
+
+    return {
+        "route_id": route.route_id,
+        "distance_km": route.distance_km,
+        "risk_score": route_risk_score,
+        "safe": route_safe,
+        "nodes": risk_results,
+    }
+
+
+async def _evaluate_routes(
+    routes: list[Any],
+    time: str,
+) -> list[dict[str, Any]]:
+    results = await asyncio.gather(
+        *(
+            _evaluate_route(route, time)
+            for route in routes
+        )
+    )
+
+    return list(results)
+
+
+async def _select_safest_route(
+    route_results: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+
+    safe_routes = [
+        route
+        for route in route_results
+        if route["safe"]
+    ]
+
+    if not safe_routes:
+        return None
+
+    return min(
+        safe_routes,
+        key=lambda route: (
+            route["risk_score"],
+            route["distance_km"],
+        ),
+    )
+
+
+async def route_node(
+    state: dict[str, Any],
+) -> dict[str, Any]:
+
+    # --------------------------------------------------
+    # 1. Load real MongoDB marine zones
+    # --------------------------------------------------
+
+    zones = await get_route_zones()
+
+    restricted_zones = zones.get(
+        "restricted",
+        [],
+    )
+
+    protected_zones = zones.get(
+        "protected",
+        [],
+    )
+
+    # --------------------------------------------------
+    # 2. Build RouteRequest
+    # --------------------------------------------------
+
+    request = await _build_route_request(
+        state,
+        restricted_zones,
+    )
+
+    if not request.time:
+        raise ValueError(
+            "Route node requires a valid time"
+        )
+
+    # --------------------------------------------------
+    # 3. Generate up to 3 candidate routes
+    # --------------------------------------------------
 
     engine = RouteEngine()
 
-    result = engine.generate_routes(
-        request=request,
-        time=requested_time,
+    candidate_routes = engine.generate_routes(
+        request,
         max_routes=3,
     )
 
-    # =====================================================
-    # 11. STORE RESULT IN AGENT STATE
-    # =====================================================
+    routes = candidate_routes.routes
+
+    # --------------------------------------------------
+    # 4. Evaluate all routes with Risk Helper
+    # --------------------------------------------------
+
+    route_risk_results = await _evaluate_routes(
+        routes,
+        request.time,
+    )
+
+    # --------------------------------------------------
+    # 5. Select safest route
+    # --------------------------------------------------
+
+    safest_route = await _select_safest_route(
+        route_risk_results
+    )
+
+    # --------------------------------------------------
+    # 6. Prepare candidate route response
+    # --------------------------------------------------
+
+    candidate_route_data = []
+
+    for route, risk in zip(
+        routes,
+        route_risk_results,
+    ):
+        candidate_route_data.append(
+            {
+                "route_id": route.route_id,
+                "distance_km": route.distance_km,
+                "risk_score": risk["risk_score"],
+                "safe": risk["safe"],
+                "waypoints": [
+                    {
+                        "node_id": waypoint.node_id,
+                        "latitude": waypoint.latitude,
+                        "longitude": waypoint.longitude,
+                    }
+                    for waypoint in route.waypoints
+                ],
+                "geojson": route.geojson,
+            }
+        )
+
+    # --------------------------------------------------
+    # 7. Build final route_result
+    # --------------------------------------------------
+
+    route_result = {
+        "coastal_reference": (
+            request.destination.coastal_reference
+        ),
+        "candidate_routes": candidate_route_data,
+        "safe_route": safest_route,
+        "zones": {
+            "restricted": restricted_zones,
+            "protected": protected_zones,
+        },
+    }
+
+    # --------------------------------------------------
+    # 8. Build risk_result
+    # --------------------------------------------------
+
+    risk_result = {
+        "routes": route_risk_results,
+        "selected_route_id": (
+            safest_route["route_id"]
+            if safest_route
+            else None
+        ),
+        "safe_route_found": (
+            safest_route is not None
+        ),
+    }
+
+    # --------------------------------------------------
+    # 9. Return AgentState updates
+    # --------------------------------------------------
 
     return {
-        "route_required": True,
-
-        "route_result": result.model_dump(),
-
-        "pending_action": None,
-
-        "workflow_status": "IN_PROGRESS",
+        "route_result": route_result,
+        "risk_result": risk_result,
+        "workflow_status": (
+            "route_completed"
+            if safest_route
+            else "no_safe_route_found"
+        ),
     }

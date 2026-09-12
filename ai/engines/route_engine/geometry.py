@@ -1,237 +1,180 @@
-from shapely.geometry import (
-    Point,
-    LineString,
-    Polygon,
-    mapping,
-)
+from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry.base import BaseGeometry
 
-
-# =========================================================
-# POINT
-# =========================================================
 
 def create_point(
     latitude: float,
     longitude: float,
 ) -> Point:
     """
-    Create a Shapely Point.
-
-    Application format:
-        (latitude, longitude)
+    External format:
+        latitude, longitude
 
     Shapely format:
-        (longitude, latitude)
+        longitude, latitude
     """
+    return Point(longitude, latitude)
 
-    return Point(
-        longitude,
-        latitude,
-    )
-
-
-# =========================================================
-# LINESTRING
-# =========================================================
 
 def create_linestring(
     coordinates: list[tuple[float, float]],
 ) -> LineString:
-    """
-    Create a Shapely LineString.
-
-    Input:
-        [
-            (latitude, longitude),
-            ...
-        ]
-
-    Shapely internally uses:
-        (longitude, latitude)
-    """
 
     if len(coordinates) < 2:
         raise ValueError(
-            "A LineString requires at least two points"
+            "A LineString requires at least two coordinates."
         )
 
-    return LineString(
-        [
-            (longitude, latitude)
-            for latitude, longitude in coordinates
-        ]
-    )
+    shapely_coordinates = [
+        (longitude, latitude)
+        for latitude, longitude in coordinates
+    ]
 
+    return LineString(shapely_coordinates)
 
-# =========================================================
-# POLYGON
-# =========================================================
 
 def create_polygon(
     coordinates: list[tuple[float, float]],
 ) -> Polygon:
-    """
-    Create a Shapely Polygon.
-
-    Input:
-        (latitude, longitude)
-
-    Shapely uses:
-        (longitude, latitude)
-    """
 
     if len(coordinates) < 3:
         raise ValueError(
-            "A Polygon requires at least three points"
+            "A Polygon requires at least three coordinates."
         )
 
-    return Polygon(
-        [
-            (longitude, latitude)
-            for latitude, longitude in coordinates
-        ]
-    )
+    shapely_coordinates = [
+        (longitude, latitude)
+        for latitude, longitude in coordinates
+    ]
 
+    if shapely_coordinates[0] != shapely_coordinates[-1]:
+        shapely_coordinates.append(
+            shapely_coordinates[0]
+        )
 
-# =========================================================
-# POINT INSIDE POLYGON
-# =========================================================
+    return Polygon(shapely_coordinates)
+
 
 def point_inside_polygon(
-    point: Point,
+    latitude: float,
+    longitude: float,
     polygon: Polygon,
 ) -> bool:
-    """
-    Check whether a point is inside a polygon.
-    """
+
+    point = create_point(
+        latitude,
+        longitude,
+    )
 
     return polygon.contains(point)
 
 
-# =========================================================
-# ROUTE INTERSECTION
-# =========================================================
-
 def route_intersects_polygon(
-    route: LineString,
+    coordinates: list[tuple[float, float]],
     polygon: Polygon,
 ) -> bool:
-    """
-    Check whether a route intersects a polygon.
-    """
+
+    route = create_linestring(coordinates)
 
     return route.intersects(polygon)
 
 
-# =========================================================
-# PFZ TO POINT
-# =========================================================
+def _get_zone_value(zone, key, default=None):
 
-def pfz_to_point(
-    pfz: dict,
-) -> Point:
+    if isinstance(zone, dict):
+        return zone.get(key, default)
+
+    return getattr(zone, key, default)
+
+
+def zone_to_polygon(zone) -> Polygon:
     """
-    Convert a PFZ dictionary into a Shapely Point.
+    Convert MongoDB/Pydantic zone data into
+    a Shapely polygon.
+
+    Supported formats:
+
+    1. MongoDB GeoJSON:
+       {
+           "geometry": {
+               "type": "Polygon",
+               "coordinates": [...]
+           }
+       }
+
+    2. Older test format:
+       {
+           "coordinates": [...]
+       }
     """
 
-    if "latitude" not in pfz:
-        raise ValueError(
-            "PFZ latitude is missing"
-        )
-
-    if "longitude" not in pfz:
-        raise ValueError(
-            "PFZ longitude is missing"
-        )
-
-    return create_point(
-        pfz["latitude"],
-        pfz["longitude"],
+    geometry = _get_zone_value(
+        zone,
+        "geometry",
     )
 
+    if geometry:
+        if hasattr(geometry, "model_dump"):
+            geometry = geometry.model_dump()
 
-# =========================================================
-# ZONE TO POLYGON
-# =========================================================
+        geometry_type = geometry.get("type")
 
-def zone_to_polygon(
-    zone,
-) -> Polygon:
-    """
-    Convert a restricted/protected zone
-    into a Shapely Polygon.
-    """
-
-    if hasattr(zone, "coordinates"):
-
-        coordinates = zone.coordinates
-
-    elif isinstance(zone, dict):
-
-        if "coordinates" not in zone:
-            raise ValueError(
-                "Zone coordinates are missing"
+        if geometry_type == "Polygon":
+            raw_coordinates = geometry.get(
+                "coordinates",
+                [],
             )
 
-        coordinates = zone["coordinates"]
+            if not raw_coordinates:
+                raise ValueError(
+                    "Polygon geometry contains no coordinates."
+                )
 
-    else:
+            # GeoJSON Polygon:
+            # coordinates[0] = exterior ring
+            ring = raw_coordinates[0]
 
-        raise TypeError(
-            "Zone must be a dictionary or an object "
-            "with a coordinates attribute"
+            return create_polygon(
+                [
+                    tuple(coordinate)
+                    for coordinate in ring
+                ]
+            )
+
+    coordinates = _get_zone_value(
+        zone,
+        "coordinates",
+    )
+
+    if coordinates:
+        return create_polygon(
+            [
+                tuple(coordinate)
+                for coordinate in coordinates
+            ]
         )
 
-    return create_polygon(
-        coordinates
+    raise ValueError(
+        "Zone does not contain polygon coordinates."
     )
 
 
-# =========================================================
-# ROUTE VALIDATION
-# =========================================================
-
 def validate_route(
-    route: LineString,
-    restricted_polygons: list[Polygon],
+    coordinates: list[tuple[float, float]],
+    restricted_zones: list,
 ) -> bool:
-    """
-    Validate that a route does not intersect
-    any restricted polygon.
 
-    Restricted/protected-area handling is retained
-    for future integration.
-    """
+    if len(coordinates) < 2:
+        return False
 
-    for polygon in restricted_polygons:
+    for zone in restricted_zones:
 
-        if route.intersects(polygon):
+        polygon = zone_to_polygon(zone)
+
+        if route_intersects_polygon(
+            coordinates,
+            polygon,
+        ):
             return False
 
     return True
-
-
-# =========================================================
-# LINESTRING → GEOJSON
-# =========================================================
-
-def linestring_to_geojson(
-    route: LineString,
-) -> dict:
-    """
-    Convert a Shapely LineString
-    into a GeoJSON Feature.
-    """
-
-    geom = mapping(route)
-
-    geom["coordinates"] = [
-        list(coord)
-        for coord in geom["coordinates"]
-    ]
-
-    return {
-        "type": "Feature",
-        "geometry": geom,
-        "properties": {},
-    }

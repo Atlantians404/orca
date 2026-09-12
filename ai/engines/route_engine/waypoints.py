@@ -1,31 +1,14 @@
-from .graph import MarineGraph
 from .schemas import Waypoint
 
 
 def generate_waypoints(
-    graph: MarineGraph,
-    path: list[str]
+    graph,
+    path: list[str],
 ) -> list[Waypoint]:
-    """
-    Convert a graph path into intermediate waypoints.
-
-    The first node represents the start location.
-    The last node represents the destination/PFZ.
-
-    Only intermediate nodes are returned.
-    """
-
-    if not path:
-        raise ValueError(
-            "Path cannot be empty"
-        )
-
-    if len(path) <= 2:
-        return []
 
     waypoints = []
 
-    for node_id in path[1:-1]:
+    for node_id in path:
 
         if node_id not in graph.nodes:
             raise ValueError(
@@ -36,60 +19,10 @@ def generate_waypoints(
 
         waypoints.append(
             Waypoint(
+                node_id=node.id,
                 latitude=node.latitude,
-                longitude=node.longitude
+                longitude=node.longitude,
             )
         )
 
     return waypoints
-
-
-def generate_waypoints_from_coordinates(
-    coordinates: list[tuple[float, float]]
-) -> list[Waypoint]:
-    """
-    Convert coordinates into intermediate waypoints.
-
-    Coordinates:
-        (latitude, longitude)
-
-    First coordinate:
-        Start
-
-    Last coordinate:
-        Destination/PFZ
-    """
-
-    if not coordinates:
-        raise ValueError(
-            "Coordinates cannot be empty"
-        )
-
-    if len(coordinates) <= 2:
-        return []
-
-    return [
-        Waypoint(
-            latitude=latitude,
-            longitude=longitude
-        )
-        for latitude, longitude in coordinates[1:-1]
-    ]
-
-
-def validate_waypoints(
-    waypoints: list[Waypoint]
-) -> bool:
-    """
-    Validate all waypoint coordinates.
-    """
-
-    for waypoint in waypoints:
-
-        if not -90 <= waypoint.latitude <= 90:
-            return False
-
-        if not -180 <= waypoint.longitude <= 180:
-            return False
-
-    return True

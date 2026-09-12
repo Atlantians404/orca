@@ -1,6 +1,7 @@
 from ai.agent_state import AgentState
 from .main import run_risk_engine
 
+
 async def risk_engine_node(state: AgentState) -> dict:
     agent_data = state.get("agent_data", {})
 
@@ -8,5 +9,5 @@ async def risk_engine_node(state: AgentState) -> dict:
 
     return {
         "risk_result": risk_result,
-        "workflow_status": "COMPLETED"
+        "workflow_status": "IN_PROGRESS",
     }

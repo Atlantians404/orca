@@ -1,20 +1,29 @@
 import heapq
+import math
 
-from .graph import MarineGraph
+
+def _heuristic(
+    graph,
+    node_id: str,
+    goal_id: str,
+) -> float:
+
+    from .engine import RouteEngine
+
+    node = graph.nodes[node_id]
+    goal = graph.nodes[goal_id]
+
+    return RouteEngine.calculate_distance(
+        (node.latitude, node.longitude),
+        (goal.latitude, goal.longitude),
+    )
 
 
-# =========================================================
-# DIJKSTRA
-# =========================================================
-
-def dijkstra(
-    graph: MarineGraph,
+def astar(
+    graph,
     start: str,
-    goal: str
+    goal: str,
 ) -> tuple[list[str], float]:
-    """
-    Find the shortest path using Dijkstra's algorithm.
-    """
 
     if start not in graph.nodes:
         raise ValueError(
@@ -26,398 +35,196 @@ def dijkstra(
             f"Unknown goal node: {goal}"
         )
 
-    distances = {
-        node_id: float("inf")
-        for node_id in graph.nodes
+    open_heap = []
+
+    heapq.heappush(
+        open_heap,
+        (
+            0.0,
+            start,
+        ),
+    )
+
+    came_from = {}
+
+    g_score = {
+        start: 0.0
     }
 
-    previous = {
-        node_id: None
-        for node_id in graph.nodes
-    }
+    visited = set()
 
-    distances[start] = 0.0
+    while open_heap:
 
-    priority_queue = [
+        _, current = heapq.heappop(
+            open_heap
+        )
+
+        if current in visited:
+            continue
+
+        visited.add(current)
+
+        if current == goal:
+
+            path = [current]
+
+            while current in came_from:
+                current = came_from[current]
+                path.append(current)
+
+            path.reverse()
+
+            return (
+                path,
+                g_score[goal],
+            )
+
+        for edge in graph.get_neighbors(current):
+
+            if edge.target not in graph.nodes:
+                continue
+
+            tentative_g = (
+                g_score[current]
+                + edge.weight
+            )
+
+            if tentative_g < g_score.get(
+                edge.target,
+                float("inf"),
+            ):
+
+                came_from[edge.target] = current
+
+                g_score[edge.target] = tentative_g
+
+                f_score = (
+                    tentative_g
+                    + _heuristic(
+                        graph,
+                        edge.target,
+                        goal,
+                    )
+                )
+
+                heapq.heappush(
+                    open_heap,
+                    (
+                        f_score,
+                        edge.target,
+                    ),
+                )
+
+    raise ValueError(
+        "No route exists between the requested nodes."
+    )
+
+
+def dijkstra(
+    graph,
+    start: str,
+    goal: str,
+) -> tuple[list[str], float]:
+
+    if start not in graph.nodes:
+        raise ValueError(
+            f"Unknown start node: {start}"
+        )
+
+    if goal not in graph.nodes:
+        raise ValueError(
+            f"Unknown goal node: {goal}"
+        )
+
+    heap = [
         (0.0, start)
     ]
 
-    while priority_queue:
+    distances = {
+        start: 0.0
+    }
 
-        current_distance, current_node = (
-            heapq.heappop(priority_queue)
+    previous = {}
+
+    while heap:
+
+        distance, current = heapq.heappop(
+            heap
         )
 
-        if current_node == goal:
-            break
-
-        if current_distance > distances[current_node]:
+        if distance > distances.get(
+            current,
+            float("inf"),
+        ):
             continue
 
-        for edge in graph.get_neighbors(current_node):
+        if current == goal:
+
+            path = [current]
+
+            while current in previous:
+                current = previous[current]
+                path.append(current)
+
+            path.reverse()
+
+            return (
+                path,
+                distance,
+            )
+
+        for edge in graph.get_neighbors(current):
 
             new_distance = (
-                current_distance
+                distance
                 + edge.weight
             )
 
-            if new_distance < distances[edge.target]:
+            if new_distance < distances.get(
+                edge.target,
+                float("inf"),
+            ):
 
                 distances[edge.target] = new_distance
-
-                previous[edge.target] = current_node
+                previous[edge.target] = current
 
                 heapq.heappush(
-                    priority_queue,
+                    heap,
                     (
                         new_distance,
-                        edge.target
-                    )
+                        edge.target,
+                    ),
                 )
 
-    if distances[goal] == float("inf"):
-        raise ValueError(
-            f"No path found from {start} to {goal}"
-        )
-
-    path = []
-
-    current = goal
-
-    while current is not None:
-
-        path.append(current)
-
-        current = previous[current]
-
-    path.reverse()
-
-    return path, distances[goal]
-
-
-# =========================================================
-# A*
-# =========================================================
-
-def astar(
-    graph: MarineGraph,
-    start: str,
-    goal: str
-) -> tuple[list[str], float]:
-    """
-    Find the shortest path using normal A*.
-    """
-
-    if start not in graph.nodes:
-        raise ValueError(
-            f"Unknown start node: {start}"
-        )
-
-    if goal not in graph.nodes:
-        raise ValueError(
-            f"Unknown goal node: {goal}"
-        )
-
-    from .engine import RouteEngine
-
-    distances = {
-        node_id: float("inf")
-        for node_id in graph.nodes
-    }
-
-    previous = {
-        node_id: None
-        for node_id in graph.nodes
-    }
-
-    distances[start] = 0.0
-
-    start_node = graph.nodes[start]
-    goal_node = graph.nodes[goal]
-
-    heuristic = RouteEngine.calculate_distance(
-        (
-            start_node.latitude,
-            start_node.longitude
-        ),
-        (
-            goal_node.latitude,
-            goal_node.longitude
-        )
+    raise ValueError(
+        "No route exists between the requested nodes."
     )
 
-    priority_queue = [
-        (heuristic, start)
-    ]
-
-    while priority_queue:
-
-        _, current_node = heapq.heappop(
-            priority_queue
-        )
-
-        if current_node == goal:
-            break
-
-        current_distance = distances[current_node]
-
-        for edge in graph.get_neighbors(current_node):
-
-            new_distance = (
-                current_distance
-                + edge.weight
-            )
-
-            if new_distance < distances[edge.target]:
-
-                distances[edge.target] = new_distance
-
-                previous[edge.target] = current_node
-
-                neighbor = graph.nodes[edge.target]
-
-                heuristic = RouteEngine.calculate_distance(
-                    (
-                        neighbor.latitude,
-                        neighbor.longitude
-                    ),
-                    (
-                        goal_node.latitude,
-                        goal_node.longitude
-                    )
-                )
-
-                priority = (
-                    new_distance
-                    + heuristic
-                )
-
-                heapq.heappush(
-                    priority_queue,
-                    (
-                        priority,
-                        edge.target
-                    )
-                )
-
-    if distances[goal] == float("inf"):
-        raise ValueError(
-            f"No path found from {start} to {goal}"
-        )
-
-    path = []
-
-    current = goal
-
-    while current is not None:
-
-        path.append(current)
-
-        current = previous[current]
-
-    path.reverse()
-
-    return path, distances[goal]
-
-
-# =========================================================
-# RISK-AWARE A*
-# =========================================================
-
-def astar_with_risk(
-    graph: MarineGraph,
-    start: str,
-    goal: str,
-    risk_scores: dict[str, float],
-    risk_weight: float = 1.0
-) -> tuple[list[str], float]:
-    """
-    Find a route using both geographic distance
-    and Risk Engine scores.
-
-    Cost of moving to a node:
-
-        edge distance
-        +
-        risk score * risk_weight
-
-    Lower total cost is preferred.
-
-    risk_scores format:
-
-        {
-            "N1": 20.0,
-            "N2": 45.0,
-            "N3": 80.0
-        }
-
-    The physical distance is NOT replaced by risk.
-    Risk is added as an additional routing cost.
-    """
-
-    if start not in graph.nodes:
-        raise ValueError(
-            f"Unknown start node: {start}"
-        )
-
-    if goal not in graph.nodes:
-        raise ValueError(
-            f"Unknown goal node: {goal}"
-        )
-
-    if risk_weight < 0:
-        raise ValueError(
-            "risk_weight cannot be negative"
-        )
-
-    from .engine import RouteEngine
-
-    distances = {
-        node_id: float("inf")
-        for node_id in graph.nodes
-    }
-
-    previous = {
-        node_id: None
-        for node_id in graph.nodes
-    }
-
-    distances[start] = 0.0
-
-    goal_node = graph.nodes[goal]
-
-    start_node = graph.nodes[start]
-
-    heuristic = RouteEngine.calculate_distance(
-        (
-            start_node.latitude,
-            start_node.longitude
-        ),
-        (
-            goal_node.latitude,
-            goal_node.longitude
-        )
-    )
-
-    priority_queue = [
-        (heuristic, start)
-    ]
-
-    while priority_queue:
-
-        _, current_node = heapq.heappop(
-            priority_queue
-        )
-
-        if current_node == goal:
-            break
-
-        current_distance = distances[current_node]
-
-        for edge in graph.get_neighbors(current_node):
-
-            node_risk = risk_scores.get(
-                edge.target,
-                0.0
-            )
-
-            risk_cost = (
-                node_risk * risk_weight
-            )
-
-            new_distance = (
-                current_distance
-                + edge.weight
-                + risk_cost
-            )
-
-            if new_distance < distances[edge.target]:
-
-                distances[edge.target] = new_distance
-
-                previous[edge.target] = current_node
-
-                neighbor = graph.nodes[
-                    edge.target
-                ]
-
-                heuristic = RouteEngine.calculate_distance(
-                    (
-                        neighbor.latitude,
-                        neighbor.longitude
-                    ),
-                    (
-                        goal_node.latitude,
-                        goal_node.longitude
-                    )
-                )
-
-                priority = (
-                    new_distance
-                    + heuristic
-                )
-
-                heapq.heappush(
-                    priority_queue,
-                    (
-                        priority,
-                        edge.target
-                    )
-                )
-
-    if distances[goal] == float("inf"):
-        raise ValueError(
-            f"No risk-aware path found "
-            f"from {start} to {goal}"
-        )
-
-    path = []
-
-    current = goal
-
-    while current is not None:
-
-        path.append(current)
-
-        current = previous[current]
-
-    path.reverse()
-
-    return path, distances[goal]
-
-
-# =========================================================
-# PATH DISTANCE
-# =========================================================
 
 def calculate_path_distance(
-    graph: MarineGraph,
-    path: list[str]
+    graph,
+    path: list[str],
 ) -> float:
-    """
-    Calculate the physical distance of a graph path.
-
-    Risk scores are NOT included here.
-    """
 
     if len(path) < 2:
         return 0.0
 
-    total_distance = 0.0
+    total = 0.0
 
     for source, target in zip(
         path,
-        path[1:]
+        path[1:],
     ):
 
         edge = next(
             (
                 edge
-                for edge
-                in graph.get_neighbors(source)
+                for edge in graph.get_neighbors(
+                    source
+                )
                 if edge.target == target
             ),
-            None
+            None,
         )
 
         if edge is None:
@@ -425,162 +232,112 @@ def calculate_path_distance(
                 f"No edge between {source} and {target}"
             )
 
-        total_distance += edge.weight
+        total += edge.weight
 
-    return total_distance
+    return total
 
-
-# =========================================================
-# CANDIDATE PATH GENERATION
-# =========================================================
 
 def generate_candidate_paths(
-    graph: MarineGraph,
+    graph,
     start: str,
     goal: str,
-    max_routes: int = 3
+    max_routes: int = 3,
 ) -> list[tuple[list[str], float]]:
-    """
-    Generate multiple candidate paths.
-
-    The first route is the shortest normal A* route.
-
-    Additional routes are generated by temporarily
-    removing edges from previous paths.
-    """
 
     if max_routes < 1:
         raise ValueError(
             "max_routes must be at least 1"
         )
 
-    if start not in graph.nodes:
-        raise ValueError(
-            f"Unknown start node: {start}"
-        )
-
-    if goal not in graph.nodes:
-        raise ValueError(
-            f"Unknown goal node: {goal}"
-        )
-
-    # -----------------------------------------------------
-    # FIRST ROUTE
-    # -----------------------------------------------------
+    candidates = []
 
     first_path, first_distance = astar(
         graph,
         start,
-        goal
+        goal,
     )
 
-    candidates = [
+    candidates.append(
         (
             first_path,
-            first_distance
+            first_distance,
         )
-    ]
+    )
 
-    seen_paths = {
-        tuple(first_path)
-    }
+    if max_routes == 1:
+        return candidates
 
-    # -----------------------------------------------------
-    # SAVE ORIGINAL GRAPH
-    # -----------------------------------------------------
+    blocked_edges = set()
 
-    original_edges = {
-        node_id: list(edges)
-        for node_id, edges
-        in graph.edges.items()
-    }
+    for _ in range(max_routes - 1):
 
-    try:
+        previous_path = candidates[-1][0]
 
-        for _ in range(max_routes - 1):
+        if len(previous_path) < 2:
+            break
 
-            previous_path = candidates[-1][0]
+        for source, target in zip(
+            previous_path,
+            previous_path[1:],
+        ):
 
-            if len(previous_path) <= 2:
-                break
+            blocked_edges.add(
+                (source, target)
+            )
 
-            alternative_found = False
+            blocked_edges.add(
+                (target, source)
+            )
 
-            # -------------------------------------------------
-            # REMOVE DIFFERENT EDGES
-            # -------------------------------------------------
+        original_edges = {}
 
-            for index in range(
-                len(previous_path) - 1
-            ):
+        for source in graph.edges:
 
-                source = previous_path[index]
-                target = previous_path[index + 1]
+            original_edges[source] = list(
+                graph.edges[source]
+            )
 
-                graph.edges[source] = [
-                    edge
-                    for edge in graph.edges[source]
-                    if edge.target != target
-                ]
+        for source, target in blocked_edges:
 
-                graph.edges[target] = [
-                    edge
-                    for edge in graph.edges[target]
-                    if edge.target != source
-                ]
+            if source not in graph.edges:
+                continue
 
-                try:
+            graph.edges[source] = [
+                edge
+                for edge in graph.edges[source]
+                if edge.target != target
+            ]
 
-                    new_path, new_distance = astar(
-                        graph,
-                        start,
-                        goal
-                    )
+        try:
 
-                    path_key = tuple(new_path)
+            path, distance = astar(
+                graph,
+                start,
+                goal,
+            )
 
-                    if path_key not in seen_paths:
+        except ValueError:
+            path = None
+            distance = None
 
-                        candidates.append(
-                            (
-                                new_path,
-                                new_distance
-                            )
-                        )
+        finally:
 
-                        seen_paths.add(
-                            path_key
-                        )
+            graph.edges = original_edges
 
-                        alternative_found = True
+        if path is None:
+            break
 
-                        graph.edges = {
-                            node_id: list(edges)
-                            for node_id, edges
-                            in original_edges.items()
-                        }
+        if any(
+            path == existing_path
+            for existing_path, _ in candidates
+        ):
+            break
 
-                        break
-
-                except ValueError:
-                    pass
-
-                # Restore graph
-                graph.edges = {
-                    node_id: list(edges)
-                    for node_id, edges
-                    in original_edges.items()
-                }
-
-            if not alternative_found:
-                break
-
-    finally:
-
-        graph.edges = {
-            node_id: list(edges)
-            for node_id, edges
-            in original_edges.items()
-        }
+        candidates.append(
+            (
+                path,
+                distance,
+            )
+        )
 
     return candidates
