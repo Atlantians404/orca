@@ -10,6 +10,7 @@ def _build_route_request(state) -> RouteRequest:
 
     - user's current location as route start
     - selected PFZ as route destination
+    - selected fishing time from time_context
     """
 
     location = state.get("location")
@@ -92,6 +93,31 @@ def _build_route_request(state) -> RouteRequest:
         coastal_reference = "Selected PFZ"
 
     # ---------------------------------------------------------
+    # Fishing time
+    # ---------------------------------------------------------
+
+    time_context = state.get("time_context")
+
+    if not time_context:
+        raise ValueError(
+            "Time is required for route generation."
+        )
+
+    slots = getattr(time_context, "slots", None)
+
+    if not slots:
+        raise ValueError(
+            "Time is required for route generation."
+        )
+
+    fishing_time = slots[0].start_time
+
+    if not fishing_time:
+        raise ValueError(
+            "Fishing start time is missing."
+        )
+
+    # ---------------------------------------------------------
     # Build RouteRequest
     # ---------------------------------------------------------
 
@@ -105,6 +131,7 @@ def _build_route_request(state) -> RouteRequest:
             "longitude": destination_longitude,
             "coastal_reference": coastal_reference,
         },
+        time=fishing_time,
     )
 
 
@@ -132,9 +159,9 @@ def _build_risk_nodes(route) -> list[dict]:
     return risk_nodes
 
 
-def _evaluate_route(
+async def _evaluate_route(
     route,
-    agent_data: dict,
+    state,
 ) -> dict:
     """
     Evaluate risk at every waypoint in a route.
@@ -160,16 +187,49 @@ def _evaluate_route(
             "nodes": [],
         }
 
-    # Import here to avoid circular imports.
+    # ---------------------------------------------------------
+    # Get fishing time
+    # ---------------------------------------------------------
+
+    time_context = state.get("time_context")
+
+    if not time_context:
+        raise ValueError(
+            "Time context is required for route risk evaluation."
+        )
+
+    slots = getattr(time_context, "slots", None)
+
+    if not slots:
+        raise ValueError(
+            "No time slots available for route risk evaluation."
+        )
+
+    fishing_time = slots[0].start_time
+
+    if not fishing_time:
+        raise ValueError(
+            "Fishing start time is missing."
+        )
+
+    # ---------------------------------------------------------
+    # Import here to avoid circular imports
+    # ---------------------------------------------------------
+
     from ai.tools.risk_helper import process_grid
 
     # ---------------------------------------------------------
-    # Evaluate risk for every waypoint
+    # Build input expected by process_grid()
     # ---------------------------------------------------------
 
-    risk_results = process_grid(
-        agent_data,
-        risk_nodes,
+    risk_input = {
+        "nodes": risk_nodes,
+        "time": fishing_time,
+    }
+
+    # process_grid() is async
+    risk_results = await process_grid(
+        risk_input
     )
 
     # ---------------------------------------------------------
@@ -335,7 +395,7 @@ async def route_node(state) -> dict:
         # No routes generated
         # ---------------------------------------------------------
 
-        if not candidate_routes:
+        if not candidate_routes.routes:
             return {
                 "route_result": {
                     "candidate_routes": [],
@@ -345,25 +405,16 @@ async def route_node(state) -> dict:
             }
 
         # ---------------------------------------------------------
-        # Get agent data for waypoint risk evaluation
-        # ---------------------------------------------------------
-
-        agent_data = state.get(
-            "agent_data",
-            {},
-        )
-
-        # ---------------------------------------------------------
         # Evaluate every candidate route
         # ---------------------------------------------------------
 
         evaluated_routes = []
 
-        for route in candidate_routes:
+        for route in candidate_routes.routes:
 
-            evaluation = _evaluate_route(
+            evaluation = await _evaluate_route(
                 route,
-                agent_data,
+                state,
             )
 
             evaluated_routes.append(
