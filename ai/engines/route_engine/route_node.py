@@ -1,187 +1,180 @@
-import asyncio
 from typing import Any
 
 from .engine import RouteEngine
-from .schemas import (
-    Coordinate,
-    RouteConstraints,
-    RouteDestination,
-    RouteRequest,
-    RestrictedZone,
-)
-from .zone_repository import get_route_zones
-
-from ai.tools.risk_helper import process_grid
+from .schemas import RouteRequest
 
 
-def _get_value(obj: Any, key: str, default=None):
-    if isinstance(obj, dict):
-        return obj.get(key, default)
+def _build_route_request(state) -> RouteRequest:
+    """
+    Build a RouteRequest using:
 
-    return getattr(obj, key, default)
-
-
-def _get_route_time(time_context: Any) -> str | None:
-    if not time_context:
-        return None
-
-    specific_time = _get_value(time_context, "specific_time")
-
-    if specific_time:
-        return specific_time
-
-    time_value = _get_value(time_context, "time")
-
-    if time_value:
-        return time_value
-
-    slots = _get_value(time_context, "slots", [])
-
-    if slots:
-        first_slot = slots[0]
-
-        date = _get_value(first_slot, "date")
-        start_time = _get_value(first_slot, "start_time")
-
-        if date and start_time:
-            return f"{date}T{start_time}:00"
-
-    return None
-
-
-async def _build_route_request(
-    state: dict[str, Any],
-    restricted_zones: list[dict[str, Any]],
-) -> RouteRequest:
+    - user's current location as route start
+    - selected PFZ as route destination
+    """
 
     location = state.get("location")
     selected_pfz = state.get("selected_pfz")
-    time_context = state.get("time_context")
 
     if not location:
-        raise ValueError("Route node requires location")
+        raise ValueError(
+            "User location is required to generate a route."
+        )
 
     if not selected_pfz:
-        raise ValueError("Route node requires selected_pfz")
-
-    if not time_context:
-        raise ValueError("Route node requires time_context")
-
-    latitude = _get_value(location, "latitude")
-    longitude = _get_value(location, "longitude")
-
-    if latitude is None or longitude is None:
         raise ValueError(
-            "Route node requires valid location coordinates"
+            "A selected PFZ is required to generate a route."
         )
 
-    pfz_latitude = _get_value(selected_pfz, "latitude")
-    pfz_longitude = _get_value(selected_pfz, "longitude")
+    # ---------------------------------------------------------
+    # Start coordinates
+    # ---------------------------------------------------------
 
-    if pfz_latitude is None or pfz_longitude is None:
-        raise ValueError(
-            "Selected PFZ requires valid coordinates"
-        )
+    start_latitude = location.latitude
+    start_longitude = location.longitude
 
-    coastal_reference = _get_value(
-        selected_pfz,
-        "coastal_reference",
-        _get_value(selected_pfz, "name", "Selected PFZ"),
-    )
+    # ---------------------------------------------------------
+    # Destination coordinates
+    # ---------------------------------------------------------
 
-    start = Coordinate(
-        latitude=latitude,
-        longitude=longitude,
-    )
+    destination_latitude = selected_pfz.get("latitude")
+    destination_longitude = selected_pfz.get("longitude")
 
-    destination = RouteDestination(
-        coastal_reference=coastal_reference,
-        latitude=pfz_latitude,
-        longitude=pfz_longitude,
-    )
+    # Fallback: coordinates object
+    if (
+        destination_latitude is None
+        or destination_longitude is None
+    ):
+        coordinates = selected_pfz.get("coordinates")
 
-    converted_zones = []
-
-    for zone in restricted_zones:
-        converted_zones.append(
-            RestrictedZone(
-                name=zone.get("name", "Unknown"),
-                state=zone.get("state", ""),
-                type=zone.get(
-                    "type",
-                    "MARINE_RESTRICTED_AREA",
-                ),
-                restriction_level=zone.get(
-                    "restriction_level",
-                    "RESTRICTED",
-                ),
-                latitude=zone["latitude"],
-                longitude=zone["longitude"],
-                geometry=zone.get("geometry"),
-                id=zone.get("id"),
-                coordinates=zone.get("coordinates"),
+        if isinstance(coordinates, dict):
+            destination_latitude = coordinates.get(
+                "latitude"
             )
+            destination_longitude = coordinates.get(
+                "longitude"
+            )
+
+    # ---------------------------------------------------------
+    # Validate coordinates
+    # ---------------------------------------------------------
+
+    if (
+        start_latitude is None
+        or start_longitude is None
+    ):
+        raise ValueError(
+            "Start location coordinates are missing."
         )
 
-    route_time = _get_route_time(time_context)
+    if (
+        destination_latitude is None
+        or destination_longitude is None
+    ):
+        raise ValueError(
+            "Selected PFZ coordinates are missing."
+        )
+
+    # ---------------------------------------------------------
+    # Coastal reference
+    # ---------------------------------------------------------
+
+    coastal_reference = selected_pfz.get(
+        "coastal_reference"
+    )
+
+    if not coastal_reference:
+        coastal_reference = selected_pfz.get("name")
+
+    if not coastal_reference:
+        coastal_reference = selected_pfz.get("pfz_name")
+
+    if not coastal_reference:
+        coastal_reference = "Selected PFZ"
+
+    # ---------------------------------------------------------
+    # Build RouteRequest
+    # ---------------------------------------------------------
 
     return RouteRequest(
-        start=start,
-        destination=destination,
-        time=route_time,
-        constraints=RouteConstraints(
-            avoid_restricted_zones=True,
-            restricted_zones=converted_zones,
-        ),
+        start={
+            "latitude": start_latitude,
+            "longitude": start_longitude,
+        },
+        destination={
+            "latitude": destination_latitude,
+            "longitude": destination_longitude,
+            "coastal_reference": coastal_reference,
+        },
     )
 
 
-async def _build_risk_nodes(
-    route: Any,
-) -> list[dict[str, Any]]:
+def _build_risk_nodes(route) -> list[dict]:
+    """
+    Convert route waypoints into nodes that can be
+    evaluated by the risk engine.
+    """
 
-    nodes = []
+    risk_nodes = []
 
     for waypoint in route.waypoints:
-        nodes.append(
+
+        risk_nodes.append(
             {
                 "node_id": (
                     waypoint.node_id
-                    or (
-                        f"{waypoint.latitude}:"
-                        f"{waypoint.longitude}"
-                    )
+                    or f"{waypoint.latitude}:{waypoint.longitude}"
                 ),
                 "latitude": waypoint.latitude,
                 "longitude": waypoint.longitude,
             }
         )
 
-    return nodes
+    return risk_nodes
 
 
-async def _evaluate_route(
-    route: Any,
-    time: str,
-) -> dict[str, Any]:
+def _evaluate_route(
+    route,
+    agent_data: dict,
+) -> dict:
+    """
+    Evaluate risk at every waypoint in a route.
 
-    nodes = await _build_risk_nodes(route)
+    Route risk is the maximum risk encountered
+    anywhere along the route.
+    """
 
-    if not nodes:
+    risk_nodes = _build_risk_nodes(route)
+
+    # ---------------------------------------------------------
+    # No waypoints
+    # ---------------------------------------------------------
+
+    if not risk_nodes:
         return {
             "route_id": route.route_id,
             "distance_km": route.distance_km,
             "risk_score": 100.0,
             "safe": False,
+            "waypoints": [],
+            "geojson": route.geojson,
             "nodes": [],
         }
 
-    risk_results = await process_grid(
-        {
-            "nodes": nodes,
-            "time": time,
-        }
+    # Import here to avoid circular imports.
+    from ai.tools.risk_helper import process_grid
+
+    # ---------------------------------------------------------
+    # Evaluate risk for every waypoint
+    # ---------------------------------------------------------
+
+    risk_results = process_grid(
+        agent_data,
+        risk_nodes,
     )
+
+    # ---------------------------------------------------------
+    # Risk engine returned nothing
+    # ---------------------------------------------------------
 
     if not risk_results:
         return {
@@ -189,51 +182,103 @@ async def _evaluate_route(
             "distance_km": route.distance_km,
             "risk_score": 100.0,
             "safe": False,
-            "nodes": [],
+            "waypoints": [
+                {
+                    "node_id": waypoint.node_id,
+                    "latitude": waypoint.latitude,
+                    "longitude": waypoint.longitude,
+                }
+                for waypoint in route.waypoints
+            ],
+            "geojson": route.geojson,
+            "nodes": risk_nodes,
         }
 
+    # ---------------------------------------------------------
+    # Overall route risk
+    # ---------------------------------------------------------
+
     route_risk_score = max(
-        result["risk_score"]
+        result.get(
+            "risk_score",
+            100.0,
+        )
         for result in risk_results
     )
 
+    # Route is safe only when every waypoint is safe.
     route_safe = all(
-        result["safe"]
+        result.get(
+            "safe",
+            False,
+        )
         for result in risk_results
     )
+
+    # ---------------------------------------------------------
+    # Preserve original waypoint coordinates
+    # ---------------------------------------------------------
+
+    waypoints = [
+        {
+            "node_id": waypoint.node_id,
+            "latitude": waypoint.latitude,
+            "longitude": waypoint.longitude,
+        }
+        for waypoint in route.waypoints
+    ]
+
+    # ---------------------------------------------------------
+    # Build evaluated route
+    # ---------------------------------------------------------
 
     return {
         "route_id": route.route_id,
         "distance_km": route.distance_km,
         "risk_score": route_risk_score,
         "safe": route_safe,
-        "nodes": risk_results,
+
+        # Intermediate route points
+        "waypoints": waypoints,
+
+        # Ready for frontend map rendering
+        "geojson": route.geojson,
+
+        # Risk information for every waypoint
+        "nodes": [
+            {
+                **node,
+                "risk_score": risk_result.get(
+                    "risk_score"
+                ),
+                "safe": risk_result.get(
+                    "safe"
+                ),
+            }
+            for node, risk_result in zip(
+                risk_nodes,
+                risk_results,
+            )
+        ],
     }
 
 
-async def _evaluate_routes(
-    routes: list[Any],
-    time: str,
-) -> list[dict[str, Any]]:
+def _select_safest_route(
+    evaluated_routes: list[dict],
+) -> dict | None:
+    """
+    Select the safest route.
 
-    return list(
-        await asyncio.gather(
-            *(
-                _evaluate_route(route, time)
-                for route in routes
-            )
-        )
-    )
+    Only routes marked safe are considered.
 
-
-async def _select_safest_route(
-    route_results: list[dict[str, Any]],
-) -> dict[str, Any] | None:
+    If multiple safe routes exist, the route with
+    the lowest maximum risk score is selected.
+    """
 
     safe_routes = [
         route
-        for route in route_results
-        if route["safe"]
+        for route in evaluated_routes
+        if route.get("safe", False)
     ]
 
     if not safe_routes:
@@ -241,132 +286,189 @@ async def _select_safest_route(
 
     return min(
         safe_routes,
-        key=lambda route: (
-            route["risk_score"],
-            route["distance_km"],
+        key=lambda route: route.get(
+            "risk_score",
+            float("inf"),
         ),
     )
 
 
-async def route_node(
-    state: dict[str, Any],
-) -> dict[str, Any]:
+async def route_node(state) -> dict:
+    """
+    Generate and evaluate candidate routes.
 
-    zones = await get_route_zones()
+    The result contains:
 
-    restricted_zones = zones.get(
-        "restricted",
-        [],
-    )
+    - candidate_routes
+    - safe_route
+    - waypoints
+    - GeoJSON
+    - route risk
+    """
 
-    protected_zones = zones.get(
-        "protected",
-        [],
-    )
+    try:
 
-    request = await _build_route_request(
-        state,
-        restricted_zones,
-    )
+        # ---------------------------------------------------------
+        # Build route request
+        # ---------------------------------------------------------
 
-    if not request.time:
-        raise ValueError(
-            "Route node requires a valid time"
+        request = _build_route_request(
+            state
         )
 
-    engine = RouteEngine()
+        # ---------------------------------------------------------
+        # Create route engine
+        # ---------------------------------------------------------
 
-    candidate_routes = engine.generate_routes(
-        request,
-        max_routes=3,
-    )
+        engine = RouteEngine()
 
-    routes = candidate_routes.routes
+        # ---------------------------------------------------------
+        # Generate candidate routes
+        # ---------------------------------------------------------
 
-    if not routes:
-        return {
-            "route_result": {
-                "coastal_reference": (
-                    request.destination.coastal_reference
-                ),
-                "candidate_routes": [],
-                "safe_route": None,
-                "zones": {
-                    "restricted": restricted_zones,
-                    "protected": protected_zones,
+        candidate_routes = engine.generate_routes(
+            request,
+            max_routes=3,
+        )
+
+        # ---------------------------------------------------------
+        # No routes generated
+        # ---------------------------------------------------------
+
+        if not candidate_routes:
+            return {
+                "route_result": {
+                    "candidate_routes": [],
+                    "safe_route": None,
                 },
-            },
-            "risk_result": {
-                "routes": [],
-                "selected_route_id": None,
-                "safe_route_found": False,
-            },
-            "workflow_status": "no_routes_found",
+                "workflow_status": "COMPLETED",
+            }
+
+        # ---------------------------------------------------------
+        # Get agent data for waypoint risk evaluation
+        # ---------------------------------------------------------
+
+        agent_data = state.get(
+            "agent_data",
+            {},
+        )
+
+        # ---------------------------------------------------------
+        # Evaluate every candidate route
+        # ---------------------------------------------------------
+
+        evaluated_routes = []
+
+        for route in candidate_routes:
+
+            evaluation = _evaluate_route(
+                route,
+                agent_data,
+            )
+
+            evaluated_routes.append(
+                evaluation
+            )
+
+        # ---------------------------------------------------------
+        # Select safest route
+        # ---------------------------------------------------------
+
+        safe_route = _select_safest_route(
+            evaluated_routes
+        )
+
+        # ---------------------------------------------------------
+        # Build candidate route response
+        # ---------------------------------------------------------
+
+        formatted_candidate_routes = []
+
+        for route in evaluated_routes:
+
+            formatted_candidate_routes.append(
+                {
+                    "route_id": route.get(
+                        "route_id"
+                    ),
+
+                    "distance_km": route.get(
+                        "distance_km"
+                    ),
+
+                    "risk_score": route.get(
+                        "risk_score"
+                    ),
+
+                    "safe": route.get(
+                        "safe"
+                    ),
+
+                    # Waypoints for frontend
+                    "waypoints": route.get(
+                        "waypoints",
+                        [],
+                    ),
+
+                    # GeoJSON LineString
+                    "geojson": route.get(
+                        "geojson"
+                    ),
+
+                    # Risk at each waypoint
+                    "nodes": route.get(
+                        "nodes",
+                        [],
+                    ),
+                }
+            )
+
+        # ---------------------------------------------------------
+        # Final route result
+        # ---------------------------------------------------------
+
+        route_result = {
+            "candidate_routes": formatted_candidate_routes,
+            "safe_route": safe_route,
         }
 
-    route_risk_results = await _evaluate_routes(
-        routes,
-        request.time,
-    )
+        return {
+            "route_result": route_result,
+            "pending_action": None,
+            "workflow_status": "IN_PROGRESS",
+        }
 
-    safest_route = await _select_safest_route(
-        route_risk_results
-    )
+    # ---------------------------------------------------------
+    # Expected route/request errors
+    # ---------------------------------------------------------
 
-    candidate_route_data = []
+    except ValueError as exc:
 
-    for route, risk in zip(
-        routes,
-        route_risk_results,
-    ):
-        candidate_route_data.append(
-            {
-                "route_id": route.route_id,
-                "distance_km": route.distance_km,
-                "risk_score": risk["risk_score"],
-                "safe": risk["safe"],
-                "waypoints": [
-                    {
-                        "node_id": waypoint.node_id,
-                        "latitude": waypoint.latitude,
-                        "longitude": waypoint.longitude,
-                    }
-                    for waypoint in route.waypoints
-                ],
-                "geojson": route.geojson,
-            }
-        )
+        return {
+            "route_result": {
+                "candidate_routes": [],
+                "safe_route": None,
+                "error": str(exc),
+            },
+            "pending_action": None,
+            "workflow_status": "COMPLETED",
+        }
 
-    route_result = {
-        "coastal_reference": (
-            request.destination.coastal_reference
-        ),
-        "candidate_routes": candidate_route_data,
-        "safe_route": safest_route,
-        "zones": {
-            "restricted": restricted_zones,
-            "protected": protected_zones,
-        },
-    }
+    # ---------------------------------------------------------
+    # Unexpected errors
+    # ---------------------------------------------------------
 
-    risk_result = {
-        "routes": route_risk_results,
-        "selected_route_id": (
-            safest_route["route_id"]
-            if safest_route
-            else None
-        ),
-        "safe_route_found": (
-            safest_route is not None
-        ),
-    }
+    except Exception as exc:
 
-    return {
-        "route_result": route_result,
-        "risk_result": risk_result,
-        "workflow_status": (
-            "route_completed"
-            if safest_route
-            else "no_safe_route_found"
-        ),
-    }
+        return {
+            "route_result": {
+                "candidate_routes": [],
+                "safe_route": None,
+                "error": (
+                    "Route generation failed: "
+                    f"{str(exc)}"
+                ),
+            },
+            "pending_action": None,
+            "workflow_status": "COMPLETED",
+        }

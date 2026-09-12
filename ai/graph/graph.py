@@ -27,7 +27,6 @@ from ai.graph.nodes import (
 def build_graph():
     graph = StateGraph(AgentState)
 
-    # Nodes
     graph.add_node("orchestrator", orchestrate)
     graph.add_node("general", general_node)
     graph.add_node("safety", safety_node)
@@ -41,10 +40,7 @@ def build_graph():
     graph.add_node("route", route_node)
     graph.add_node("final_response", final_response_node)
 
-    # Entry
     graph.add_edge(START, "orchestrator")
-
-    # Query routing
     graph.add_conditional_edges(
         "orchestrator",
         route_query,
@@ -55,17 +51,16 @@ def build_graph():
         },
     )
 
-    # General query
     graph.add_edge("general", END)
 
-    # Planning / safety workflow
+    # ---------------------------------------------------------
+    # Planning / Safety workflow
+    # ---------------------------------------------------------
     graph.add_edge("location", "time")
     graph.add_edge("time", "pfz")
     graph.add_edge("pfz", "data_collection")
     graph.add_edge("data_collection", "risk")
     graph.add_edge("risk", "pfz_selection")
-
-    # PFZ selection
     graph.add_conditional_edges(
         "pfz_selection",
         route_after_pfz_selection,
@@ -74,14 +69,23 @@ def build_graph():
             "final_response": "final_response",
         },
     )
-
-    # Route
     graph.add_edge("route", "final_response")
 
-    # Response
+    # ---------------------------------------------------------
+    # Final response
+    # ---------------------------------------------------------
     graph.add_edge("final_response", END)
 
-    # HITL checkpointing
+    # ---------------------------------------------------------
+    # Simple in-memory checkpointing
+    #
+    # This allows HITL interrupt/resume to work while the
+    # application process is running.
+    #
+    # NOTE:
+    # MemorySaver is NOT persistent across server restarts.
+    # We will replace this with PostgreSQL checkpointing later.
+    # ---------------------------------------------------------
     checkpointer = MemorySaver()
 
     return graph.compile(checkpointer=checkpointer)
