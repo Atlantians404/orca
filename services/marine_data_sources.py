@@ -12,8 +12,9 @@ from pymongo import MongoClient
 # Load environment variables
 # ---------------------------------------------------------
 
-ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
 load_dotenv(ENV_FILE)
+load_dotenv()
 
 
 # ---------------------------------------------------------
@@ -137,6 +138,11 @@ def get_current_pfz_advisory(collection):
         else:
             if today <= end_date:
                 return advisory
+
+    # Fallback to the latest available advisory if none are currently valid for today's date
+    fallback = collection.find_one(sort=[("retrieved_at", -1)])
+    if fallback:
+        return fallback
 
     return None
 

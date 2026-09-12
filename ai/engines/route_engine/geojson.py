@@ -1,23 +1,26 @@
-from shapely.geometry import mapping, LineString
+from .geometry import create_linestring
 
 
-def linestring_to_geojson(
-    route: LineString
+def route_to_geojson(
+    coordinates: list[tuple[float, float]],
 ) -> dict:
-    """
-    Convert a Shapely LineString
-    into a GeoJSON Feature.
-    """
 
-    geom = mapping(route)
-
-    geom["coordinates"] = [
-        list(coord)
-        for coord in geom["coordinates"]
-    ]
+    line = create_linestring(
+        coordinates
+    )
 
     return {
         "type": "Feature",
-        "geometry": geom,
-        "properties": {}
+        "properties": {},
+        "geometry": {
+            "type": "LineString",
+            "coordinates": [
+                [
+                    longitude,
+                    latitude,
+                ]
+                for latitude, longitude
+                in coordinates
+            ],
+        },
     }
