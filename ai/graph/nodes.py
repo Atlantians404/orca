@@ -17,21 +17,14 @@ from services.location.pfz_to_coordinate import get_pfz_coordinates
 
 from services.time.time_parser import (
     build_specific_time,
-    build_generic_time,
+    build_generic_time
 )
 
 from services.marine_data_sources import get_pfz_candidates
 
-
-# =========================================================
-# DATA COLLECTION
-# CHANGE THIS IMPORT IF YOUR FRIEND'S FUNCTION NAME DIFFERS
-# =========================================================
-
-from ai.agents.data_collection_agent.data_collection_agent import (
-    data_collection_agent,
+from ai.engines.data_collection_engine.data_collection_engine import (
+    data_collection_engine
 )
-
 
 # =========================================================
 # ROUTE ENGINE
@@ -39,7 +32,7 @@ from ai.agents.data_collection_agent.data_collection_agent import (
 # =========================================================
 
 from ai.engines.route_engine.route_node import (
-    route_engine_node,
+    route_node as route_engine_node
 )
 
 
@@ -439,26 +432,45 @@ async def pfz_node(state: AgentState) -> dict:
 # DATA COLLECTION NODE
 # =========================================================
 
-async def data_collection_node(
-    state: AgentState,
-) -> dict:
+async def data_collection_node(state: AgentState) -> dict:
+    """
+    Adapter between the main graph PFZ structure and
+    the Data Collection Engine.
 
-    # -----------------------------------------------------
-    # Call friend's Data Collection Agent
-    # -----------------------------------------------------
+    Main graph:
+        pfz_candidates -> dict
 
-    agent_data = await data_collection_agent(
-        location=state.get("location"),
-        time_context=state.get("time_context"),
-        pfz_candidates=state.get("pfz_candidates", {}),
+    Data Collection Engine:
+        pfz_candidates -> list of PFZ dictionaries
+    """
+
+    pfz_candidates = state.get("pfz_candidates", {})
+
+    # Convert PFZ dictionary to list for Data Collection Engine
+    if isinstance(pfz_candidates, dict):
+        pfz_list = list(pfz_candidates.values())
+    elif isinstance(pfz_candidates, list):
+        pfz_list = pfz_candidates
+    else:
+        pfz_list = []
+
+    # Create a temporary state for the Data Collection Engine
+    collection_state = {
+        **state,
+        "pfz_candidates": pfz_list,
+    }
+
+    updated_state = await data_collection_engine(
+        collection_state
     )
 
     return {
-        "agent_data": agent_data,
-        "pending_action": None,
+        "agent_data": updated_state.get(
+            "agent_data",
+            {}
+        ),
         "workflow_status": "IN_PROGRESS",
     }
-
 
 # =========================================================
 # RISK NODE
@@ -667,7 +679,7 @@ async def route_node(
     state: AgentState,
 ) -> dict:
 
-    result = await route_engine_node(state)
+    result = await route_node(state)
 
     return {
         "route_result": result.get(
