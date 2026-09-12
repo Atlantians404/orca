@@ -402,7 +402,6 @@ async def route_node(state: AgentState) -> dict:
 
     return {
         "route_result": result.get("route_result"),
-        "risk_result": result.get("risk_result"),
         "pending_action": None,
         "workflow_status": result.get(
             "workflow_status",
@@ -413,57 +412,104 @@ async def route_node(state: AgentState) -> dict:
 
 async def final_response_node(state: AgentState) -> dict:
     risk_result = state.get("risk_result")
-    selected_pfz = state.get("selected_pfz")
     selected_pfz_name = state.get("selected_pfz_name")
     route_result = state.get("route_result")
 
-    if risk_result:
-        ranked_results = risk_result.get("ranked_results", [])
+    lines = []
 
-        if selected_pfz and selected_pfz_name:
-            selected_risk = None
+    if selected_pfz_name:
+        lines.append(
+            f"Selected PFZ: {selected_pfz_name}"
+        )
 
-            for result in ranked_results:
-                if (
-                    result.get("pfz_name", "").strip().casefold()
-                    == selected_pfz_name.strip().casefold()
-                ):
-                    selected_risk = result
-                    break
+    if risk_result and selected_pfz_name:
+        ranked_results = risk_result.get(
+            "ranked_results",
+            [],
+        )
 
-            if selected_risk:
-                message = (
-                    f"Selected PFZ: {selected_pfz_name}\n"
-                    f"Risk Assessment:\n"
-                )
+        selected_risk = None
 
-                for time_result in selected_risk.get("times", []):
-                    message += (
-                        f"- {time_result.get('time')}: "
-                        f"{time_result.get('risk_score')} "
-                        f"({time_result.get('risk_level')})\n"
-                    )
-            else:
-                message = f"Selected PFZ: {selected_pfz_name}"
-
-        elif ranked_results:
-            message = "Risk assessment completed."
-
-        else:
-            message = (
-                "Risk assessment completed for "
-                "the requested PFZs and times."
+        for result in ranked_results:
+            pfz_name = result.get(
+                "pfz_name",
+                "",
             )
 
-    else:
-        message = "Your ORCA request has been completed."
+            if (
+                pfz_name.strip().casefold()
+                == selected_pfz_name.strip().casefold()
+            ):
+                selected_risk = result
+                break
+
+        if selected_risk:
+            lines.append("")
+            lines.append("Risk Assessment:")
+
+            for time_result in selected_risk.get(
+                "times",
+                [],
+            ):
+                lines.append(
+                    f"- {time_result.get('time')}: "
+                    f"{time_result.get('risk_score')} "
+                    f"({time_result.get('risk_level')})"
+                )
 
     if route_result:
-        message += "\n\nRoute generation completed."
+        safe_route = route_result.get(
+            "safe_route"
+        )
+
+        candidate_routes = route_result.get(
+            "candidate_routes",
+            [],
+        )
+
+        lines.append("")
+
+        if safe_route:
+            lines.append("Recommended Route:")
+            lines.append(
+                f"- Route ID: "
+                f"{safe_route.get('route_id')}"
+            )
+            lines.append(
+                f"- Distance: "
+                f"{safe_route.get('distance_km'):.2f} km"
+            )
+            lines.append(
+                f"- Route Risk: "
+                f"{safe_route.get('risk_score')}"
+            )
+            lines.append(
+                f"- Status: "
+                f"{'SAFE' if safe_route.get('safe') else 'UNSAFE'}"
+            )
+
+        elif candidate_routes:
+            lines.append(
+                "No safe route was found."
+            )
+            lines.append(
+                f"Candidate routes evaluated: "
+                f"{len(candidate_routes)}"
+            )
+
+        else:
+            lines.append(
+                "No route could be generated."
+            )
+
+    if not lines:
+        lines.append(
+            "Your ORCA request has been completed."
+        )
 
     return {
         "response": {
-            "message": message,
+            "message": "\n".join(lines),
         },
         "pending_action": None,
         "workflow_status": "COMPLETED",
