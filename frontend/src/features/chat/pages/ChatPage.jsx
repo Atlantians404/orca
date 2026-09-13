@@ -1,78 +1,58 @@
-import { useState, useCallback } from "react";
-import RecentSessions from "../components/RecentSessions";
+import { useOutletContext } from "react-router-dom";
 import ChatWindow from "../components/ChatWindow";
-import { getSession } from "../services/chatApi";
 
-/**
- * ChatPage
- *
- * Responsibility: owns which session is active and the overall chat page
- * state. Does NOT do raw API calls except via chatApi.js, and does NOT
- * contain RecentSessions' list-management logic (create/rename/delete
- * live in RecentSessions.jsx itself, per the CRUD spec).
- */
 export default function ChatPage() {
-  const [activeSession, setActiveSession] = useState(null);
-  const [loadingSession, setLoadingSession] = useState(false);
-  const [sessionError, setSessionError] = useState(null);
+  const {
+    activeSession,
+    loadingSession,
+    sessionError,
+    chatsActive,
+  } = useOutletContext();
 
-  const selectSession = useCallback(async (session) => {
-    setSessionError(null);
+  if (!chatsActive) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[#080809] px-6 text-center">
+        <div className="mb-5 h-px w-16 bg-white/10" />
 
-    // If RecentSessions already gave us full session data (e.g. right after
-    // creation), no need to re-fetch. Otherwise load the full record —
-    // this is also where message history would come from once ChatWindow
-    // is wired up to display them.
-    const hasFullData = session && "messages" in session;
+        <h1 className="text-xl font-medium tracking-tight text-white">
+          ORCA
+        </h1>
 
-    if (hasFullData) {
-      setActiveSession(session);
-      return;
-    }
+        <p className="mt-2 max-w-md text-sm text-[#77777C]">
+          Select Chats to view your recent
+          conversations.
+        </p>
 
-    setLoadingSession(true);
-    try {
-      const fullSession = await getSession(session.id);
-      setActiveSession(fullSession);
-    } catch (err) {
-      console.error("Failed to load session:", err);
-      setSessionError("Unable to load that conversation.");
-    } finally {
-      setLoadingSession(false);
-    }
-  }, []);
+        <div className="mt-5 h-px w-16 bg-white/10" />
+      </div>
+    );
+  }
 
-  const handleSessionCreated = useCallback((newSession) => {
-    // New session is already the full object from createSession — use it
-    // directly as the active session, no extra round-trip.
-    setActiveSession(newSession);
-    setSessionError(null);
-  }, []);
+  if (loadingSession) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#080809]">
+        <p className="text-sm text-[#77777C]">
+          Loading conversation...
+        </p>
+      </div>
+    );
+  }
 
-  const handleActiveSessionDeleted = useCallback(() => {
-    setActiveSession(null);
-  }, []);
+  if (sessionError) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#080809] px-6 text-center">
+        <p className="text-sm text-[#99999F]">
+          {sessionError}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full">
-      <aside className="w-72 border-r border-gray-200">
-        <RecentSessions
-          activeSessionId={activeSession?.id ?? null}
-          onSelectSession={selectSession}
-          onSessionCreated={handleSessionCreated}
-          onActiveSessionDeleted={handleActiveSessionDeleted}
-        />
-      </aside>
-
-      <main className="flex-1">
-        {loadingSession ? (
-          <p className="p-4 text-sm text-gray-500">Loading conversation...</p>
-        ) : sessionError ? (
-          <p className="p-4 text-sm text-red-600">{sessionError}</p>
-        ) : (
-          <ChatWindow session={activeSession} />
-        )}
-      </main>
+    <div className="h-full bg-[#080809]">
+      <ChatWindow
+        session={activeSession}
+      />
     </div>
   );
 }
