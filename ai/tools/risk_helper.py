@@ -5,9 +5,11 @@ from ai.engines.risk_engine.main import run_risk_engine
 from services.risk_engine_service.weather_batch import (
     get_weather_data_batch,
 )
+
 from services.risk_engine_service.marine_batch import (
     get_marine_batch,
 )
+
 from services.location.marine_zones import (
     is_protected,
     is_restricted,
@@ -18,7 +20,9 @@ RISK_MAX_CONCURRENT = 5
 
 
 async def get_geo_data_batch(nodes):
+
     async def process_node(node):
+
         lat = node["latitude"]
         lon = node["longitude"]
 
@@ -48,6 +52,7 @@ def build_risk_input(
     marine,
     geo,
 ):
+
     node_id = node["node_id"]
 
     marine_data = marine[node_id].copy()
@@ -59,10 +64,12 @@ def build_risk_input(
 
     return {
         "marine": marine_data,
+
         "weather": {
             **weather[node_id],
             "wave_height": marine_data["wave_height"],
         },
+
         "geo": geo[node_id],
     }
 
@@ -75,6 +82,7 @@ async def evaluate_node(
     geo,
     semaphore,
 ):
+
     async with semaphore:
 
         risk_input = build_risk_input(
@@ -109,21 +117,6 @@ async def evaluate_node(
 
         pfz_result = ranked_results[0]
 
-        # -----------------------------------------------------
-        # New risk-engine structure:
-        #
-        # {
-        #     "pfz_name": "...",
-        #     "times": [
-        #         {
-        #             "time": "...",
-        #             "risk_score": ...,
-        #             "risk_level": ...
-        #         }
-        #     ]
-        # }
-        # -----------------------------------------------------
-
         times = pfz_result.get(
             "times",
             [],
@@ -136,9 +129,6 @@ async def evaluate_node(
                 "safe": False,
             }
 
-        # Since evaluate_node() sends exactly ONE
-        # node + ONE time to run_risk_engine(),
-        # there should be exactly one time result.
         risk = times[0]
 
         risk_score = risk.get(
@@ -160,19 +150,39 @@ async def evaluate_node(
 
 
 async def process_grid(k7_input):
+
     nodes = k7_input["nodes"]
 
+    # Original ORCA time.
+    # Example: "06:00"
     time = k7_input["time"]
 
+    # Weather requires a complete ISO datetime.
+    # Example: "2026-08-29T06:00"
+    #
+    # Fallback keeps backward compatibility if
+    # weather_time is not supplied.
+    weather_time = k7_input.get(
+        "weather_time",
+        time,
+    )
+
     weather, marine, geo = await asyncio.gather(
+
+        # Weather Batch:
+        # get_weather_data_batch(nodes, weather_time)
         get_weather_data_batch(
             nodes,
-            time,
+            weather_time,
         ),
+
+        # Marine Batch remains unchanged.
         get_marine_batch(
             nodes,
             time,
         ),
+
+        # Marine zone checks.
         get_geo_data_batch(
             nodes,
         ),

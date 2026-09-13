@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Compass, MapPinned, ShieldAlert, Waves } from "lucide-react";
 import ChatMessage from "./ChatMessage";
+import logo from "../../../assets/logo.png";
 import ChatInput from "./ChatInput";
 import {
   getChatHistory,
@@ -255,7 +256,17 @@ export default function ChatWindow({ session }) {
 function EmptyState({ suggestions, onSuggestionClick }) {
   return (
     <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <h1 className="font-display text-2xl font-semibold tracking-tightest text-ink sm:text-3xl">ORCA</h1>
+      <div className="flex items-center justify-center gap-3">
+  <img
+    src={logo}
+    alt=""
+    aria-hidden="true"
+    className="h-10 w-10 object-contain shrink-0"
+  />
+  <h1 className="font-display text-2xl font-semibold tracking-tightest text-ink sm:text-3xl">
+    O R C A
+  </h1>
+</div>
       <p className="mt-2 text-sm text-mute">Marine intelligence, in conversation.</p>
 
       {suggestions.length > 0 && (
