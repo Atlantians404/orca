@@ -1,3 +1,54 @@
+<<<<<<< HEAD
+/* ============================================================
+   ORCA — global styles
+   Fonts are loaded via <link> tags in index.html (see instructions).
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #0a0a0c;
+  color: #f2f4f5;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+/* Fonts used across the app: */
+.font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.font-body {
+  font-family: 'Inter', sans-serif;
+}
+=======
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 
 @tailwind base;
@@ -81,3 +132,4 @@ button:focus-visible {
     transform: scale(1.15);
   }
 }
+>>>>>>> 0e54a27cdbd1775ac4fedf774a43cc1bef6b467c
