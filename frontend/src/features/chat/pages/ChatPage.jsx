@@ -1,85 +1,58 @@
-import { useState, useCallback } from "react";
-import RecentSessions from "../components/RecentSessions";
+import { useOutletContext } from "react-router-dom";
 import ChatWindow from "../components/ChatWindow";
-import { getSession } from "../services/chatApi";
 
-/**
- * ChatPage
- *
- * Integration layer only — owns which session is active and wires the
- * session-management layer (RecentSessions) to the conversation UI
- * (ChatWindow). Session CRUD itself lives entirely in RecentSessions.jsx /
- * chatApi.js and is not duplicated here.
- */
 export default function ChatPage() {
-  const [activeSession, setActiveSession] = useState(null);
-  const [loadingSession, setLoadingSession] = useState(false);
-  const [sessionError, setSessionError] = useState(null);
+  const {
+    activeSession,
+    loadingSession,
+    sessionError,
+    chatsActive,
+  } = useOutletContext();
 
-  const selectSession = useCallback(async (session) => {
-    setSessionError(null);
+  if (!chatsActive) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center bg-[#080809] px-6 text-center">
+        <div className="mb-5 h-px w-16 bg-white/10" />
 
-    const hasFullData = session && "messages" in session;
+        <h1 className="text-xl font-medium tracking-tight text-white">
+          ORCA
+        </h1>
 
-    if (hasFullData) {
-      setActiveSession(session);
-      return;
-    }
+        <p className="mt-2 max-w-md text-sm text-[#77777C]">
+          Select Chats to view your recent
+          conversations.
+        </p>
 
-    setLoadingSession(true);
+        <div className="mt-5 h-px w-16 bg-white/10" />
+      </div>
+    );
+  }
 
-    try {
-      const fullSession = await getSession(session.id);
-      setActiveSession(fullSession);
-    } catch (err) {
-      console.error("Failed to load session:", err);
-      setSessionError("Unable to load that conversation.");
-    } finally {
-      setLoadingSession(false);
-    }
-  }, []);
+  if (loadingSession) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#080809]">
+        <p className="text-sm text-[#77777C]">
+          Loading conversation...
+        </p>
+      </div>
+    );
+  }
 
-  const handleSessionCreated = useCallback((newSession) => {
-    setActiveSession(newSession);
-    setSessionError(null);
-  }, []);
-
-  const handleActiveSessionDeleted = useCallback(() => {
-    setActiveSession(null);
-  }, []);
+  if (sessionError) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#080809] px-6 text-center">
+        <p className="text-sm text-[#99999F]">
+          {sessionError}
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-screen bg-void text-ink">
-      <aside className="hidden w-72 shrink-0 flex-col border-r border-line bg-deep sm:flex">
-        <div className="flex items-center gap-2 px-4 py-4">
-          <span className="font-display text-sm font-semibold tracking-tightest text-ink">
-            ORCA
-          </span>
-        </div>
-
-        <div className="flex-1 overflow-hidden">
-          <RecentSessions
-            activeSessionId={activeSession?.id ?? null}
-            onSelectSession={selectSession}
-            onSessionCreated={handleSessionCreated}
-            onActiveSessionDeleted={handleActiveSessionDeleted}
-          />
-        </div>
-      </aside>
-
-      <main className="flex min-w-0 flex-1 flex-col">
-        {loadingSession ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-mute">Loading conversation...</p>
-          </div>
-        ) : sessionError ? (
-          <div className="flex h-full items-center justify-center">
-            <p className="text-sm text-mute">{sessionError}</p>
-          </div>
-        ) : (
-          <ChatWindow session={activeSession} />
-        )}
-      </main>
+    <div className="h-full bg-[#080809]">
+      <ChatWindow
+        session={activeSession}
+      />
     </div>
   );
 }

@@ -1001,94 +1001,161 @@ const RecentSessions = forwardRef(function RecentSessions(
   // RENDER
   // ===================================================
 
-   return (
-    <div className="relative flex h-full flex-col bg-deep">
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
 
-      {/* NEW CHAT */}
-      <div className="px-3 py-3">
-        <button
-          type="button"
-          onClick={createNewSession}
-          disabled={loading}
-          className="
-            flex w-full items-center justify-center
-            rounded-lg border border-[#29292C]
-            px-3 py-2
-            text-[13px] font-medium
-            text-[#F5F5F5]
-            transition-colors
-            hover:bg-[#1D1D20]
-            disabled:opacity-50
-          "
-        >
-          + New Chat
-        </button>
+      {/* =============================================
+          SCROLLABLE AREA
+          ============================================= */}
+
+      <div
+        className="
+          min-h-0
+          flex-1
+          overflow-y-auto
+          overflow-x-hidden
+          px-2
+          pb-4
+        "
+        style={{
+          scrollbarWidth: "thin",
+          scrollbarColor: "#3A3A3E transparent",
+        }}
+      >
+
+        {loading ? (
+
+          <>
+            <div className="px-2 pt-3 pb-2">
+              <div className="h-2.5 w-16 rounded bg-[#1B1B1D] animate-pulse" />
+            </div>
+
+            <LoadingRow />
+            <LoadingRow />
+            <LoadingRow />
+          </>
+
+        ) : (
+
+          <>
+
+            {/* =====================================
+                PINNED
+                ===================================== */}
+
+            <div className="mt-2">
+
+              <SectionHeader
+                title="PINNED"
+                count={pinnedSessions.length}
+                open={pinnedOpen}
+                onClick={() =>
+                  setPinnedOpen(
+                    (value) => !value
+                  )
+                }
+              />
+
+              {pinnedOpen &&
+                renderSessions(
+                  pinnedSessions
+                )}
+
+            </div>
+
+
+            {/* =====================================
+                RECENTS
+                ===================================== */}
+
+            <div className="mt-2">
+
+              <SectionHeader
+                title="RECENTS"
+                count={sessions.length}
+                open={recentsOpen}
+                onClick={() =>
+                  setRecentsOpen(
+                    (value) => !value
+                  )
+                }
+              />
+
+              {recentsOpen &&
+                renderSessions(
+                  sessions
+                )}
+
+            </div>
+
+
+            {/* =====================================
+                ARCHIVED
+                ===================================== */}
+
+            <div className="mt-2">
+
+              <SectionHeader
+                title="ARCHIVED"
+                count={archivedSessions.length}
+                open={archivedOpen}
+                onClick={() =>
+                  setArchivedOpen(
+                    (value) => !value
+                  )
+                }
+              />
+
+              {archivedOpen &&
+                renderSessions(
+                  archivedSessions
+                )}
+
+            </div>
+
+          </>
+        )}
+
       </div>
 
-      {/* SESSION LIST */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-2">
 
-        {/* PINNED */}
-        <div className="mb-2">
-          <SectionHeader
-            title="PINNED"
-            count={pinnedSessions.length}
-            open={pinnedOpen}
-            onClick={() => setPinnedOpen((previous) => !previous)}
-          />
+      {/* =============================================
+          THREE DOT POPUP
+          ============================================= */}
 
-          {pinnedOpen && renderSessions(pinnedSessions)}
-        </div>
-
-        {/* RECENT */}
-        <div className="mb-2">
-          <SectionHeader
-            title="RECENT"
-            count={sessions.length}
-            open={recentsOpen}
-            onClick={() => setRecentsOpen((previous) => !previous)}
-          />
-
-          {recentsOpen && renderSessions(sessions)}
-        </div>
-
-        {/* ARCHIVED */}
-        <div className="mb-2">
-          <SectionHeader
-            title="ARCHIVED"
-            count={archivedSessions.length}
-            open={archivedOpen}
-            onClick={() => setArchivedOpen((previous) => !previous)}
-          />
-
-          {archivedOpen && renderSessions(archivedSessions)}
-        </div>
-
-      </div>
-
-      {/* SESSION OPTIONS MENU */}
       {menu && (
         <div
           data-session-menu
           className="
-            fixed z-50
+            fixed
+            z-[9999]
             w-[190px]
             overflow-hidden
-            rounded-lg
-            border border-[#29292C]
+            rounded-xl
+            border
+            border-[#303034]
             bg-[#111113]
-            shadow-xl
+            py-1
+            shadow-2xl
           "
           style={{
-            top: menu.top,
-            left: menu.left,
+            top: `${menu.top}px`,
+            left: `${menu.left}px`,
           }}
+          onMouseDown={(event) =>
+            event.stopPropagation()
+          }
         >
 
           {/* PIN / UNPIN */}
+
           <button
             type="button"
-            onClick={() => handlePinToggle(menu.session)}
+            onClick={() =>
+              handlePinToggle(
+                menu.session
+              )
+            }
             className="
               flex w-full items-center
               gap-3 px-3 py-2.5
@@ -1100,14 +1167,22 @@ const RecentSessions = forwardRef(function RecentSessions(
             <PinIcon />
 
             <span>
-              {menu.session.is_pinned ? "Unpin" : "Pin"}
+              {menu.session.is_pinned
+                ? "Unpin"
+                : "Pin"}
             </span>
           </button>
 
+
           {/* ARCHIVE / UNARCHIVE */}
+
           <button
             type="button"
-            onClick={() => handleArchiveToggle(menu.session)}
+            onClick={() =>
+              handleArchiveToggle(
+                menu.session
+              )
+            }
             className="
               flex w-full items-center
               gap-3 px-3 py-2.5
@@ -1125,12 +1200,17 @@ const RecentSessions = forwardRef(function RecentSessions(
             </span>
           </button>
 
+
           <div className="my-1 border-t border-[#29292C]" />
 
+
           {/* RENAME */}
+
           <button
             type="button"
-            onClick={() => startEditing(menu.session)}
+            onClick={() =>
+              startEditing(menu.session)
+            }
             className="
               flex w-full items-center
               gap-3 px-3 py-2.5
@@ -1144,10 +1224,16 @@ const RecentSessions = forwardRef(function RecentSessions(
             <span>Rename</span>
           </button>
 
+
           {/* DELETE */}
+
           <button
             type="button"
-            onClick={() => handleDelete(menu.session)}
+            onClick={() =>
+              handleDelete(
+                menu.session
+              )
+            }
             className="
               flex w-full items-center
               gap-3 px-3 py-2.5
@@ -1166,6 +1252,8 @@ const RecentSessions = forwardRef(function RecentSessions(
 
     </div>
   );
+});
+
 
 function LoadingRow() {
   return (
@@ -1176,5 +1264,5 @@ function LoadingRow() {
   );
 }
 
-});
+
 export default RecentSessions;
