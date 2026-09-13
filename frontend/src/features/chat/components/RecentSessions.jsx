@@ -124,16 +124,9 @@ export default function RecentSessions({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-3 py-2">
+          <div className="flex flex-col h-full">
+      <div className="px-3 py-2">
         <h2 className="text-sm font-semibold text-gray-700">Conversations</h2>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="text-sm px-2 py-1 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {creating ? "Creating…" : "+ New Chat"}
-        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-2">
