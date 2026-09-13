@@ -24,6 +24,15 @@ from services.time.time_parser import (
 )
 from services.marine_data_sources import get_pfz_candidates
 
+from ai.schemas.agent_response import (
+    AgentResponse,
+    MapData,
+    PFZData,
+    RiskData,
+    RouteData,
+    WaypointData,
+)
+
 
 DEFAULT_RADIUS_KM = 50.0
 MAX_PFZ_CANDIDATES = 20
@@ -551,12 +560,12 @@ async def pfz_selection_node(state: AgentState) -> dict:
     actual_name = selected_result.get("pfz_name")
 
     return {
-        "selected_pfz_name": actual_name,
+        "selected_pfz_name": requested_name,
         "selected_pfz": selected_pfz,
-
-        # IMPORTANT:
-        # Preserve the original risk result.
         "risk_result": risk_result,
+
+        # Preserve route requirement for the conditional edge
+        "route_required": state.get("route_required", False),
 
         "pending_action": None,
         "workflow_status": "IN_PROGRESS",
@@ -582,188 +591,354 @@ async def route_node(state: AgentState) -> dict:
     }
 
 
-async def final_response_node(state: AgentState) -> dict:
+def final_response_node(state: AgentState) -> dict:
     """
-    Build the final response using:
-
-    - selected PFZ
-    - original PFZ risk result
-    - route result
+    Build the final structured response after PFZ selection
+    and optional route generation.
     """
 
-    risk_result = state.get("risk_result")
-    selected_pfz_name = state.get("selected_pfz_name")
-    selected_pfz = state.get("selected_pfz")
+    selected_pfz = state.get("selected_pfz") or {}
+    risk_result = state.get("risk_result") or {}
     route_result = state.get("route_result")
 
-    lines = []
+    # =========================================================
+    # PFZ DATA
+    # =========================================================
 
-    # ---------------------------------------------------------
-    # Selected PFZ
-    # ---------------------------------------------------------
-    if selected_pfz_name:
-        lines.append(
-            f"Selected PFZ: {selected_pfz_name}"
+    pfz_name = (
+        selected_pfz.get("name")
+        or state.get("selected_pfz_name")
+        or "Unknown PFZ"
+    )
+
+    pfz_latitude = selected_pfz.get("latitude")
+    pfz_longitude = selected_pfz.get("longitude")
+    pfz_distance = selected_pfz.get("distance_from_source_km")
+
+    pfz_data = None
+
+    if pfz_latitude is not None and pfz_longitude is not None:
+        pfz_data = PFZData(
+            name=pfz_name,
+            latitude=float(pfz_latitude),
+            longitude=float(pfz_longitude),
+            distance_from_source_km=(
+                float(pfz_distance)
+                if pfz_distance is not None
+                else None
+            ),
         )
 
-    # ---------------------------------------------------------
-    # PFZ coordinates
-    # ---------------------------------------------------------
-    if selected_pfz:
-        latitude = selected_pfz.get("latitude")
-        longitude = selected_pfz.get("longitude")
+    # =========================================================
+    # RISK DATA
+    # =========================================================
 
-        if latitude is not None and longitude is not None:
-            lines.append(
-                f"PFZ Location: {latitude}, {longitude}"
-            )
+    risk_score = None
+    risk_level = "UNKNOWN"
 
-    # ---------------------------------------------------------
-    # Risk assessment
-    # ---------------------------------------------------------
-    if risk_result and selected_pfz_name:
-        ranked_results = risk_result.get(
-            "ranked_results",
-            [],
+    ranked_results = risk_result.get(
+        "ranked_results",
+        []
+    )
+
+    for result in ranked_results:
+
+        result_name = (
+            result.get("pfz_name")
+            or result.get("name")
         )
 
-        selected_risk = None
+        if result_name == pfz_name:
 
-        for result in ranked_results:
-            pfz_name = result.get(
-                "pfz_name",
-                "",
-            )
-
-            if (
-                pfz_name.strip().casefold()
-                == selected_pfz_name.strip().casefold()
-            ):
-                selected_risk = result
-                break
-
-        if selected_risk:
-            risk_times = selected_risk.get(
+            times = result.get(
                 "times",
-                [],
+                []
             )
 
-            # Only display Risk Assessment if there
-            # is actually something to show.
-            if risk_times:
-                lines.append("")
-                lines.append("Risk Assessment:")
+            if times:
 
-                for time_result in risk_times:
-                    if not isinstance(time_result, dict):
-                        continue
+                risk_data = times[0]
 
-                    time_value = time_result.get(
-                        "time",
-                        "Unknown time",
-                    )
+                risk_score = risk_data.get(
+                    "risk_score"
+                )
 
-                    risk_score = time_result.get(
-                        "risk_score",
-                        "N/A",
-                    )
+                risk_level = (
+                    risk_data.get("risk_level")
+                    or risk_data.get("risk")
+                    or "UNKNOWN"
+                )
 
-                    risk_level = time_result.get(
-                        "risk_level",
-                        "UNKNOWN",
-                    )
+            break
 
-                    lines.append(
-                        f"- {time_value}: "
-                        f"{risk_score} "
-                        f"({risk_level})"
-                    )
+    risk_model = None
 
-    # ---------------------------------------------------------
-    # Route result
-    # ---------------------------------------------------------
+    if risk_score is not None:
+        risk_model = RiskData(
+            score=float(risk_score),
+            level=str(risk_level),
+        )
+
+    # =========================================================
+    # ROUTE DATA
+    # =========================================================
+
+    route_model = None
+    map_model = None
+
     if route_result:
-        safe_route = route_result.get(
+
+        # -----------------------------------------------------
+        # Get recommended / safe route
+        #
+        # Route engine returns:
+        #
+        # {
+        #     "candidate_routes": [...],
+        #     "safe_route": {...}
+        # }
+        # -----------------------------------------------------
+
+        recommended_route = route_result.get(
             "safe_route"
         )
 
-        candidate_routes = route_result.get(
-            "candidate_routes",
-            [],
-        )
+        if recommended_route:
 
-        lines.append("")
+            # -------------------------------------------------
+            # ROUTE BASIC DATA
+            # -------------------------------------------------
 
-        if safe_route:
-            lines.append(
-                "Recommended Route:"
+            route_id = recommended_route.get(
+                "route_id",
+                "UNKNOWN"
             )
 
-            lines.append(
-                f"- Route ID: "
-                f"{safe_route.get('route_id')}"
+            distance_km = recommended_route.get(
+                "distance_km",
+                0.0
             )
 
-            distance_km = safe_route.get(
-                "distance_km"
+            route_risk_score = recommended_route.get(
+                "risk_score",
+                0.0
             )
 
-            if distance_km is not None:
-                lines.append(
-                    f"- Distance: "
-                    f"{distance_km:.2f} km"
+            safe = recommended_route.get(
+                "safe",
+                False
+            )
+
+            # -------------------------------------------------
+            # WAYPOINTS
+            # -------------------------------------------------
+
+            waypoint_models = []
+
+            for waypoint in recommended_route.get(
+                "waypoints",
+                []
+            ):
+
+                latitude = waypoint.get(
+                    "latitude"
                 )
 
-            lines.append(
-                f"- Route Risk: "
-                f"{safe_route.get('risk_score')}"
+                longitude = waypoint.get(
+                    "longitude"
+                )
+
+                if latitude is None or longitude is None:
+                    continue
+
+                waypoint_models.append(
+                    WaypointData(
+                        latitude=float(latitude),
+                        longitude=float(longitude),
+                        risk_score=(
+                            float(waypoint["risk_score"])
+                            if waypoint.get("risk_score") is not None
+                            else None
+                        ),
+                        safe=(
+                            bool(waypoint["safe"])
+                            if waypoint.get("safe") is not None
+                            else None
+                        ),
+                    )
+                )
+
+            # -------------------------------------------------
+            # GEOJSON
+            # -------------------------------------------------
+
+            geojson = recommended_route.get(
+                "geojson"
             )
 
-            lines.append(
-                f"- Status: "
-                f"{'SAFE' if safe_route.get('safe') else 'UNSAFE'}"
+            # -------------------------------------------------
+            # BUILD ROUTE MODEL
+            # -------------------------------------------------
+
+            route_model = RouteData(
+                route_id=str(route_id),
+                distance_km=float(distance_km),
+                risk_score=float(route_risk_score),
+                safe=bool(safe),
+                waypoints=waypoint_models,
+                geojson=geojson,
             )
 
-        elif candidate_routes:
-            lines.append(
-                "No safe route was found."
+            # -------------------------------------------------
+            # MAP DATA
+            #
+            # Frontend coordinates:
+            #
+            # [longitude, latitude]
+            # -------------------------------------------------
+
+            coordinates = []
+
+            for waypoint in recommended_route.get(
+                "waypoints",
+                []
+            ):
+
+                latitude = waypoint.get(
+                    "latitude"
+                )
+
+                longitude = waypoint.get(
+                    "longitude"
+                )
+
+                if latitude is None or longitude is None:
+                    continue
+
+                coordinates.append(
+                    [
+                        float(longitude),
+                        float(latitude),
+                    ]
+                )
+
+            # -------------------------------------------------
+            # Prefer GeoJSON coordinates
+            # -------------------------------------------------
+
+            if geojson:
+
+                geometry = geojson.get(
+                    "geometry",
+                    {}
+                )
+
+                geojson_coordinates = geometry.get(
+                    "coordinates"
+                )
+
+                if geojson_coordinates:
+                    coordinates = geojson_coordinates
+
+            map_model = MapData(
+                coordinates=coordinates
             )
 
-            lines.append(
-                f"Candidate routes evaluated: "
-                f"{len(candidate_routes)}"
-            )
+    # =========================================================
+    # BUILD HUMAN-READABLE MESSAGE
+    # =========================================================
 
-        else:
+    message_lines = [
+        f"Selected PFZ: {pfz_name}"
+    ]
 
-            lines.append(
+    # ---------------------------------------------------------
+    # PFZ LOCATION
+    # ---------------------------------------------------------
 
-                "No route could be generated."
-
-            )
-
-            route_error = route_result.get("error")
-
-            if route_error:
-
-                lines.append(
-
-            f"Route Engine Error: {route_error}"
-
+    if (
+        pfz_latitude is not None
+        and pfz_longitude is not None
+    ):
+        message_lines.append(
+            f"PFZ Location: "
+            f"{pfz_latitude}, "
+            f"{pfz_longitude}"
         )
 
     # ---------------------------------------------------------
-    # Fallback
+    # RISK
     # ---------------------------------------------------------
-    if not lines:
-        lines.append(
-            "Your ORCA request has been completed."
+
+    if risk_model:
+
+        message_lines.extend(
+            [
+                "",
+                "Risk Assessment:",
+                (
+                    f"- Risk: "
+                    f"{risk_model.score:.2f} "
+                    f"({risk_model.level})"
+                ),
+            ]
         )
+
+    # ---------------------------------------------------------
+    # ROUTE
+    # ---------------------------------------------------------
+
+    if route_model:
+
+        message_lines.extend(
+            [
+                "",
+                "Recommended Route:",
+                (
+                    f"- Route ID: "
+                    f"{route_model.route_id}"
+                ),
+                (
+                    f"- Distance: "
+                    f"{route_model.distance_km:.2f} km"
+                ),
+                (
+                    f"- Route Risk: "
+                    f"{route_model.risk_score:.2f}"
+                ),
+                (
+                    "- Status: "
+                    f"{'SAFE' if route_model.safe else 'UNSAFE'}"
+                ),
+                (
+                    f"- Waypoints: "
+                    f"{len(route_model.waypoints)}"
+                ),
+            ]
+        )
+
+    # ---------------------------------------------------------
+    # FINAL MESSAGE
+    # ---------------------------------------------------------
+
+    message = "\n".join(
+        message_lines
+    )
+
+    # =========================================================
+    # FINAL AGENT RESPONSE
+    # =========================================================
+
+    response = AgentResponse(
+        message=message,
+        map=map_model,
+        pfz=pfz_data,
+        risk=risk_model,
+        route=route_model,
+    )
 
     return {
-        "response": {
-            "message": "\n".join(lines),
-        },
+        "response": response,
         "pending_action": None,
         "workflow_status": "COMPLETED",
     }

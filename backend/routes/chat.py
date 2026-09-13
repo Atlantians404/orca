@@ -51,12 +51,19 @@ async def chat(
         session_id=data.session_id,
         message=response["message"],
         pending_action=response.get("pending_action"),
-        workflow_status=response.get("workflow_status", "COMPLETED"),
+        workflow_status=response.get(
+            "workflow_status",
+            "COMPLETED"
+        ),
         options=response.get("options"),
+        response_data=response.get("response_data"),
     )
 
 
-@router.post("/{session_id}/resume", response_model=ChatResponse)
+@router.post(
+    "/{session_id}/resume",
+    response_model=ChatResponse
+)
 async def resume(
     session_id: int,
     data: ChatResumeRequest,
@@ -87,6 +94,7 @@ async def resume(
             "COMPLETED"
         ),
         options=response.get("options"),
+        response_data=response.get("response_data"),
     )
 
 
