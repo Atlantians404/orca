@@ -15,6 +15,10 @@ async def main():
     print("ORCA FULL ROUTE FLOW TEST")
     print("=" * 70)
 
+    # ------------------------------------------------------------
+    # Build graph
+    # ------------------------------------------------------------
+
     graph = build_graph()
 
     config = {
@@ -24,20 +28,24 @@ async def main():
     }
 
     # ============================================================
-    # STEP 1 — Initial request
+    # STEP 1
+    # Initial user request
     # ============================================================
 
-    print("\n[STEP 1] User:")
-    print("Plan a Trip with route")
+    print("\n" + "-" * 70)
+    print("[STEP 1] Initial request")
+    print("-" * 70)
+
+    print("User: Plan a Trip with route")
 
     result = await graph.ainvoke(
         {
-            "prompt": "Plan a Trip with route",
+            "prompt": "Plan a Trip with route"
         },
         config=config,
     )
 
-    print("\n[STEP 1] Graph response:")
+    print("\nGraph response:")
     print(
         json.dumps(
             result,
@@ -47,24 +55,29 @@ async def main():
     )
 
     # ============================================================
-    # STEP 2 — Resume GET_LOCATION
+    # STEP 2
+    # Provide location
     # ============================================================
 
     print("\n" + "-" * 70)
-    print("[STEP 2] Providing location...")
+    print("[STEP 2] Providing location")
     print("-" * 70)
+
+    location = {
+        "latitude": 13.0827,
+        "longitude": 80.2707,
+    }
+
+    print("User:", location)
 
     result = await graph.ainvoke(
         Command(
-            resume={
-                "latitude": 13.0827,
-                "longitude": 80.2707,
-            }
+            resume=location
         ),
         config=config,
     )
 
-    print("\n[STEP 2] Graph response:")
+    print("\nGraph response:")
     print(
         json.dumps(
             result,
@@ -74,21 +87,26 @@ async def main():
     )
 
     # ============================================================
-    # STEP 3 — Resume GET_TIME
+    # STEP 3
+    # Provide fishing time
     # ============================================================
 
     print("\n" + "-" * 70)
-    print("[STEP 3] Providing fishing time...")
+    print("[STEP 3] Providing fishing time")
     print("-" * 70)
+
+    fishing_time = "tomorrow at 6 AM"
+
+    print("User:", fishing_time)
 
     result = await graph.ainvoke(
         Command(
-            resume="tomorrow at 6 AM"
+            resume=fishing_time
         ),
         config=config,
     )
 
-    print("\n[STEP 3] Graph response:")
+    print("\nGraph response:")
     print(
         json.dumps(
             result,
@@ -98,21 +116,30 @@ async def main():
     )
 
     # ============================================================
-    # STEP 4 — Resume SELECT_PFZ
+    # STEP 4
+    # Select PFZ
+    #
+    # IMPORTANT:
+    # This must match one of the PFZ names returned by the
+    # risk engine.
     # ============================================================
 
     print("\n" + "-" * 70)
-    print("[STEP 4] Selecting PFZ...")
+    print("[STEP 4] Selecting PFZ")
     print("-" * 70)
+
+    selected_pfz_name = "Kanathur Reddy Kuppam"
+
+    print("User selected:", selected_pfz_name)
 
     result = await graph.ainvoke(
         Command(
-            resume="Coromandel"
+            resume=selected_pfz_name
         ),
         config=config,
     )
 
-    print("\n[STEP 4] Graph response:")
+    print("\nGraph response:")
     print(
         json.dumps(
             result,
@@ -122,7 +149,7 @@ async def main():
     )
 
     # ============================================================
-    # IMPORTANT DEBUG
+    # DEBUG
     # Inspect state immediately after PFZ selection
     # ============================================================
 
@@ -134,48 +161,79 @@ async def main():
     print("STATE AFTER PFZ SELECTION")
     print("=" * 70)
 
-    state_debug = {
-        "selected_pfz_name": (
-            state_after_selection.values.get(
-                "selected_pfz_name"
-            )
-        ),
+    state_values = state_after_selection.values
 
-        "selected_pfz": (
-            state_after_selection.values.get(
-                "selected_pfz"
-            )
+    debug_state = {
+        "selected_pfz_name": state_values.get(
+            "selected_pfz_name"
         ),
-
-        "route_required": (
-            state_after_selection.values.get(
-                "route_required"
-            )
+        "selected_pfz": state_values.get(
+            "selected_pfz"
         ),
-
-        "pending_action": (
-            state_after_selection.values.get(
-                "pending_action"
-            )
+        "route_required": state_values.get(
+            "route_required"
         ),
-
-        "workflow_status": (
-            state_after_selection.values.get(
-                "workflow_status"
-            )
+        "pending_action": state_values.get(
+            "pending_action"
+        ),
+        "workflow_status": state_values.get(
+            "workflow_status"
         ),
     }
 
     print(
         json.dumps(
-            state_debug,
+            debug_state,
             indent=2,
             default=str,
         )
     )
 
     # ============================================================
-    # FULL STATE AFTER PFZ SELECTION
+    # Verify PFZ selection
+    # ============================================================
+
+    print("\n" + "=" * 70)
+    print("PFZ SELECTION CHECK")
+    print("=" * 70)
+
+    selected_pfz = state_values.get(
+        "selected_pfz"
+    )
+
+    selected_pfz_name_state = state_values.get(
+        "selected_pfz_name"
+    )
+
+    if selected_pfz:
+
+        print("✅ selected_pfz exists")
+
+        print(
+            json.dumps(
+                selected_pfz,
+                indent=2,
+                default=str,
+            )
+        )
+
+    else:
+
+        print("❌ selected_pfz is missing")
+
+    if selected_pfz_name_state:
+
+        print(
+            f"✅ selected_pfz_name: "
+            f"{selected_pfz_name_state}"
+        )
+
+    else:
+
+        print("❌ selected_pfz_name is missing")
+
+    # ============================================================
+    # FULL STATE AFTER SELECTION
     # ============================================================
 
     print("\n" + "=" * 70)
@@ -184,27 +242,30 @@ async def main():
 
     print(
         json.dumps(
-            state_after_selection.values,
+            state_values,
             indent=2,
             default=str,
         )
     )
 
     # ============================================================
-    # STEP 5 — Final state inspection
+    # STEP 5
+    # Get final state
     # ============================================================
 
     print("\n" + "=" * 70)
-    print("FINAL STATE INSPECTION")
+    print("[STEP 5] FINAL STATE")
     print("=" * 70)
 
     final_state = await graph.aget_state(
         config
     )
 
+    final_values = final_state.values
+
     print(
         json.dumps(
-            final_state.values,
+            final_values,
             indent=2,
             default=str,
         )
@@ -214,7 +275,7 @@ async def main():
     # ROUTE RESULT
     # ============================================================
 
-    route_result = final_state.values.get(
+    route_result = final_values.get(
         "route_result"
     )
 
@@ -222,28 +283,52 @@ async def main():
     print("ROUTE RESULT")
     print("=" * 70)
 
-    if not route_result:
+    if route_result is None:
 
         print("❌ route_result is missing")
 
-        return
+    else:
 
-    print(
-        json.dumps(
-            route_result,
-            indent=2,
-            default=str,
+        print(
+            json.dumps(
+                route_result,
+                indent=2,
+                default=str,
+            )
         )
-    )
+
+    # ============================================================
+    # ROUTE ERROR
+    # ============================================================
+
+    if route_result:
+
+        route_error = route_result.get(
+            "error"
+        )
+
+        if route_error:
+
+            print("\n" + "=" * 70)
+            print("ROUTE ERROR")
+            print("=" * 70)
+
+            print(
+                f"❌ {route_error}"
+            )
 
     # ============================================================
     # CANDIDATE ROUTES
     # ============================================================
 
-    candidate_routes = route_result.get(
-        "candidate_routes",
-        [],
-    )
+    candidate_routes = []
+
+    if route_result:
+
+        candidate_routes = route_result.get(
+            "candidate_routes",
+            []
+        )
 
     print("\n" + "=" * 70)
     print(
@@ -252,27 +337,34 @@ async def main():
     )
     print("=" * 70)
 
-    for route in candidate_routes:
+    for index, route in enumerate(
+        candidate_routes,
+        start=1,
+    ):
 
-        print("\nRoute:")
+        print("\n" + "-" * 50)
+        print(f"ROUTE {index}")
+        print("-" * 50)
+
         print(
-            f"  ID: "
-            f"{route.get('route_id')}"
+            "Route ID:",
+            route.get("route_id"),
         )
 
         print(
-            f"  Distance: "
-            f"{route.get('distance_km')} km"
+            "Distance:",
+            route.get("distance_km"),
+            "km",
         )
 
         print(
-            f"  Risk: "
-            f"{route.get('risk_score')}"
+            "Risk Score:",
+            route.get("risk_score"),
         )
 
         print(
-            f"  Safe: "
-            f"{route.get('safe')}"
+            "Safe:",
+            route.get("safe"),
         )
 
         # --------------------------------------------------------
@@ -281,40 +373,36 @@ async def main():
 
         waypoints = route.get(
             "waypoints",
-            [],
+            []
         )
 
         print(
-            f"  Waypoints: "
-            f"{len(waypoints)}"
+            "Waypoints:",
+            len(waypoints),
         )
 
-        if waypoints:
+        for waypoint_index, waypoint in enumerate(
+            waypoints,
+            start=1,
+        ):
 
-            print("  Waypoint coordinates:")
-
-            for index, waypoint in enumerate(
-                waypoints,
-                start=1,
-            ):
-
-                print(
-                    f"    {index}. "
-                    f"{waypoint.get('latitude')}, "
-                    f"{waypoint.get('longitude')}"
-                )
+            print(
+                f"  {waypoint_index}. "
+                f"{waypoint.get('latitude')}, "
+                f"{waypoint.get('longitude')}"
+            )
 
         # --------------------------------------------------------
         # GeoJSON
         # --------------------------------------------------------
 
+        geojson = route.get(
+            "geojson"
+        )
+
         print(
-            "  GeoJSON: "
-            + (
-                "YES"
-                if route.get("geojson")
-                else "NO"
-            )
+            "GeoJSON:",
+            "YES" if geojson else "NO",
         )
 
         # --------------------------------------------------------
@@ -323,38 +411,38 @@ async def main():
 
         nodes = route.get(
             "nodes",
-            [],
+            []
         )
 
         print(
-            f"  Risk nodes: "
-            f"{len(nodes)}"
+            "Risk nodes:",
+            len(nodes),
         )
 
-        if nodes:
+        for node_index, node in enumerate(
+            nodes,
+            start=1,
+        ):
 
-            print("  Waypoint risks:")
-
-            for index, node in enumerate(
-                nodes,
-                start=1,
-            ):
-
-                print(
-                    f"    {index}. "
-                    f"{node.get('latitude')}, "
-                    f"{node.get('longitude')} "
-                    f"→ risk={node.get('risk_score')} "
-                    f"safe={node.get('safe')}"
-                )
+            print(
+                f"  {node_index}. "
+                f"{node.get('latitude')}, "
+                f"{node.get('longitude')} "
+                f"→ risk={node.get('risk_score')} "
+                f"safe={node.get('safe')}"
+            )
 
     # ============================================================
     # SAFE ROUTE
     # ============================================================
 
-    safe_route = route_result.get(
-        "safe_route"
-    )
+    safe_route = None
+
+    if route_result:
+
+        safe_route = route_result.get(
+            "safe_route"
+        )
 
     print("\n" + "=" * 70)
     print("SAFE ROUTE")
@@ -363,93 +451,168 @@ async def main():
     if safe_route:
 
         print(
-            f"Route ID: "
-            f"{safe_route.get('route_id')}"
+            "Route ID:",
+            safe_route.get("route_id"),
         )
 
         print(
-            f"Distance: "
-            f"{safe_route.get('distance_km')} km"
+            "Distance:",
+            safe_route.get("distance_km"),
+            "km",
         )
 
         print(
-            f"Risk Score: "
-            f"{safe_route.get('risk_score')}"
+            "Risk Score:",
+            safe_route.get("risk_score"),
         )
 
         print(
-            f"Safe: "
-            f"{safe_route.get('safe')}"
+            "Safe:",
+            safe_route.get("safe"),
         )
 
         safe_waypoints = safe_route.get(
             "waypoints",
-            [],
+            []
         )
 
         print(
-            f"Waypoints: "
-            f"{len(safe_waypoints)}"
+            "Waypoints:",
+            len(safe_waypoints),
         )
 
-        if safe_waypoints:
+        for index, waypoint in enumerate(
+            safe_waypoints,
+            start=1,
+        ):
 
-            print("Waypoint coordinates:")
-
-            for index, waypoint in enumerate(
-                safe_waypoints,
-                start=1,
-            ):
-
-                print(
-                    f"  {index}. "
-                    f"{waypoint.get('latitude')}, "
-                    f"{waypoint.get('longitude')}"
-                )
-
-        print(
-            "GeoJSON: "
-            + (
-                "YES"
-                if safe_route.get("geojson")
-                else "NO"
+            print(
+                f"  {index}. "
+                f"{waypoint.get('latitude')}, "
+                f"{waypoint.get('longitude')}"
             )
+
+        print(
+            "GeoJSON:",
+            "YES"
+            if safe_route.get("geojson")
+            else "NO",
         )
 
         safe_nodes = safe_route.get(
             "nodes",
-            [],
+            []
         )
 
         print(
-            f"Risk nodes: "
-            f"{len(safe_nodes)}"
+            "Risk nodes:",
+            len(safe_nodes),
         )
 
-        if safe_nodes:
+        for index, node in enumerate(
+            safe_nodes,
+            start=1,
+        ):
 
-            print("Waypoint risks:")
-
-            for index, node in enumerate(
-                safe_nodes,
-                start=1,
-            ):
-
-                print(
-                    f"  {index}. "
-                    f"{node.get('latitude')}, "
-                    f"{node.get('longitude')} "
-                    f"→ risk={node.get('risk_score')} "
-                    f"safe={node.get('safe')}"
-                )
+            print(
+                f"  {index}. "
+                f"{node.get('latitude')}, "
+                f"{node.get('longitude')} "
+                f"→ risk={node.get('risk_score')} "
+                f"safe={node.get('safe')}"
+            )
 
     else:
 
         print("⚠️ No safe route was found.")
 
     # ============================================================
-    # FINAL TEST STATUS
+    # FINAL RESPONSE
     # ============================================================
+
+    response = final_values.get(
+        "response"
+    )
+
+    print("\n" + "=" * 70)
+    print("FINAL RESPONSE")
+    print("=" * 70)
+
+    if response:
+
+        print(
+            response.get(
+                "message",
+                "No response message.",
+            )
+        )
+
+    else:
+
+        print("No final response found.")
+
+    # ============================================================
+    # FINAL STATUS
+    # ============================================================
+
+    print("\n" + "=" * 70)
+    print("FINAL TEST STATUS")
+    print("=" * 70)
+
+    print(
+        "Selected PFZ:",
+        final_values.get(
+            "selected_pfz_name"
+        ),
+    )
+
+    print(
+        "Route required:",
+        final_values.get(
+            "route_required"
+        ),
+    )
+
+    print(
+        "Workflow status:",
+        final_values.get(
+            "workflow_status"
+        ),
+    )
+
+    if selected_pfz and route_result:
+
+        if safe_route:
+
+            print(
+                "\n✅ FULL ROUTE FLOW SUCCESS"
+            )
+
+        elif candidate_routes:
+
+            print(
+                "\n⚠️ ROUTES GENERATED, "
+                "BUT NO SAFE ROUTE"
+            )
+
+        else:
+
+            print(
+                "\n⚠️ PFZ SELECTED, "
+                "BUT NO ROUTES GENERATED"
+            )
+
+    elif not selected_pfz:
+
+        print(
+            "\n❌ PFZ SELECTION FAILED"
+        )
+
+    else:
+
+        print(
+            "\n❌ ROUTE FLOW FAILED"
+        )
 
     print("\n" + "=" * 70)
     print("TEST COMPLETE")
@@ -458,4 +621,3 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
