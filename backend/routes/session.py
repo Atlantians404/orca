@@ -13,6 +13,12 @@ from backend.schemas.session import (
 from backend.services.session_service import (
     create_session,
     get_user_sessions,
+    get_pinned_sessions,
+    pin_session,
+    unpin_session,
+    get_archived_sessions,
+    archive_session,
+    unarchive_session,
     get_session,
     update_session,
     delete_session,
@@ -60,7 +66,7 @@ async def create(
 
 
 # ==================================================
-# GET ALL - PAGINATED
+# GET ALL - RECENT + PAGINATED
 # ==================================================
 
 @router.get(
@@ -88,6 +94,188 @@ async def get_all(
         limit,
         db
     )
+
+
+# ==================================================
+# GET PINNED - RECENT + PAGINATED
+# ==================================================
+
+@router.get(
+    "/pinned",
+    response_model=SessionListResponse
+)
+async def get_pinned(
+    page: int = Query(
+        default=1,
+        ge=1
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    return await get_pinned_sessions(
+        user_id,
+        page,
+        limit,
+        db
+    )
+
+
+# ==================================================
+# PIN
+# ==================================================
+
+@router.post(
+    "/{session_id}/pin",
+    response_model=SessionResponse
+)
+async def pin(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    session = await pin_session(
+        session_id,
+        user_id,
+        db
+    )
+
+    logger.info(
+        "Session pinned: %s for user: %s",
+        session_id,
+        user_id
+    )
+
+    return session
+
+
+# ==================================================
+# UNPIN
+# ==================================================
+
+@router.delete(
+    "/{session_id}/pin",
+    response_model=SessionResponse
+)
+async def unpin(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    session = await unpin_session(
+        session_id,
+        user_id,
+        db
+    )
+
+    logger.info(
+        "Session unpinned: %s for user: %s",
+        session_id,
+        user_id
+    )
+
+    return session
+
+
+# ==================================================
+# GET ARCHIVED - RECENT + PAGINATED
+# ==================================================
+
+@router.get(
+    "/archived",
+    response_model=SessionListResponse
+)
+async def get_archived(
+    page: int = Query(
+        default=1,
+        ge=1
+    ),
+    limit: int = Query(
+        default=20,
+        ge=1,
+        le=100
+    ),
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    return await get_archived_sessions(
+        user_id,
+        page,
+        limit,
+        db
+    )
+
+
+# ==================================================
+# ARCHIVE
+# ==================================================
+
+@router.post(
+    "/{session_id}/archive",
+    response_model=SessionResponse
+)
+async def archive(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    session = await archive_session(
+        session_id,
+        user_id,
+        db
+    )
+
+    logger.info(
+        "Session archived: %s for user: %s",
+        session_id,
+        user_id
+    )
+
+    return session
+
+
+# ==================================================
+# UNARCHIVE
+# ==================================================
+
+@router.delete(
+    "/{session_id}/archive",
+    response_model=SessionResponse
+)
+async def unarchive(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(verify_token)
+):
+    user_id = int(token["sub"])
+
+    session = await unarchive_session(
+        session_id,
+        user_id,
+        db
+    )
+
+    logger.info(
+        "Session unarchived: %s for user: %s",
+        session_id,
+        user_id
+    )
+
+    return session
 
 
 # ==================================================
