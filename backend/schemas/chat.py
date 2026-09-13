@@ -2,6 +2,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from ai.schemas.agent_response import AgentResponse
+
 
 class ChatRequest(BaseModel):
     session_id: int
@@ -18,6 +20,7 @@ class ChatResponse(BaseModel):
     pending_action: Optional[str] = None
     workflow_status: str
     options: Optional[list[Any]] = None
+    response_data: Optional[AgentResponse] = None
 
 
 class MessageResponse(BaseModel):

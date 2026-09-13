@@ -21,7 +21,23 @@ def _get_interrupt(result: dict) -> Any:
 
 
 def _build_response(result: dict) -> dict:
+    """
+    Convert LangGraph result into a consistent API response.
+
+    HITL interrupt:
+        Returns message + pending action + options.
+
+    Normal/final response:
+        Preserves the complete structured AgentResponse
+        so the frontend can access PFZ, risk, route,
+        waypoints and map data.
+    """
+
     interrupt = _get_interrupt(result)
+
+    # ---------------------------------------------------------
+    # HITL RESPONSE
+    # ---------------------------------------------------------
 
     if interrupt:
         return {
@@ -32,14 +48,32 @@ def _build_response(result: dict) -> dict:
             "pending_action": interrupt.get("action"),
             "workflow_status": "WAITING_FOR_USER",
             "options": interrupt.get("options"),
+            "response_data": None,
         }
+
+    # ---------------------------------------------------------
+    # FINAL AGENT RESPONSE
+    # ---------------------------------------------------------
 
     response = result.get("response")
 
-    if isinstance(response, dict):
+    response_data = None
+
+    if response is None:
+        message = ""
+
+    elif hasattr(response, "model_dump"):
+        # Pydantic AgentResponse
+        response_data = response.model_dump()
+        message = response.message
+
+    elif isinstance(response, dict):
+        # In case LangGraph returns a dictionary
+        response_data = response
         message = response.get("message", "")
+
     else:
-        message = str(response or "")
+        message = str(response)
 
     return {
         "message": message,
@@ -49,6 +83,7 @@ def _build_response(result: dict) -> dict:
             "COMPLETED"
         ),
         "options": None,
+        "response_data": response_data,
     }
 
 
@@ -110,6 +145,10 @@ async def send_message(
 
     response = _build_response(result)
 
+    # ---------------------------------------------------------
+    # SAVE USER MESSAGE
+    # ---------------------------------------------------------
+
     user_message = Message(
         session_id=session_id,
         role="user",
@@ -117,14 +156,15 @@ async def send_message(
         response_data=None
     )
 
+    # ---------------------------------------------------------
+    # SAVE ASSISTANT MESSAGE
+    # ---------------------------------------------------------
+
     assistant_message = Message(
         session_id=session_id,
         role="assistant",
         content=response["message"],
-        response_data={
-            "pending_action": response["pending_action"],
-            "workflow_status": response["workflow_status"],
-        }
+        response_data=response["response_data"],
     )
 
     db.add(user_message)
@@ -161,14 +201,15 @@ async def resume_chat(
 
     response = _build_response(result)
 
+    # ---------------------------------------------------------
+    # SAVE ASSISTANT MESSAGE
+    # ---------------------------------------------------------
+
     assistant_message = Message(
         session_id=session_id,
         role="assistant",
         content=response["message"],
-        response_data={
-            "pending_action": response["pending_action"],
-            "workflow_status": response["workflow_status"],
-        }
+        response_data=response["response_data"],
     )
 
     db.add(assistant_message)
