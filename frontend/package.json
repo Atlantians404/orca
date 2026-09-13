@@ -1,51 +1,35 @@
 {
-<<<<<<< HEAD
-  "name": "frontend",
-=======
   "name": "orca",
->>>>>>> 0e54a27cdbd1775ac4fedf774a43cc1bef6b467c
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-<<<<<<< HEAD
     "lint": "eslint .",
     "preview": "vite preview"
   },
   "dependencies": {
-=======
-    "lint": "oxlint",
-    "preview": "vite preview"
-  },
-  "dependencies": {
+    "axios": "^1.20.0",
     "framer-motion": "^13.2.0",
     "lucide-react": "^1.43.0",
->>>>>>> 0e54a27cdbd1775ac4fedf774a43cc1bef6b467c
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.3"
   },
   "devDependencies": {
-<<<<<<< HEAD
     "@eslint/js": "^10.0.1",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "autoprefixer": "^10.5.5",
     "eslint": "^10.9.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.4",
     "globals": "^17.11.0",
-=======
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.1.0",
-    "autoprefixer": "^10.5.5",
     "oxlint": "^1.79.0",
     "postcss": "^8.5.28",
     "tailwindcss": "^3.4.19",
->>>>>>> 0e54a27cdbd1775ac4fedf774a43cc1bef6b467c
     "vite": "^8.2.2"
   }
 }
