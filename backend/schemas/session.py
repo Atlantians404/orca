@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, field_validator
 
 
@@ -7,8 +9,11 @@ class SessionCreate(BaseModel):
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: str) -> str:
-        if not value.strip():
+        value = value.strip()
+
+        if not value:
             raise ValueError("Title cannot be empty")
+
         return value
 
 
@@ -18,14 +23,21 @@ class SessionUpdate(BaseModel):
     @field_validator("title")
     @classmethod
     def validate_title(cls, value: str | None) -> str | None:
-        if value is not None and not value.strip():
-            raise ValueError("Title cannot be empty")
+        if value is not None:
+            value = value.strip()
+
+            if not value:
+                raise ValueError("Title cannot be empty")
+
         return value
+
 
 class SessionResponse(BaseModel):
     id: int
     title: str
-    summary: str | None = None
+    is_pinned: bool
+    is_archived: bool
+    updated_at: datetime
 
     class Config:
         from_attributes = True

@@ -2,8 +2,8 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from ai.agent_state import AgentState
-
 from ai.orchestrator import orchestrate
+
 from ai.graph.routing import (
     route_query,
     route_after_pfz_selection,
@@ -25,86 +25,22 @@ from ai.graph.nodes import (
 
 
 def build_graph():
-
     graph = StateGraph(AgentState)
 
-    # =====================================================
-    # NODES
-    # =====================================================
+    graph.add_node("orchestrator", orchestrate)
+    graph.add_node("general", general_node)
+    graph.add_node("safety", safety_node)
+    graph.add_node("planning", planning_node)
+    graph.add_node("location", location_node)
+    graph.add_node("time", time_node)
+    graph.add_node("pfz", pfz_node)
+    graph.add_node("data_collection", data_collection_node)
+    graph.add_node("risk", risk_node)
+    graph.add_node("pfz_selection", pfz_selection_node)
+    graph.add_node("route", route_node)
+    graph.add_node("final_response", final_response_node)
 
-    graph.add_node(
-        "orchestrator",
-        orchestrate,
-    )
-
-    graph.add_node(
-        "general",
-        general_node,
-    )
-
-    graph.add_node(
-        "safety",
-        safety_node,
-    )
-
-    graph.add_node(
-        "planning",
-        planning_node,
-    )
-
-    graph.add_node(
-        "location",
-        location_node,
-    )
-
-    graph.add_node(
-        "time",
-        time_node,
-    )
-
-    graph.add_node(
-        "pfz",
-        pfz_node,
-    )
-
-    graph.add_node(
-        "data_collection",
-        data_collection_node,
-    )
-
-    graph.add_node(
-        "risk",
-        risk_node,
-    )
-
-    graph.add_node(
-        "pfz_selection",
-        pfz_selection_node,
-    )
-
-    graph.add_node(
-        "route",
-        route_node,
-    )
-
-    graph.add_node(
-        "final_response",
-        final_response_node,
-    )
-
-    # =====================================================
-    # START → ORCHESTRATOR
-    # =====================================================
-
-    graph.add_edge(
-        START,
-        "orchestrator",
-    )
-
-    # =====================================================
-    # ORCHESTRATOR → ROUTER
-    # =====================================================
-
+    graph.add_edge(START, "orchestrator")
     graph.add_conditional_edges(
         "orchestrator",
         route_query,
@@ -115,64 +51,16 @@ def build_graph():
         },
     )
 
-    # =====================================================
-    # GENERAL → END
-    # =====================================================
+    graph.add_edge("general", END)
 
-    graph.add_edge(
-        "general",
-        END,
-    )
-
-    # =====================================================
-    # LOCATION → TIME
-    # =====================================================
-
-    graph.add_edge(
-        "location",
-        "time",
-    )
-
-    # =====================================================
-    # TIME → PFZ
-    # =====================================================
-
-    graph.add_edge(
-        "time",
-        "pfz",
-    )
-
-    # =====================================================
-    # PFZ → DATA COLLECTION
-    # =====================================================
-
-    graph.add_edge(
-        "pfz",
-        "data_collection",
-    )
-
-    # =====================================================
-    # DATA COLLECTION → RISK
-    # =====================================================
-
-    graph.add_edge(
-        "data_collection",
-        "risk",
-    )
-
-    # =====================================================
-    # RISK → PFZ SELECTION HITL
-    # =====================================================
-
-    graph.add_edge(
-        "risk",
-        "pfz_selection",
-    )
-
-    # =====================================================
-    # PFZ SELECTION → ROUTE / FINAL RESPONSE
-    # =====================================================
-
+    # ---------------------------------------------------------
+    # Planning / Safety workflow
+    # ---------------------------------------------------------
+    graph.add_edge("location", "time")
+    graph.add_edge("time", "pfz")
+    graph.add_edge("pfz", "data_collection")
+    graph.add_edge("data_collection", "risk")
+    graph.add_edge("risk", "pfz_selection")
     graph.add_conditional_edges(
         "pfz_selection",
         route_after_pfz_selection,
@@ -181,39 +69,26 @@ def build_graph():
             "final_response": "final_response",
         },
     )
+    graph.add_edge("route", "final_response")
 
-    # =====================================================
-    # ROUTE → FINAL RESPONSE
-    # =====================================================
+    # ---------------------------------------------------------
+    # Final response
+    # ---------------------------------------------------------
+    graph.add_edge("final_response", END)
 
-    graph.add_edge(
-        "route",
-        "final_response",
-    )
-
-    # =====================================================
-    # FINAL RESPONSE → END
-    # =====================================================
-
-    graph.add_edge(
-        "final_response",
-        END,
-    )
-
-    # =====================================================
-    # CHECKPOINTER
-    # Required for HITL interrupt / resume
-    # =====================================================
-
+    # ---------------------------------------------------------
+    # Simple in-memory checkpointing
+    #
+    # This allows HITL interrupt/resume to work while the
+    # application process is running.
+    #
+    # NOTE:
+    # MemorySaver is NOT persistent across server restarts.
+    # We will replace this with PostgreSQL checkpointing later.
+    # ---------------------------------------------------------
     checkpointer = MemorySaver()
 
-    return graph.compile(
-        checkpointer=checkpointer,
-    )
+    return graph.compile(checkpointer=checkpointer)
 
-
-# =========================================================
-# COMPILED APPLICATION GRAPH
-# =========================================================
 
 app_graph = build_graph()

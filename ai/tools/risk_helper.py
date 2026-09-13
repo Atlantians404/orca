@@ -1,26 +1,41 @@
 import asyncio
+
 from ai.engines.risk_engine.main import run_risk_engine
-from services.risk_engine_service.weather_batch import get_weather_data_batch
-from services.risk_engine_service.marine_batch import get_marine_batch
-from services.location.marine_zones import is_protected, is_restricted
+
+from services.risk_engine_service.weather_batch import (
+    get_weather_data_batch,
+)
+
+from services.risk_engine_service.marine_batch import (
+    get_marine_batch,
+)
+
+from services.location.marine_zones import (
+    is_protected,
+    is_restricted,
+)
+
 
 RISK_MAX_CONCURRENT = 5
 
+
 async def get_geo_data_batch(nodes):
+
     async def process_node(node):
+
         lat = node["latitude"]
         lon = node["longitude"]
 
         restricted, protected = await asyncio.gather(
             is_restricted(lat, lon),
-            is_protected(lat, lon)
+            is_protected(lat, lon),
         )
 
         return node["node_id"], {
             "latitude": lat,
             "longitude": lon,
             "restricted_area": restricted,
-            "protected_area": protected
+            "protected_area": protected,
         }
 
     results = await asyncio.gather(
@@ -29,8 +44,17 @@ async def get_geo_data_batch(nodes):
 
     return dict(results)
 
-def build_risk_input(node, time, weather, marine, geo):
+
+def build_risk_input(
+    node,
+    time,
+    weather,
+    marine,
+    geo,
+):
+
     node_id = node["node_id"]
+
     marine_data = marine[node_id].copy()
 
     if "warning" in marine_data:
@@ -40,12 +64,15 @@ def build_risk_input(node, time, weather, marine, geo):
 
     return {
         "marine": marine_data,
+
         "weather": {
             **weather[node_id],
-            "wave_height": marine_data["wave_height"]
+            "wave_height": marine_data["wave_height"],
         },
-        "geo": geo[node_id]
+
+        "geo": geo[node_id],
     }
+
 
 async def evaluate_node(
     node,
@@ -53,43 +80,117 @@ async def evaluate_node(
     weather,
     marine,
     geo,
-    semaphore
+    semaphore,
 ):
+
     async with semaphore:
+
         risk_input = build_risk_input(
             node,
             time,
             weather,
             marine,
-            geo
+            geo,
         )
 
         agent_data = {
             node["node_id"]: {
-                time: risk_input
+                time: risk_input,
             }
         }
 
-        result = run_risk_engine(agent_data)
-        risk = result["ranked_results"][0]
+        result = run_risk_engine(
+            agent_data
+        )
+
+        ranked_results = result.get(
+            "ranked_results",
+            [],
+        )
+
+        if not ranked_results:
+            return {
+                "node_id": node["node_id"],
+                "risk_score": 100.0,
+                "safe": False,
+            }
+
+        pfz_result = ranked_results[0]
+
+        times = pfz_result.get(
+            "times",
+            [],
+        )
+
+        if not times:
+            return {
+                "node_id": node["node_id"],
+                "risk_score": 100.0,
+                "safe": False,
+            }
+
+        risk = times[0]
+
+        risk_score = risk.get(
+            "risk_score"
+        )
+
+        if risk_score is None:
+            return {
+                "node_id": node["node_id"],
+                "risk_score": 100.0,
+                "safe": False,
+            }
 
         return {
             "node_id": node["node_id"],
-            "risk_score": risk["risk_score"],
-            "safe": risk["risk_score"] <= 60
+            "risk_score": risk_score,
+            "safe": risk_score <= 60,
         }
 
+
 async def process_grid(k7_input):
+
     nodes = k7_input["nodes"]
+
+    # Original ORCA time.
+    # Example: "06:00"
     time = k7_input["time"]
 
-    weather, marine, geo = await asyncio.gather(
-        get_weather_data_batch(nodes, time),
-        get_marine_batch(nodes, time),
-        get_geo_data_batch(nodes)
+    # Weather requires a complete ISO datetime.
+    # Example: "2026-08-29T06:00"
+    #
+    # Fallback keeps backward compatibility if
+    # weather_time is not supplied.
+    weather_time = k7_input.get(
+        "weather_time",
+        time,
     )
 
-    semaphore = asyncio.Semaphore(RISK_MAX_CONCURRENT)
+    weather, marine, geo = await asyncio.gather(
+
+        # Weather Batch:
+        # get_weather_data_batch(nodes, weather_time)
+        get_weather_data_batch(
+            nodes,
+            weather_time,
+        ),
+
+        # Marine Batch remains unchanged.
+        get_marine_batch(
+            nodes,
+            time,
+        ),
+
+        # Marine zone checks.
+        get_geo_data_batch(
+            nodes,
+        ),
+    )
+
+    semaphore = asyncio.Semaphore(
+        RISK_MAX_CONCURRENT
+    )
 
     results = await asyncio.gather(
         *(
@@ -99,7 +200,7 @@ async def process_grid(k7_input):
                 weather,
                 marine,
                 geo,
-                semaphore
+                semaphore,
             )
             for node in nodes
         )

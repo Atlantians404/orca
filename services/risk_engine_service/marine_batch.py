@@ -495,7 +495,7 @@ async def get_marine_batch(nodes, time):
 
             else:
 
-                warning_level = None
+                warning_level = "None"
 
             # -------------------------------------
             # ONLY ONE WARNING FIELD

@@ -32,10 +32,9 @@ DOMAIN_WEIGHTS = {
 }
 
 WEATHER_WEIGHTS = {
-    "wind_speed": 0.30,
-    "wave_height": 0.20,
-    "visibility": 0.20,
-    "precipitation": 0.10,
+    "wind_speed": 0.40,
+    "visibility": 0.25,
+    "precipitation": 0.15,
     "lightning": 0.20
 }
 
@@ -260,11 +259,6 @@ def calculate_weather_score(weather):
         "wind_speed":
             score_wind_speed(
                 weather.wind_speed
-            ),
-
-        "wave_height":
-            score_wave_height(
-                weather.wave_height
             ),
 
         "visibility":
