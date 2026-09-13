@@ -2,7 +2,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from backend.models.users import User
-from backend.schemas.auth import RegisterRequest, LoginRequest
+from backend.schemas.auth import (
+    RegisterRequest,
+    LoginRequest,
+)
+
+from backend.models.profiles import Profile
 
 from backend.utils.auth_util import (
     hash_password,
@@ -16,12 +21,12 @@ from backend.core.exceptions import (
 )
 
 
-async def register_user(
-    data: RegisterRequest,
-    db: AsyncSession
-) -> User:
+# ==================================================
+# REGISTER USER
+# ==================================================
 
-    # Check whether email already exists
+async def register_user(data: RegisterRequest, db: AsyncSession) -> User:
+
     result = await db.execute(
         select(User).where(User.email == data.email)
     )
@@ -31,7 +36,6 @@ async def register_user(
     if existing_user:
         conflict("Email already registered")
 
-    # Create user
     user = User(
         username=data.username,
         email=data.email,
@@ -41,18 +45,32 @@ async def register_user(
 
     db.add(user)
 
+    # Generate user.id before commit
+    await db.flush()
+
+    profile = Profile(
+        user_id=user.id,
+        display_name=data.username,
+        language="en"
+    )
+
+    db.add(profile)
+
     await db.commit()
     await db.refresh(user)
 
     return user
 
 
+# ==================================================
+# LOGIN USER
+# ==================================================
+
 async def login_user(
     data: LoginRequest,
     db: AsyncSession
 ) -> str:
 
-    # Find user
     result = await db.execute(
         select(User).where(User.email == data.email)
     )
@@ -62,14 +80,12 @@ async def login_user(
     if not user:
         unauthorized("Invalid email or password")
 
-    # Verify password
     if not verify_password(
         data.password,
         user.hashed_password
     ):
         unauthorized("Invalid email or password")
 
-    # Create JWT
     token = create_access_token(
         {
             "sub": str(user.id),
@@ -79,3 +95,29 @@ async def login_user(
     )
 
     return token
+
+
+# ==================================================
+# GET CURRENT USER
+# ==================================================
+
+async def get_me(
+    current_user: User
+) -> User:
+
+    return current_user
+
+
+# ==================================================
+# LOGOUT USER
+# ==================================================
+
+async def logout_user(
+    current_user: User
+) -> None:
+
+    # Currently using stateless JWT.
+    # There is no server-side token/session to delete.
+    # The frontend removes the access token.
+
+    return None

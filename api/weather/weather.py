@@ -1,8 +1,6 @@
-import requests
-
+import httpx
 
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
-
 
 def get_weather_condition(weather_code):
 
@@ -45,7 +43,7 @@ def is_thunderstorm(weather_code):
     return weather_code in [95, 96, 99]
 
 
-def get_location_time(latitude, longitude):
+async def get_location_time(latitude, longitude):
 
     params = {
         "latitude": latitude,
@@ -54,11 +52,11 @@ def get_location_time(latitude, longitude):
         "timezone": "auto"
     }
 
-    response = requests.get(
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
         WEATHER_URL,
-        params=params,
-        timeout=10
-    )
+        params=params
+        )
 
     response.raise_for_status()
 
@@ -70,15 +68,15 @@ def get_location_time(latitude, longitude):
     )
 
 
-def get_open_meteo_data(latitude, longitude, time=None):
+async def get_open_meteo_data(latitude, longitude, time=None):
   
     if time is None:
-        time, timezone = get_location_time(
+        time, timezone = await get_location_time(
             latitude,
             longitude
         )
     else:
-        _, timezone = get_location_time(
+        _, timezone = await get_location_time(
             latitude,
             longitude
         )
@@ -100,11 +98,11 @@ def get_open_meteo_data(latitude, longitude, time=None):
         "end_hour": time
     }
 
-    response = requests.get(
+    async with httpx.AsyncClient(timeout=30) as client:
+        response = await client.get(
         WEATHER_URL,
-        params=weather_params,
-        timeout=10
-    )
+        params=weather_params
+        )
 
     response.raise_for_status()
 

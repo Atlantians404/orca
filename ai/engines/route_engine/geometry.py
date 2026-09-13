@@ -1,105 +1,180 @@
 from shapely.geometry import Point, LineString, Polygon
+from shapely.geometry.base import BaseGeometry
 
 
 def create_point(
     latitude: float,
-    longitude: float
+    longitude: float,
 ) -> Point:
     """
-    Create a Shapely Point.
+    External format:
+        latitude, longitude
 
-    Shapely uses:
-        (x, y) = (longitude, latitude)
+    Shapely format:
+        longitude, latitude
     """
-
     return Point(longitude, latitude)
 
 
 def create_linestring(
-    coordinates: list[tuple[float, float]]
-):
+    coordinates: list[tuple[float, float]],
+) -> LineString:
+
     if len(coordinates) < 2:
         raise ValueError(
-            "A LineString requires at least two points"
+            "A LineString requires at least two coordinates."
         )
 
-    return LineString(
-        [
-            (longitude, latitude)
-            for latitude, longitude in coordinates
-        ]
-    )
+    shapely_coordinates = [
+        (longitude, latitude)
+        for latitude, longitude in coordinates
+    ]
+
+    return LineString(shapely_coordinates)
 
 
 def create_polygon(
-    coordinates: list[tuple[float, float]]
+    coordinates: list[tuple[float, float]],
 ) -> Polygon:
-    """
-    Create a Polygon from
-    (latitude, longitude) coordinates.
-    """
 
-    return Polygon(
-        [
-            (longitude, latitude)
-            for latitude, longitude in coordinates
-        ]
-    )
+    if len(coordinates) < 3:
+        raise ValueError(
+            "A Polygon requires at least three coordinates."
+        )
+
+    shapely_coordinates = [
+        (longitude, latitude)
+        for latitude, longitude in coordinates
+    ]
+
+    if shapely_coordinates[0] != shapely_coordinates[-1]:
+        shapely_coordinates.append(
+            shapely_coordinates[0]
+        )
+
+    return Polygon(shapely_coordinates)
+
 
 def point_inside_polygon(
-    point: Point,
-    polygon: Polygon
+    latitude: float,
+    longitude: float,
+    polygon: Polygon,
 ) -> bool:
-    """
-    Check whether a point is inside a polygon.
-    """
+
+    point = create_point(
+        latitude,
+        longitude,
+    )
 
     return polygon.contains(point)
 
+
 def route_intersects_polygon(
-    route: LineString,
-    polygon: Polygon
+    coordinates: list[tuple[float, float]],
+    polygon: Polygon,
 ) -> bool:
-    """
-    Check whether a route intersects a polygon.
-    """
+
+    route = create_linestring(coordinates)
 
     return route.intersects(polygon)
 
-def pfz_to_point(pfz: dict) -> Point:
-    """
-    Convert a PFZ dictionary into a Shapely Point.
-    """
 
-    return create_point(
-        pfz["latitude"],
-        pfz["longitude"]
-    )
+def _get_zone_value(zone, key, default=None):
+
+    if isinstance(zone, dict):
+        return zone.get(key, default)
+
+    return getattr(zone, key, default)
+
+
 def zone_to_polygon(zone) -> Polygon:
+    """
+    Convert MongoDB/Pydantic zone data into
+    a Shapely polygon.
 
-    if hasattr(zone, "coordinates"):
-        coordinates = zone.coordinates
-    else:
-        coordinates = zone["coordinates"]
+    Supported formats:
 
-    return create_polygon(coordinates)
+    1. MongoDB GeoJSON:
+       {
+           "geometry": {
+               "type": "Polygon",
+               "coordinates": [...]
+           }
+       }
+
+    2. Older test format:
+       {
+           "coordinates": [...]
+       }
+    """
+
+    geometry = _get_zone_value(
+        zone,
+        "geometry",
+    )
+
+    if geometry:
+        if hasattr(geometry, "model_dump"):
+            geometry = geometry.model_dump()
+
+        geometry_type = geometry.get("type")
+
+        if geometry_type == "Polygon":
+            raw_coordinates = geometry.get(
+                "coordinates",
+                [],
+            )
+
+            if not raw_coordinates:
+                raise ValueError(
+                    "Polygon geometry contains no coordinates."
+                )
+
+            # GeoJSON Polygon:
+            # coordinates[0] = exterior ring
+            ring = raw_coordinates[0]
+
+            return create_polygon(
+                [
+                    tuple(coordinate)
+                    for coordinate in ring
+                ]
+            )
+
+    coordinates = _get_zone_value(
+        zone,
+        "coordinates",
+    )
+
+    if coordinates:
+        return create_polygon(
+            [
+                tuple(coordinate)
+                for coordinate in coordinates
+            ]
+        )
+
+    raise ValueError(
+        "Zone does not contain polygon coordinates."
+    )
+
 
 def validate_route(
-    route: LineString,
-    restricted_polygons: list[Polygon]
+    coordinates: list[tuple[float, float]],
+    restricted_zones: list,
 ) -> bool:
-    """
-    Validate that a route does not intersect
-    any restricted polygon.
 
-    Returns:
-        True  -> route is safe
-        False -> route intersects a restricted area
-    """
+    if len(coordinates) < 2:
+        return False
 
-    for polygon in restricted_polygons:
+    for zone in restricted_zones:
 
-        if route.intersects(polygon):
+        polygon = zone_to_polygon(zone)
+
+        if route_intersects_polygon(
+            coordinates,
+            polygon,
+        ):
             return False
 
     return True

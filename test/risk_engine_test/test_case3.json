@@ -1,11 +1,6 @@
 {
   "PFZ01": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ01_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.8,
         "wave_period": 8,
@@ -36,11 +31,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ01_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.5,
         "wave_period": 9,
@@ -71,11 +61,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ01_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.2,
         "wave_period": 10,
@@ -106,14 +91,8 @@
       }
     }
   },
-
   "PFZ02": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ02_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.6,
         "wave_period": 7,
@@ -144,11 +123,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ02_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.2,
         "wave_period": 8,
@@ -179,11 +153,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ02_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.8,
         "wave_period": 9,
@@ -214,14 +183,8 @@
       }
     }
   },
-
   "PFZ03": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ03_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.0,
         "wave_period": 8,
@@ -252,11 +215,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ03_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.7,
         "wave_period": 9,
@@ -287,11 +245,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ03_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.5,
         "wave_period": 10,
@@ -322,14 +275,8 @@
       }
     }
   },
-
   "PFZ04": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ04_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.3,
         "wave_period": 8,
@@ -360,11 +307,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ04_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.0,
         "wave_period": 10,
@@ -395,11 +337,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ04_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 3.0,
         "wave_period": 11,
@@ -430,14 +367,8 @@
       }
     }
   },
-
   "PFZ05": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ05_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.7,
         "wave_period": 7,
@@ -468,11 +399,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ05_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.4,
         "wave_period": 8,
@@ -503,11 +429,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ05_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.1,
         "wave_period": 9,
@@ -538,14 +459,8 @@
       }
     }
   },
-
   "PFZ06": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ06_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.1,
         "wave_period": 8,
@@ -576,11 +491,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ06_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.8,
         "wave_period": 9,
@@ -611,11 +521,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ06_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.8,
         "wave_period": 10,
@@ -646,14 +551,8 @@
       }
     }
   },
-
   "PFZ07": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ07_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.5,
         "wave_period": 6,
@@ -684,11 +583,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ07_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.0,
         "wave_period": 7,
@@ -719,11 +613,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ07_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.6,
         "wave_period": 8,
@@ -754,14 +643,8 @@
       }
     }
   },
-
   "PFZ08": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ08_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.4,
         "wave_period": 8,
@@ -792,11 +675,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ08_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.1,
         "wave_period": 9,
@@ -827,11 +705,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ08_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 3.2,
         "wave_period": 11,
@@ -862,14 +735,8 @@
       }
     }
   },
-
   "PFZ09": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ09_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.9,
         "wave_period": 7,
@@ -900,11 +767,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ09_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.5,
         "wave_period": 8,
@@ -935,11 +797,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ09_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.4,
         "wave_period": 10,
@@ -970,14 +827,8 @@
       }
     }
   },
-
   "PFZ10": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ10_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.0,
         "wave_period": 8,
@@ -1001,18 +852,13 @@
         "condition": "clear"
       },
       "geo": {
-        "latitude": 13.10,
-        "longitude": 80.30,
+        "latitude": 13.1,
+        "longitude": 80.3,
         "restricted_area": false,
         "protected_area": false
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ10_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.8,
         "wave_period": 9,
@@ -1036,18 +882,13 @@
         "condition": "cloudy"
       },
       "geo": {
-        "latitude": 13.10,
-        "longitude": 80.30,
+        "latitude": 13.1,
+        "longitude": 80.3,
         "restricted_area": false,
         "protected_area": false
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ10_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.9,
         "wave_period": 10,
@@ -1071,21 +912,15 @@
         "condition": "rain"
       },
       "geo": {
-        "latitude": 13.10,
-        "longitude": 80.30,
+        "latitude": 13.1,
+        "longitude": 80.3,
         "restricted_area": false,
         "protected_area": false
       }
     }
   },
-
   "PFZ11": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ11_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.7,
         "wave_period": 7,
@@ -1116,11 +951,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ11_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.3,
         "wave_period": 8,
@@ -1151,11 +981,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ11_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.0,
         "wave_period": 9,
@@ -1186,14 +1011,8 @@
       }
     }
   },
-
   "PFZ12": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ12_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.2,
         "wave_period": 8,
@@ -1224,11 +1043,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ12_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.9,
         "wave_period": 9,
@@ -1259,11 +1073,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ12_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 3.1,
         "wave_period": 11,
@@ -1294,14 +1103,8 @@
       }
     }
   },
-
   "PFZ13": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ13_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.9,
         "wave_period": 7,
@@ -1332,11 +1135,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ13_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.6,
         "wave_period": 8,
@@ -1367,11 +1165,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ13_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.6,
         "wave_period": 10,
@@ -1402,14 +1195,8 @@
       }
     }
   },
-
   "PFZ14": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ14_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.0,
         "wave_period": 8,
@@ -1440,11 +1227,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ14_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.7,
         "wave_period": 9,
@@ -1475,11 +1257,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ14_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.7,
         "wave_period": 10,
@@ -1510,14 +1287,8 @@
       }
     }
   },
-
   "PFZ15": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ15_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.6,
         "wave_period": 6,
@@ -1548,11 +1319,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ15_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.1,
         "wave_period": 7,
@@ -1583,11 +1349,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ15_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.9,
         "wave_period": 9,
@@ -1618,14 +1379,8 @@
       }
     }
   },
-
   "PFZ16": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ16_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.3,
         "wave_period": 8,
@@ -1656,11 +1411,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ16_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.0,
         "wave_period": 9,
@@ -1691,11 +1441,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ16_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 3.3,
         "wave_period": 11,
@@ -1726,14 +1471,8 @@
       }
     }
   },
-
   "PFZ17": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ17_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.8,
         "wave_period": 7,
@@ -1764,11 +1503,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ17_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.4,
         "wave_period": 8,
@@ -1799,11 +1533,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ17_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.3,
         "wave_period": 10,
@@ -1834,14 +1563,8 @@
       }
     }
   },
-
   "PFZ18": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ18_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.1,
         "wave_period": 8,
@@ -1872,11 +1595,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ18_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.9,
         "wave_period": 9,
@@ -1907,11 +1625,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ18_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 3.0,
         "wave_period": 10,
@@ -1942,14 +1655,8 @@
       }
     }
   },
-
   "PFZ19": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ19_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 0.7,
         "wave_period": 7,
@@ -1980,11 +1687,6 @@
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ19_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.2,
         "wave_period": 8,
@@ -2015,11 +1717,6 @@
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ19_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.9,
         "wave_period": 9,
@@ -2050,14 +1747,8 @@
       }
     }
   },
-
   "PFZ20": {
     "2026-08-31 06:00": {
-      "request": {
-        "request_id": "CASE3_PFZ20_06",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.0,
         "wave_period": 8,
@@ -2081,18 +1772,13 @@
         "condition": "clear"
       },
       "geo": {
-        "latitude": 13.20,
-        "longitude": 80.40,
+        "latitude": 13.2,
+        "longitude": 80.4,
         "restricted_area": false,
         "protected_area": false
       }
     },
     "2026-08-31 12:00": {
-      "request": {
-        "request_id": "CASE3_PFZ20_12",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 1.8,
         "wave_period": 9,
@@ -2116,18 +1802,13 @@
         "condition": "cloudy"
       },
       "geo": {
-        "latitude": 13.20,
-        "longitude": 80.40,
+        "latitude": 13.2,
+        "longitude": 80.4,
         "restricted_area": false,
         "protected_area": false
       }
     },
     "2026-08-31 17:00": {
-      "request": {
-        "request_id": "CASE3_PFZ20_17",
-        "requires_route": false,
-        "forecast_hours": 24
-      },
       "marine": {
         "wave_height": 2.8,
         "wave_period": 10,
@@ -2151,8 +1832,8 @@
         "condition": "rain"
       },
       "geo": {
-        "latitude": 13.20,
-        "longitude": 80.40,
+        "latitude": 13.2,
+        "longitude": 80.4,
         "restricted_area": false,
         "protected_area": false
       }

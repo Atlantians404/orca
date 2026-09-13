@@ -64,7 +64,7 @@ from ai.orchestrator import orchestrate
         ),
     ],
 )
-async def test_orchestrator(prompt, expected):
+async def test_orchestrator_query_type(prompt, expected):
 
     state = {
         "prompt": prompt
@@ -73,3 +73,47 @@ async def test_orchestrator(prompt, expected):
     result = await orchestrate(state)
 
     assert result["query_type"] == expected
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_extracts_pfz():
+
+    state = {
+        "prompt": "Is PFZ03 safe tomorrow at 5 PM?"
+    }
+
+    result = await orchestrate(state)
+
+    assert result["query_type"] == "safety"
+    assert result["selected_pfz_id"] == "PFZ03"
+    assert result["distance_km"] is None
+    assert result["route_required"] is False
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_extracts_distance():
+
+    state = {
+        "prompt": "Find a safe PFZ within 20 km."
+    }
+
+    result = await orchestrate(state)
+
+    assert result["query_type"] == "planning"
+    assert result["distance_km"] == 20
+    assert result["selected_pfz_id"] is None
+    assert result["route_required"] is False
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_extracts_route_and_pfz():
+
+    state = {
+        "prompt": "Give me a safe route to PFZ07."
+    }
+
+    result = await orchestrate(state)
+
+    assert result["query_type"] == "planning"
+    assert result["selected_pfz_id"] == "PFZ07"
+    assert result["route_required"] is True
