@@ -1176,5 +1176,5 @@ function LoadingRow() {
   );
 }
 
-
+});
 export default RecentSessions;
