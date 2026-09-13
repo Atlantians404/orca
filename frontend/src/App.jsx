@@ -9,7 +9,6 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<LandingPage />} />
-<<<<<<< HEAD
 
         {/* Routes inside AppLayout get the sidebar + collapse/drawer behavior */}
         <Route element={<AppLayout />}>
@@ -17,10 +16,10 @@ export default function App() {
           <Route path="/maps" element={<MapsPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>
-=======
+
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/test-sessions" element={<ChatPage />} />
->>>>>>> origin/main
+
       </Routes>
     </BrowserRouter>
   );
