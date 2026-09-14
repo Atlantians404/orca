@@ -8,7 +8,7 @@ from ai.prompts.orchestrator_prompt import ORCHESTRATOR_PROMPT
 from ai.prompts.time_prompt import TIME_PROMPT
 
 from ai.schemas.location import Location
-from ai.schemas.time import TimeContext, TimeSlot
+from ai.schemas.time import TimeContext
 
 
 TIMEZONE = "Asia/Kolkata"
@@ -88,12 +88,12 @@ async def _parse_time_input(
             "time"
         )
 
-        if not date_expression or not time:
+        # Date is optional.
+        # If date is None, time_parser will
+        # automatically use today's date.
+        if not time:
             return None
 
-        # IMPORTANT:
-        # This currently keeps date resolution in the
-        # existing time service.
         from services.time.time_parser import (
             build_specific_time,
         )
@@ -119,7 +119,10 @@ async def _parse_time_input(
             "period"
         )
 
-        if not date_expression or not period:
+        # Date is optional.
+        # If date is None, time_parser will
+        # automatically use today's date.
+        if not period:
             return None
 
         from services.time.time_parser import (
