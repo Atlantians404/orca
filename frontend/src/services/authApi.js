@@ -2,6 +2,7 @@ import api from "./api";
 
 /**
  * Auth API service for user login, registration, fetching profile, and logout.
+ * Base URL: https://orca-qlqz.onrender.com
  */
 
 const LOGIN_URL = "/auth/login";
@@ -9,9 +10,12 @@ const REGISTER_URL = "/auth/register";
 const ME_URL = "/auth/me";
 const LOGOUT_URL = "/auth/logout";
 
-/** Log in user with credentials { email, password } and store access_token in localStorage */
-export async function loginUser(credentials) {
-  const res = await api.post(LOGIN_URL, credentials);
+/**
+ * Log in user with credentials { email, password }
+ * POST /auth/login -> Returns { access_token, token_type: "bearer" }
+ */
+export async function loginUser({ email, password }) {
+  const res = await api.post(LOGIN_URL, { email, password });
   const token = res.data?.access_token || res.data?.token;
   if (token) {
     localStorage.setItem("authToken", token);
@@ -19,19 +23,28 @@ export async function loginUser(credentials) {
   return res.data;
 }
 
-/** Register user with payload { username, email, password, ... } */
-export async function registerUser(payload) {
-  const res = await api.post(REGISTER_URL, payload);
+/**
+ * Register user with payload { username, email, password }
+ * POST /auth/register -> Returns { message: string }
+ */
+export async function registerUser({ username, email, password }) {
+  const res = await api.post(REGISTER_URL, { username, email, password });
   return res.data;
 }
 
-/** Get the currently authenticated user. Shape is whatever the backend returns. */
+/**
+ * Get current user profile
+ * GET /auth/me -> Returns { id, username, email, role }
+ */
 export async function getCurrentUser() {
   const res = await api.get(ME_URL);
   return res.data;
 }
 
-/** Log the current user out and clear token from localStorage. */
+/**
+ * Log out current user
+ * POST /auth/logout -> Returns { message: string }
+ */
 export async function logout() {
   try {
     await api.post(LOGOUT_URL);
@@ -40,4 +53,5 @@ export async function logout() {
   } finally {
     localStorage.removeItem("authToken");
   }
-}
+}
+
