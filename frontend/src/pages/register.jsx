@@ -1,3 +1,5 @@
+
+
 import { useState } from 'react';
 import AuthModal from '../AuthModal';
 import { EyeIcon, EyeOffIcon, ChevronDownIcon } from '../AuthIcons';
@@ -122,7 +124,7 @@ export default function Register({ isOpen, onClose, onSwitchToLogin, onRegister 
   };
 
   return (
-    <AuthModal isOpen={isOpen} onClose={onClose} wide>
+    <AuthModal isOpen={isOpen} onClose={onClose} wide glow={false}>
       <div className="auth-header">
         <div className="auth-logo font-display">ORCA</div>
         <h2 className="auth-title font-display">Create your account</h2>

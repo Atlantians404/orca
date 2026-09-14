@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import AuthModal from '../AuthModal';
 import { EyeIcon, EyeOffIcon } from '../AuthIcons';
@@ -12,7 +13,7 @@ import { EyeIcon, EyeOffIcon } from '../AuthIcons';
  *  - onLogin: (payload) => Promise    (wire this to your API — see handleSubmit below)
  */
 export default function Login({ isOpen, onClose, onSwitchToRegister, onForgotPassword, onLogin }) {
-  const [formData, setFormData] = useState({ username: '', password: '' });
+  const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -25,7 +26,11 @@ export default function Login({ isOpen, onClose, onSwitchToRegister, onForgotPas
 
   const validate = () => {
     const nextErrors = {};
-    if (!formData.username.trim()) nextErrors.username = 'Username is required';
+    if (!formData.email.trim()) {
+      nextErrors.email = 'Email is required';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      nextErrors.email = 'Enter a valid email address';
+    }
     if (!formData.password) nextErrors.password = 'Password is required';
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -73,24 +78,24 @@ export default function Login({ isOpen, onClose, onSwitchToRegister, onForgotPas
         {errors.form && <div className="auth-error-banner font-body">{errors.form}</div>}
 
         <div className="auth-field">
-          <label htmlFor="login-username" className="auth-label font-body">Username</label>
+          <label htmlFor="login-email" className="auth-label font-body">Email</label>
           <input
-            id="login-username"
-            name="username"
-            type="text"
-            className={`auth-input font-body ${errors.username ? 'auth-input-error' : ''}`}
-            placeholder="Enter your username"
-            value={formData.username}
+            id="login-email"
+            name="email"
+            type="email"
+            className={`auth-input font-body ${errors.email ? 'auth-input-error' : ''}`}
+            placeholder="Enter your email"
+            value={formData.email}
             onChange={handleChange}
-            autoComplete="username"
+            autoComplete="email"
           />
-          {errors.username && <span className="auth-field-error font-body">{errors.username}</span>}
+          {errors.email && <span className="auth-field-error font-body">{errors.email}</span>}
         </div>
 
         <div className="auth-field">
           <div className="auth-label-row">
             <label htmlFor="login-password" className="auth-label font-body">Password</label>
-            <button type="button" className="auth-link-inline auth-link-neutral font-body" onClick={onForgotPassword}>
+            <button type="button" className="auth-link-inline font-body" onClick={onForgotPassword}>
               Forgot password?
             </button>
           </div>
@@ -124,7 +129,7 @@ export default function Login({ isOpen, onClose, onSwitchToRegister, onForgotPas
 
       <p className="auth-switch font-body">
         Don&apos;t have an account?{' '}
-        <button type="button" className="auth-link auth-link-neutral" onClick={onSwitchToRegister}>
+        <button type="button" className="auth-link" onClick={onSwitchToRegister}>
           Sign up
         </button>
       </p>
