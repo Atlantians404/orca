@@ -87,3 +87,46 @@ export const unarchiveSession = async (sessionId) => {
   const response = await api.delete(`/sessions/${sessionId}/archive`);
   return response.data;
 };
+// =====================================================
+// CHAT
+// =====================================================
+
+// Get chat history for a session
+export const getChatHistory = async (sessionId) => {
+  const response = await api.get(
+    `/chat/${sessionId}/history`
+  );
+
+  return response.data;
+};
+
+// Send message
+export const sendChatMessage = async (
+  sessionId,
+  message
+) => {
+  const response = await api.post(
+    "/chat",
+    {
+      session_id: sessionId,
+      message,
+    }
+  );
+
+  return response.data;
+};
+
+// Resume pending chat workflow
+export const resumeChat = async (
+  sessionId,
+  value
+) => {
+  const response = await api.post(
+    `/chat/${sessionId}/resume`,
+    {
+      value,
+    }
+  );
+
+  return response.data;
+};
