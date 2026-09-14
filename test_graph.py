@@ -1,208 +1,256 @@
 import asyncio
+import json
 
-from langgraph.types import Command
-
-from ai.graph.graph import build_graph
+from ai.orchestrator import orchestrate
 
 
-async def test_graph():
+TEST_CASES = [
+    # ========================================================
+    # LOCATION + TIME
+    # ========================================================
 
-    graph = build_graph()
+    "I want to fish around Mahabalipuram tomorrow evening",
 
-    session_id = "graph-route-test-001"
+    "Plan a fishing trip from Chennai tomorrow morning",
 
-    config = {
-        "configurable": {
-            "thread_id": session_id
-        }
+    "I want to go fishing around Cuddalore at 6 AM tomorrow",
+
+    "I want to fish from Pondicherry at 5:30 PM",
+
+    # ========================================================
+    # LOCATION ONLY
+    # ========================================================
+
+    "I want to fish around Mahabalipuram",
+
+    "Plan a fishing trip from Chennai",
+
+    "I want to go fishing from Cuddalore",
+
+    # ========================================================
+    # TIME ONLY
+    # ========================================================
+
+    "I want to go fishing tomorrow evening",
+
+    "Plan a fishing trip tomorrow at 6 AM",
+
+    "I want to leave at 17:30",
+
+    # ========================================================
+    # COORDINATES
+    # ========================================================
+
+    "I want to fish at 12.85, 80.28 tomorrow morning",
+
+    "Plan fishing from 12.779167, 80.342222 at 6 PM",
+
+    # ========================================================
+    # DISTANCE
+    # ========================================================
+
+    "Find a PFZ within 20 km from Mahabalipuram tomorrow morning",
+
+    "Find fishing zones within 30 kilometers from Chennai",
+
+    # ========================================================
+    # PFZ / SAFETY
+    # ========================================================
+
+    "Is Pondicherry safe for fishing?",
+
+    "Is Nagapattinam Harbour safe?",
+
+    "Is Kanathur Reddy Kuppam safe tomorrow evening?",
+
+    # ========================================================
+    # ROUTE
+    # ========================================================
+
+    "Give me a route to Pondicherry",
+
+    "Find the safest route to Kanathur Reddy Kuppam",
+
+    "How do I reach the selected PFZ tomorrow morning?",
+
+    # ========================================================
+    # GENERAL
+    # ========================================================
+
+    "What is a PFZ?",
+
+    "What does PFZ mean?",
+
+    "What is the weather like for fishing?",
+]
+
+
+async def run_test(prompt: str):
+
+    print("\n" + "=" * 80)
+    print(f"INPUT: {prompt}")
+    print("=" * 80)
+
+    state = {
+        "prompt": prompt,
+        "workflow_status": "IN_PROGRESS",
     }
 
-    # =========================================================
-    # STEP 1 — Initial request
-    # =========================================================
+    try:
 
-    print("\n========== STEP 1 ==========")
+        result = await orchestrate(state)
 
-    result = await graph.ainvoke(
-        {
-            "thread_id": session_id,
-            "prompt": "Plan a fishing trip with route",
-            "workflow_status": "IN_PROGRESS",
-            "route_required": True,
-        },
-        config=config,
-    )
-
-    print("Pending action:")
-    print(result.get("pending_action"))
-
-    print("Workflow status:")
-    print(result.get("workflow_status"))
-
-    print("Interrupt:")
-    print(result.get("__interrupt__"))
-
-    # =========================================================
-    # STEP 2 — Location
-    # =========================================================
-
-    print("\n========== STEP 2 ==========")
-
-    result = await graph.ainvoke(
-        Command(
-            resume={
-                "latitude": 13.0827,
-                "longitude": 80.2707,
-            }
-        ),
-        config=config,
-    )
-
-    print("Pending action:")
-    print(result.get("pending_action"))
-
-    print("Workflow status:")
-    print(result.get("workflow_status"))
-
-    print("Interrupt:")
-    print(result.get("__interrupt__"))
-
-    # =========================================================
-    # STEP 3 — Time
-    # =========================================================
-
-    print("\n========== STEP 3 ==========")
-
-    result = await graph.ainvoke(
-        Command(
-            resume="tomorrow at 6 AM"
-        ),
-        config=config,
-    )
-
-    print("Pending action:")
-    print(result.get("pending_action"))
-
-    print("Workflow status:")
-    print(result.get("workflow_status"))
-
-    print("Interrupt:")
-    print(result.get("__interrupt__"))
-
-    print("\nRoute required:")
-    print(result.get("route_required"))
-
-    # =========================================================
-    # STEP 4 — PFZ selection
-    # =========================================================
-
-    print("\n========== STEP 4 ==========")
-
-    result = await graph.ainvoke(
-        Command(
-            resume="Kanathur Reddy Kuppam"
-        ),
-        config=config,
-    )
-
-    print("Pending action:")
-    print(result.get("pending_action"))
-
-    print("Workflow status:")
-    print(result.get("workflow_status"))
-
-    print("\nRoute required:")
-    print(result.get("route_required"))
-
-    # =========================================================
-    # ROUTE RESULT
-    # =========================================================
-
-    print("\n========== ROUTE RESULT ==========")
-
-    route_result = result.get("route_result")
-
-    if route_result is None:
-        print("❌ route_result = None")
-    else:
-        print("✅ route_result exists")
-
-        print("\nRoute result:")
-        print(route_result)
-
-        print("\nSafe route:")
         print(
-            route_result.get("safe_route")
+            json.dumps(
+                result,
+                indent=4,
+                default=str,
+            )
         )
 
-        print("\nCandidate routes:")
-        candidate_routes = route_result.get(
-            "candidate_routes",
-            []
+        # ----------------------------------------------------
+        # Basic validation
+        # ----------------------------------------------------
+
+        assert result["query_type"] in {
+            "general",
+            "safety",
+            "planning",
+        }
+
+        assert (
+            "location" in result
+        )
+
+        assert (
+            "time_context" in result
+        )
+
+        assert (
+            "distance_km" in result
+        )
+
+        assert (
+            "selected_pfz_name" in result
+        )
+
+        assert (
+            "route_required" in result
+        )
+
+        print("\n✅ STRUCTURE OK")
+
+        # ----------------------------------------------------
+        # Location validation
+        # ----------------------------------------------------
+
+        location = result.get(
+            "location"
+        )
+
+        if location:
+
+            print(
+                "\n📍 LOCATION:"
+            )
+
+            print(
+                f"   place      = {location.place}"
+            )
+
+            print(
+                f"   latitude   = {location.latitude}"
+            )
+
+            print(
+                f"   longitude  = {location.longitude}"
+            )
+
+        else:
+
+            print(
+                "\n📍 LOCATION: None"
+            )
+
+        # ----------------------------------------------------
+        # Time validation
+        # ----------------------------------------------------
+
+        time_context = result.get(
+            "time_context"
+        )
+
+        if time_context:
+
+            print(
+                "\n🕐 TIME:"
+            )
+
+            print(
+                f"   timezone = {time_context.timezone}"
+            )
+
+            for slot in time_context.slots:
+
+                print(
+                    f"   date       = {slot.date}"
+                )
+
+                print(
+                    f"   start_time = {slot.start_time}"
+                )
+
+                print(
+                    f"   end_time   = {slot.end_time}"
+                )
+
+        else:
+
+            print(
+                "\n🕐 TIME: None"
+            )
+
+        # ----------------------------------------------------
+        # Other fields
+        # ----------------------------------------------------
+
+        print(
+            "\n📋 OTHER:"
         )
 
         print(
-            f"Number of candidates: "
-            f"{len(candidate_routes)}"
+            f"   query_type        = {result.get('query_type')}"
         )
 
-        for route in candidate_routes:
-            print(
-                f"\n{route.get('route_id')}"
-            )
-            print(
-                f"Distance: "
-                f"{route.get('distance_km')}"
-            )
-            print(
-                f"Risk: "
-                f"{route.get('risk_score')}"
-            )
-            print(
-                f"Safe: "
-                f"{route.get('safe')}"
-            )
-            print(
-                f"Waypoints: "
-                f"{len(route.get('waypoints', []))}"
-            )
+        print(
+            f"   distance_km       = {result.get('distance_km')}"
+        )
 
-    # =========================================================
-    # FINAL RESPONSE
-    # =========================================================
+        print(
+            f"   selected_pfz_name = {result.get('selected_pfz_name')}"
+        )
 
-    print("\n========== FINAL RESPONSE ==========")
+        print(
+            f"   route_required    = {result.get('route_required')}"
+        )
 
-    response = result.get("response")
+    except Exception as exc:
 
-    print(response)
+        print(
+            f"\n❌ TEST FAILED: {type(exc).__name__}"
+        )
 
-    # =========================================================
-    # IMPORTANT STATE CHECKS
-    # =========================================================
+        print(
+            f"   {exc}"
+        )
 
-    print("\n========== STATE CHECK ==========")
 
-    print(
-        "selected_pfz_name:",
-        result.get("selected_pfz_name")
-    )
+async def main():
 
-    print(
-        "selected_pfz:",
-        result.get("selected_pfz")
-    )
+    for prompt in TEST_CASES:
 
-    print(
-        "route_required:",
-        result.get("route_required")
-    )
-
-    print(
-        "route_result exists:",
-        result.get("route_result") is not None
-    )
+        await run_test(prompt)
 
 
 if __name__ == "__main__":
-    asyncio.run(test_graph())
+    asyncio.run(main())
