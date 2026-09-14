@@ -1,292 +1,1129 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Compass, MapPinned, ShieldAlert, Waves } from "lucide-react";
-import ChatMessage from "./ChatMessage";
-import logo from "../../../assets/logo.png";
-import ChatInput from "./ChatInput";
+import { useEffect, useRef, useState } from "react";
 import {
   getChatHistory,
-  sendMessage,
-  editMessage,
-  regenerateMessage,
-  sendFeedback,
-  getSuggestions,
-} from "../services/chathelp";
+  sendChatMessage,
+  resumeChat,
+} from "../services/chatApi";
 
-const SUGGESTION_ICONS = [Waves, MapPinned, ShieldAlert, Compass];
+import orcaLogo from "../../../assets/log.png";
+
+
+// =====================================================
+// STATIC SUGGESTIONS
+// No backend endpoint is used for these.
+// =====================================================
+
+const SUGGESTIONS = [
+  "What are the current marine conditions?",
+  "Show me safe fishing areas.",
+  "Analyze the weather conditions.",
+  "What risks should I be aware of?",
+];
+
+
+// =====================================================
+// HELPERS
+// =====================================================
+
+const normalizeHistoryMessage = (item) => ({
+  id: item.id,
+  role:
+    item.role?.toLowerCase() === "user"
+      ? "user"
+      : "assistant",
+  content: item.content || "",
+  response_data: item.response_data ?? null,
+});
+
+
+const buildAssistantMessage = (response) => ({
+  id: `assistant-${Date.now()}`,
+  role: "assistant",
+  content: response.message || "",
+  response_data: response.response_data ?? null,
+  pending_action: response.pending_action ?? null,
+  workflow_status: response.workflow_status ?? null,
+  options: Array.isArray(response.options)
+    ? response.options
+    : [],
+});
+
 
 export default function ChatWindow({ session }) {
-  const sessionId = session?.id ?? null;
+
+  // ===================================================
+  // STATE
+  // ===================================================
 
   const [messages, setMessages] = useState([]);
-  const [historyLoading, setHistoryLoading] = useState(true);
-  const [sending, setSending] = useState(false);
-  const [inputValue, setInputValue] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [regeneratingId, setRegeneratingId] = useState(null);
-  const [suggestions, setSuggestions] = useState([]);
-  const [error, setError] = useState(null);
+  const [input, setInput] = useState("");
 
-  const bottomRef = useRef(null);
+  const [loadingHistory, setLoadingHistory] =
+    useState(false);
+
+  const [sending, setSending] =
+    useState(false);
+
+  const [resuming, setResuming] =
+    useState(false);
+
+  const [error, setError] =
+    useState("");
+
+  const [pendingAction, setPendingAction] =
+    useState(null);
+
+  const [pendingOptions, setPendingOptions] =
+    useState([]);
+
+  const [resumeInput, setResumeInput] =
+    useState("");
+
+  const messagesEndRef = useRef(null);
+
+
+  // ===================================================
+  // LOAD HISTORY WHEN SESSION CHANGES
+  // ===================================================
 
   useEffect(() => {
-    if (sessionId == null) {
+
+    if (!session?.id) {
       setMessages([]);
-      setHistoryLoading(false);
+      setPendingAction(null);
+      setPendingOptions([]);
+      setError("");
       return;
     }
 
     let cancelled = false;
-    setHistoryLoading(true);
-    setError(null);
-    setEditingId(null);
-    setRegeneratingId(null);
-    setInputValue("");
 
-    getChatHistory(sessionId).then((history) => {
-      if (cancelled) return;
-      setMessages(history);
-      setHistoryLoading(false);
-    });
+    const loadHistory = async () => {
+
+      setLoadingHistory(true);
+      setError("");
+
+      try {
+
+        const history =
+          await getChatHistory(session.id);
+
+        if (cancelled) {
+          return;
+        }
+
+        const normalized =
+          Array.isArray(history)
+            ? history.map(
+                normalizeHistoryMessage
+              )
+            : [];
+
+        setMessages(normalized);
+
+      } catch (err) {
+
+        if (!cancelled) {
+
+          setError(
+            err?.response?.data?.detail ||
+            "Unable to load conversation history."
+          );
+        }
+
+      } finally {
+
+        if (!cancelled) {
+          setLoadingHistory(false);
+        }
+      }
+    };
+
+
+    loadHistory();
 
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+
+  }, [session?.id]);
+
+
+  // ===================================================
+  // AUTO SCROLL
+  // ===================================================
 
   useEffect(() => {
-    let cancelled = false;
-    getSuggestions().then((items) => {
-      if (!cancelled) setSuggestions(items);
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: "smooth",
     });
-    return () => {
-      cancelled = true;
+
+  }, [
+    messages,
+    sending,
+    resuming,
+  ]);
+
+
+  // ===================================================
+  // SEND NORMAL CHAT MESSAGE
+  // ===================================================
+
+  const handleSend = async (
+    messageOverride = null
+  ) => {
+
+    const text =
+      (
+        messageOverride ??
+        input
+      ).trim();
+
+    if (!text || !session?.id || sending) {
+      return;
+    }
+
+    setError("");
+
+    const userMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      content: text,
+      response_data: null,
     };
-  }, [sessionId]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+    // Show user's message immediately.
+    setMessages((previous) => [
+      ...previous,
+      userMessage,
+    ]);
 
-  const handleSend = useCallback(
-    async (text) => {
-      setError(null);
-      setInputValue("");
-      setSending(true);
+    setInput("");
 
-      const userMessage = {
-        id: `pending-user-${Date.now()}`,
-        role: "user",
-        content: text,
-        response_data: null,
-        created_at: new Date().toISOString(),
-      };
-      const pendingAssistant = {
-        id: `pending-assistant-${Date.now()}`,
-        role: "assistant",
-        content: "",
-        response_data: null,
-        created_at: null,
-        pending: true,
-      };
-      setMessages((prev) => [...prev, userMessage, pendingAssistant]);
+    setSending(true);
 
-      try {
-        const assistantMessage = await sendMessage(sessionId, text);
-        setMessages((prev) => {
-          const withoutPlaceholder = prev.filter((m) => m.id !== pendingAssistant.id);
-          return [...withoutPlaceholder, assistantMessage];
-        });
-      } catch (err) {
-        setMessages((prev) => prev.filter((m) => m.id !== pendingAssistant.id));
-        setError({
-          message: err?.message || "ORCA couldn't complete that request.",
-          retry: () => handleSend(text),
-        });
-      } finally {
-        setSending(false);
+    try {
+
+      const response =
+        await sendChatMessage(
+          session.id,
+          text
+        );
+
+      const assistantMessage =
+        buildAssistantMessage(response);
+
+      setMessages((previous) => [
+        ...previous,
+        assistantMessage,
+      ]);
+
+
+      // -----------------------------------------------
+      // Pending workflow
+      // -----------------------------------------------
+
+      if (
+        response.pending_action ||
+        response.workflow_status ||
+        (
+          Array.isArray(response.options) &&
+          response.options.length > 0
+        )
+      ) {
+
+        setPendingAction(
+          response.pending_action ?? null
+        );
+
+        setPendingOptions(
+          Array.isArray(response.options)
+            ? response.options
+            : []
+        );
+      } else {
+
+        setPendingAction(null);
+        setPendingOptions([]);
       }
-    },
-    [sessionId]
-  );
 
-  const handleSuggestionClick = useCallback((text) => {
-    setInputValue(text);
-  }, []);
+    } catch (err) {
 
-  const handleStartEdit = useCallback((id) => setEditingId(id), []);
-  const handleCancelEdit = useCallback(() => setEditingId(null), []);
-
-  const handleSubmitEdit = useCallback(
-    async (id, newContent) => {
-      setError(null);
-      setEditingId(null);
-
-      setMessages((prev) => {
-        const index = prev.findIndex((m) => m.id === id);
-        if (index === -1) return prev;
-        const edited = { ...prev[index], content: newContent };
-        return [
-          ...prev.slice(0, index),
-          edited,
-          {
-            id: `pending-assistant-${Date.now()}`,
-            role: "assistant",
-            content: "",
-            response_data: null,
-            created_at: null,
-            pending: true,
-          },
-        ];
-      });
-
-      try {
-        const { messages: updated } = await editMessage(sessionId, id, newContent);
-        setMessages(updated);
-      } catch (err) {
-        setError({
-          message: err?.message || "ORCA couldn't complete that request.",
-          retry: () => handleSubmitEdit(id, newContent),
-        });
-        const history = await getChatHistory(sessionId);
-        setMessages(history);
-      }
-    },
-    [sessionId]
-  );
-
-  const handleRegenerate = useCallback(
-    async (id) => {
-      setError(null);
-      setRegeneratingId(id);
-      try {
-        const regenerated = await regenerateMessage(sessionId, id);
-        setMessages((prev) => prev.map((m) => (m.id === id ? regenerated : m)));
-      } catch (err) {
-        setError({
-          message: err?.message || "ORCA couldn't complete that request.",
-          retry: () => handleRegenerate(id),
-        });
-      } finally {
-        setRegeneratingId(null);
-      }
-    },
-    [sessionId]
-  );
-
-  const handleFeedback = useCallback(
-    (id, type) => {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === id ? { ...m, feedback: m.feedback === type ? null : type } : m))
+      setError(
+        err?.response?.data?.detail ||
+        "Unable to send message."
       );
-      const current = messages.find((m) => m.id === id);
-      const nextFeedback = current?.feedback === type ? null : type;
-      if (nextFeedback) {
-        sendFeedback(sessionId, id, nextFeedback).catch(() => {});
+
+    } finally {
+
+      setSending(false);
+    }
+  };
+
+
+  // ===================================================
+  // RESUME PENDING WORKFLOW
+  // ===================================================
+
+  const handleResume = async (
+    value
+  ) => {
+
+    if (
+      !session?.id ||
+      resuming
+    ) {
+      return;
+    }
+
+    if (
+      value === null ||
+      value === undefined ||
+      String(value).trim() === ""
+    ) {
+      return;
+    }
+
+    setError("");
+    setResuming(true);
+
+    try {
+
+      const response =
+        await resumeChat(
+          session.id,
+          value
+        );
+
+      const assistantMessage =
+        buildAssistantMessage(response);
+
+      setMessages((previous) => [
+        ...previous,
+        assistantMessage,
+      ]);
+
+
+      if (
+        response.pending_action ||
+        response.workflow_status ||
+        (
+          Array.isArray(response.options) &&
+          response.options.length > 0
+        )
+      ) {
+
+        setPendingAction(
+          response.pending_action ?? null
+        );
+
+        setPendingOptions(
+          Array.isArray(response.options)
+            ? response.options
+            : []
+        );
+
+      } else {
+
+        setPendingAction(null);
+        setPendingOptions([]);
       }
-    },
-    [messages, sessionId]
-  );
+
+      setResumeInput("");
+
+    } catch (err) {
+
+      setError(
+        err?.response?.data?.detail ||
+        "Unable to resume the conversation."
+      );
+
+    } finally {
+
+      setResuming(false);
+    }
+  };
+
+
+  // ===================================================
+  // ENTER KEY
+  // ===================================================
+
+  const handleKeyDown = (event) => {
+
+    if (event.key === "Enter" && !event.shiftKey) {
+
+      event.preventDefault();
+
+      handleSend();
+    }
+  };
+
+
+  // ===================================================
+  // EMPTY SESSION
+  // ===================================================
 
   if (!session) {
+
     return (
-      <div className="flex h-full items-center justify-center px-6 text-center">
-        <p className="text-sm text-mute">Select a conversation or start a new one.</p>
+      <div
+        className="
+          flex
+          h-full
+          flex-col
+          items-center
+          justify-center
+          bg-[#080809]
+          px-6
+          text-center
+        "
+      >
+
+        <img
+          src={orcaLogo}
+          alt="ORCA"
+          className="
+            mb-5
+            h-16
+            w-16
+            object-contain
+          "
+        />
+
+        <h1
+          className="
+            text-2xl
+            font-semibold
+            tracking-tight
+            text-white
+          "
+        >
+          ORCA
+        </h1>
+
+        <p
+          className="
+            mt-2
+            text-sm
+            text-[#77777C]
+          "
+        >
+          Marine intelligence, in conversation.
+        </p>
+
+
+        {/* Suggestion cards */}
+
+        <div
+          className="
+            mt-8
+            grid
+            w-full
+            max-w-2xl
+            grid-cols-1
+            gap-3
+            sm:grid-cols-2
+          "
+        >
+
+          {SUGGESTIONS.map(
+            (suggestion) => (
+
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() =>
+                  setInput(suggestion)
+                }
+
+                className="
+                  rounded-xl
+                  border
+                  border-white/10
+                  bg-[#111113]
+                  px-4
+                  py-4
+                  text-left
+                  text-sm
+                  text-[#B8B8BE]
+
+                  transition
+
+                  hover:border-white/20
+                  hover:bg-[#171719]
+                  hover:text-white
+                "
+              >
+                {suggestion}
+              </button>
+
+            )
+          )}
+
+        </div>
+
+
+        {/* Input */}
+
+        <div
+          className="
+            mt-5
+            flex
+            w-full
+            max-w-2xl
+            items-end
+            gap-2
+            rounded-xl
+            border
+            border-white/10
+            bg-[#111113]
+            p-2
+          "
+        >
+
+          <textarea
+            value={input}
+            onChange={(event) =>
+              setInput(event.target.value)
+            }
+            onKeyDown={handleKeyDown}
+
+            placeholder="Ask ORCA anything about the marine environment..."
+
+            rows={1}
+
+            className="
+              min-h-[44px]
+              flex-1
+              resize-none
+              bg-transparent
+              px-3
+              py-3
+              text-sm
+              text-white
+              outline-none
+              placeholder:text-[#5F5F65]
+            "
+          />
+
+          <button
+            type="button"
+            onClick={() =>
+              handleSend()
+            }
+
+            disabled={
+              !input.trim() ||
+              sending
+            }
+
+            className="
+              rounded-lg
+              bg-white
+              px-4
+              py-2.5
+              text-sm
+              font-medium
+              text-black
+
+              transition
+
+              hover:bg-[#E8E8E8]
+
+              disabled:cursor-not-allowed
+              disabled:opacity-40
+            "
+          >
+            Send
+          </button>
+
+        </div>
+
       </div>
     );
   }
 
-  const showEmptyState = !historyLoading && messages.length === 0;
+
+  // ===================================================
+  // MAIN CHAT UI
+  // ===================================================
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
-        {historyLoading ? (
-          <div className="flex h-full items-center justify-center">
-            <div className="flex items-center gap-1.5" role="status" aria-label="Loading conversation">
-              {[0, 1, 2].map((i) => (
-                <span
-                  key={i}
-                  className="h-1.5 w-1.5 rounded-full bg-mute2"
-                  style={{ animation: "pulseDot 1.2s ease-in-out infinite", animationDelay: `${i * 0.15}s` }}
-                />
-              ))}
-            </div>
-          </div>
-        ) : showEmptyState ? (
-          <EmptyState suggestions={suggestions} onSuggestionClick={handleSuggestionClick} />
-        ) : (
-          <div className="mx-auto flex max-w-[720px] flex-col gap-6 px-6 py-8">
-            {messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                message={message}
-                isEditing={editingId === message.id}
-                isRegenerating={regeneratingId === message.id}
-                onStartEdit={handleStartEdit}
-                onCancelEdit={handleCancelEdit}
-                onSubmitEdit={handleSubmitEdit}
-                onRegenerate={handleRegenerate}
-                onFeedback={handleFeedback}
-              />
-            ))}
-            <div ref={bottomRef} />
-          </div>
-        )}
-      </div>
+    <div
+      className="
+        flex
+        h-full
+        flex-col
+        bg-[#080809]
+      "
+    >
 
-      <div className="mx-auto w-full max-w-[720px] px-6 pb-6 pt-2">
-        {error && (
-          <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-2.5">
-            <span className="text-xs text-mute">{error.message}</span>
-            <button
-              type="button"
-              onClick={error.retry}
-              className="shrink-0 text-xs font-medium text-[#3DA7B7] hover:text-ink transition-colors"
-            >
-              Try again
-            </button>
-          </div>
-        )}
-        <ChatInput value={inputValue} onChange={setInputValue} onSend={handleSend} disabled={sending || historyLoading} />
-      </div>
-    </div>
-  );
-}
+      {/* =================================================
+          CHAT HEADER
+          ================================================= */}
 
-function EmptyState({ suggestions, onSuggestionClick }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="flex items-center justify-center gap-3">
-  <img
-    src={logo}
-    alt=""
-    aria-hidden="true"
-    className="h-10 w-10 object-contain shrink-0"
-  />
-  <h1 className="font-display text-2xl font-semibold tracking-tightest text-ink sm:text-3xl">
-    O R C A
-  </h1>
-</div>
-      <p className="mt-2 text-sm text-mute">Marine intelligence, in conversation.</p>
+      <header
+        className="
+          flex
+          h-[64px]
+          shrink-0
+          items-center
+          border-b
+          border-[#202023]
+          px-6
+        "
+      >
 
-      {suggestions.length > 0 && (
-        <div className="mt-10 grid w-full max-w-[560px] grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {suggestions.map((prompt, i) => {
-            const Icon = SUGGESTION_ICONS[i % SUGGESTION_ICONS.length];
-            return (
-              <button
-                key={prompt}
-                type="button"
-                onClick={() => onSuggestionClick(prompt)}
-                className="flex items-center gap-2.5 rounded-xl border border-line bg-surface px-4 py-3 text-left text-sm text-mute transition-colors duration-200 hover:border-line2 hover:bg-surface2 hover:text-ink"
-              >
-                <Icon size={15} className="shrink-0 text-[#3DA7B7]" aria-hidden="true" />
-                <span>{prompt}</span>
-              </button>
-            );
-          })}
+        <div className="min-w-0">
+
+          <h1
+            className="
+              truncate
+              text-sm
+              font-medium
+              text-white
+            "
+          >
+            {session.title || "Conversation"}
+          </h1>
+
+          <p
+            className="
+              mt-0.5
+              text-[11px]
+              text-[#66666C]
+            "
+          >
+            Conversation
+          </p>
+
         </div>
+
+      </header>
+
+
+      {/* =================================================
+          MESSAGE AREA
+          ================================================= */}
+
+      <div
+        className="
+          min-h-0
+          flex-1
+          overflow-y-auto
+          px-4
+          py-6
+        "
+      >
+
+        {loadingHistory ? (
+
+          <div
+            className="
+              flex
+              h-full
+              items-center
+              justify-center
+              text-sm
+              text-[#77777C]
+            "
+          >
+            Loading conversation...
+          </div>
+
+        ) : messages.length === 0 ? (
+
+          <div
+            className="
+              flex
+              h-full
+              flex-col
+              items-center
+              justify-center
+              text-center
+            "
+          >
+
+            <img
+              src={orcaLogo}
+              alt="ORCA"
+              className="
+                h-14
+                w-14
+                object-contain
+              "
+            />
+
+            <p
+              className="
+                mt-4
+                text-sm
+                text-[#77777C]
+              "
+            >
+              Start the conversation.
+            </p>
+
+          </div>
+
+        ) : (
+
+          <div
+            className="
+              mx-auto
+              flex
+              w-full
+              max-w-4xl
+              flex-col
+              gap-5
+            "
+          >
+
+            {messages.map(
+              (message) => (
+
+                <div
+                  key={message.id}
+                  className={`
+                    flex
+                    ${
+                      message.role === "user"
+                        ? "justify-end"
+                        : "justify-start"
+                    }
+                  `}
+                >
+
+                  <div
+                    className={`
+                      max-w-[80%]
+                      rounded-2xl
+                      px-4
+                      py-3
+                      text-sm
+                      leading-6
+
+                      ${
+                        message.role === "user"
+                          ? "bg-[#1B1B1D] text-white"
+                          : "border border-white/10 bg-[#111113] text-[#D5D5D9]"
+                      }
+                    `}
+                  >
+
+                    <div className="whitespace-pre-wrap">
+                      {message.content}
+                    </div>
+
+
+                    {/* response_data.message */}
+
+                    {message.response_data?.message && (
+                      <div
+                        className="
+                          mt-3
+                          border-t
+                          border-white/10
+                          pt-3
+                          text-sm
+                          text-[#B8B8BE]
+                        "
+                      >
+                        {message.response_data.message}
+                      </div>
+                    )}
+
+
+                    {/* Preserve map coordinates */}
+
+                    {message.response_data?.map?.coordinates && (
+
+                      <div
+                        className="
+                          mt-3
+                          rounded-lg
+                          border
+                          border-white/10
+                          bg-black/20
+                          px-3
+                          py-2
+                          text-xs
+                          text-[#85858B]
+                        "
+                      >
+
+                        Map coordinates received:
+
+                        <pre
+                          className="
+                            mt-1
+                            whitespace-pre-wrap
+                            text-[#AFAFB5]
+                          "
+                        >
+                          {JSON.stringify(
+                            message.response_data.map.coordinates,
+                            null,
+                            2
+                          )}
+                        </pre>
+
+                      </div>
+
+                    )}
+
+                  </div>
+
+                </div>
+
+              )
+            )}
+
+
+            <div
+              ref={messagesEndRef}
+            />
+
+          </div>
+
+        )}
+
+      </div>
+
+
+      {/* =================================================
+          ERROR
+          ================================================= */}
+
+      {error && (
+
+        <div
+          className="
+            shrink-0
+            border-t
+            border-red-500/10
+            bg-red-500/5
+            px-6
+            py-2
+            text-center
+            text-xs
+            text-red-400
+          "
+        >
+          {error}
+        </div>
+
       )}
+
+
+      {/* =================================================
+          PENDING WORKFLOW
+          ================================================= */}
+
+      {(pendingAction ||
+        pendingOptions.length > 0) && (
+
+        <div
+          className="
+            shrink-0
+            border-t
+            border-white/10
+            bg-[#0D0D0F]
+            px-4
+            py-4
+          "
+        >
+
+          <div
+            className="
+              mx-auto
+              w-full
+              max-w-4xl
+            "
+          >
+
+            {pendingAction && (
+
+              <p
+                className="
+                  mb-3
+                  text-sm
+                  text-[#D0D0D5]
+                "
+              >
+                {pendingAction}
+              </p>
+
+            )}
+
+
+            {pendingOptions.length > 0 && (
+
+              <div
+                className="
+                  flex
+                  flex-wrap
+                  gap-2
+                "
+              >
+
+                {pendingOptions.map(
+                  (option, index) => {
+
+                    const value =
+                      typeof option === "object"
+                        ? option.value ??
+                          option.label ??
+                          JSON.stringify(option)
+                        : option;
+
+                    const label =
+                      typeof option === "object"
+                        ? option.label ??
+                          option.value ??
+                          JSON.stringify(option)
+                        : option;
+
+                    return (
+                      <button
+                        key={`${label}-${index}`}
+                        type="button"
+                        disabled={resuming}
+
+                        onClick={() =>
+                          handleResume(value)
+                        }
+
+                        className="
+                          rounded-lg
+                          border
+                          border-white/10
+                          bg-[#171719]
+                          px-4
+                          py-2
+                          text-sm
+                          text-white
+
+                          transition
+
+                          hover:bg-[#202023]
+
+                          disabled:opacity-40
+                        "
+                      >
+                        {label}
+                      </button>
+                    );
+                  }
+                )}
+
+              </div>
+
+            )}
+
+
+            {/* Free-text resume */}
+
+            <div
+              className="
+                mt-3
+                flex
+                gap-2
+              "
+            >
+
+              <input
+                value={resumeInput}
+                onChange={(event) =>
+                  setResumeInput(
+                    event.target.value
+                  )
+                }
+
+                onKeyDown={(event) => {
+
+                  if (
+                    event.key === "Enter"
+                  ) {
+
+                    handleResume(
+                      resumeInput
+                    );
+                  }
+                }}
+
+                placeholder="Enter another value..."
+
+                className="
+                  min-w-0
+                  flex-1
+                  rounded-lg
+                  border
+                  border-white/10
+                  bg-[#111113]
+                  px-3
+                  py-2
+                  text-sm
+                  text-white
+                  outline-none
+
+                  placeholder:text-[#5F5F65]
+
+                  focus:border-white/20
+                "
+              />
+
+              <button
+                type="button"
+                disabled={
+                  !resumeInput.trim() ||
+                  resuming
+                }
+
+                onClick={() =>
+                  handleResume(
+                    resumeInput
+                  )
+                }
+
+                className="
+                  rounded-lg
+                  bg-white
+                  px-4
+                  py-2
+                  text-sm
+                  font-medium
+                  text-black
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-40
+                "
+              >
+                {resuming
+                  ? "Sending..."
+                  : "Continue"}
+              </button>
+
+            </div>
+
+          </div>
+
+        </div>
+
+      )}
+
+
+      {/* =================================================
+          NORMAL CHAT INPUT
+          ================================================= */}
+
+      <div
+        className="
+          shrink-0
+          border-t
+          border-[#202023]
+          bg-[#080809]
+          px-4
+          py-4
+        "
+      >
+
+        <div
+          className="
+            mx-auto
+            flex
+            w-full
+            max-w-4xl
+            items-end
+            gap-2
+            rounded-xl
+            border
+            border-white/10
+            bg-[#111113]
+            p-2
+          "
+        >
+
+          <textarea
+            value={input}
+            onChange={(event) =>
+              setInput(event.target.value)
+            }
+
+            onKeyDown={handleKeyDown}
+
+            placeholder="Message ORCA..."
+
+            rows={1}
+
+            disabled={sending}
+
+            className="
+              min-h-[44px]
+              flex-1
+              resize-none
+              bg-transparent
+              px-3
+              py-3
+              text-sm
+              text-white
+              outline-none
+              placeholder:text-[#5F5F65]
+            "
+          />
+
+          <button
+            type="button"
+            onClick={() =>
+              handleSend()
+            }
+
+            disabled={
+              !input.trim() ||
+              sending
+            }
+
+            className="
+              rounded-lg
+              bg-white
+              px-4
+              py-2.5
+              text-sm
+              font-medium
+              text-black
+
+              transition
+
+              hover:bg-[#E8E8E8]
+
+              disabled:cursor-not-allowed
+              disabled:opacity-40
+            "
+          >
+            {sending
+              ? "Sending..."
+              : "Send"}
+          </button>
+
+        </div>
+
+        <p
+          className="
+            mx-auto
+            mt-2
+            max-w-4xl
+            px-1
+            text-[10px]
+            text-[#4F4F55]
+          "
+        >
+          ORCA uses the selected conversation session.
+        </p>
+
+      </div>
+
     </div>
   );
 }
