@@ -13,23 +13,21 @@ def _now() -> datetime:
     """
     return datetime.now(ZoneInfo(TIMEZONE))
 
-
 def resolve_date(date_expression: str | None) -> str:
     """
     Resolve simple date expressions.
 
     Supported:
+    - no date provided -> today
     - today
     - tomorrow
     - day after tomorrow
-
-    If no date is supplied, default to tomorrow.
     """
 
     now = _now()
 
     if not date_expression:
-        date = now + timedelta(days=1)
+        date = now
 
     else:
         expression = date_expression.strip().lower()
@@ -45,8 +43,8 @@ def resolve_date(date_expression: str | None) -> str:
 
         else:
             # Calendar-date parsing can be added later.
-            # For now, preserve existing behaviour.
-            date = now + timedelta(days=1)
+            # For now, default unknown expressions to today.
+            date = now
 
     return date.strftime("%Y-%m-%d")
 
