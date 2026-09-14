@@ -37,6 +37,10 @@ export async function registerUser({ username, email, password }) {
  * GET /auth/me -> Returns { id, username, email, role }
  */
 export async function getCurrentUser() {
+  const token = localStorage.getItem("authToken");
+  if (!token) {
+    return null;
+  }
   const res = await api.get(ME_URL);
   return res.data;
 }
