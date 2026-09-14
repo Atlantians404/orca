@@ -7,6 +7,7 @@ import MapsPage from "./pages/MapsPage";
 import ProfilePage from "./pages/ProfilePage";
 import Login from "./pages/login";
 import Register from "./pages/register";
+import { loginUser, registerUser } from "./services/authApi";
 
 function LoginPageWrapper() {
   const navigate = useNavigate();
@@ -18,7 +19,7 @@ function LoginPageWrapper() {
         onClose={() => navigate('/')}
         onSwitchToRegister={() => navigate('/signup')}
         onLogin={async (payload) => {
-          console.log("Logged in:", payload);
+          await loginUser(payload);
           navigate('/chat');
         }}
       />
@@ -36,7 +37,7 @@ function RegisterPageWrapper() {
         onClose={() => navigate('/')}
         onSwitchToLogin={() => navigate('/login')}
         onRegister={async (payload) => {
-          console.log("Registered:", payload);
+          await registerUser(payload);
           navigate('/chat');
         }}
       />
@@ -110,4 +111,4 @@ export default function App() {
       </Routes>
     </BrowserRouter>
   );
-}
+}
