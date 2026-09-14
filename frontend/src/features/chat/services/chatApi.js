@@ -87,7 +87,6 @@ export const unarchiveSession = async (sessionId) => {
   const response = await api.delete(`/sessions/${sessionId}/archive`);
   return response.data;
 };
-
 // =====================================================
 // CHAT
 // =====================================================
@@ -100,7 +99,6 @@ export const getChatHistory = async (sessionId) => {
 
   return response.data;
 };
-
 
 // Send message
 export const sendChatMessage = async (
@@ -117,7 +115,6 @@ export const sendChatMessage = async (
 
   return response.data;
 };
-
 
 // Resume pending chat workflow
 export const resumeChat = async (

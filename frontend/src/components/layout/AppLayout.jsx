@@ -7,9 +7,17 @@ import {
 
 import Sidebar from "./Sidebar";
 
-import {
-  getSession,
-} from "../../features/chat/services/chatApi";
+import { getSession } from "../../features/chat/services/chatApi";
+
+// =====================================================
+// CHAT ROUTE
+// =====================================================
+
+const CHAT_ROUTE = "/chat";
+
+// =====================================================
+// MENU ICON
+// =====================================================
 
 const MenuIcon = (props) => (
   <svg
@@ -26,40 +34,49 @@ const MenuIcon = (props) => (
   </svg>
 );
 
-const CHAT_ROUTE = "/test-sessions";
+// =====================================================
+// APP LAYOUT
+// =====================================================
 
 export default function AppLayout() {
-  const [collapsed, setCollapsed] =
-    useState(false);
+  const [collapsed, setCollapsed] = useState(false);
 
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  const [chatsActive, setChatsActive] =
-    useState(true);
+  // Chats is active by default
+  const [chatsActive, setChatsActive] = useState(true);
 
-  const [activeSession, setActiveSession] =
-    useState(null);
+  // Currently selected conversation
+  const [activeSession, setActiveSession] = useState(null);
 
-  const [loadingSession, setLoadingSession] =
-    useState(false);
+  const [loadingSession, setLoadingSession] = useState(false);
 
-  const [sessionError, setSessionError] =
-    useState(null);
+  const [sessionError, setSessionError] = useState(null);
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // ===================================================
+  // SELECT SESSION
+  // ===================================================
 
   const selectSession = useCallback(
     async (session) => {
       setSessionError(null);
 
+      if (!session?.id) {
+        return;
+      }
+
+      // Some session objects may already contain
+      // complete session data.
       const hasFullData =
         session &&
         "messages" in session;
 
       if (hasFullData) {
         setActiveSession(session);
+        setChatsActive(true);
         return;
       }
 
@@ -71,6 +88,11 @@ export default function AppLayout() {
 
         setActiveSession(fullSession);
         setChatsActive(true);
+
+        // Make sure we are on the chat page
+        if (location.pathname !== CHAT_ROUTE) {
+          navigate(CHAT_ROUTE);
+        }
       } catch (err) {
         console.error(
           "Failed to load session:",
@@ -84,31 +106,42 @@ export default function AppLayout() {
         setLoadingSession(false);
       }
     },
-    []
+    [location.pathname, navigate]
   );
 
-  const handleSessionCreated =
-    useCallback((newSession) => {
+  // ===================================================
+  // SESSION CREATED
+  // ===================================================
+
+  const handleSessionCreated = useCallback(
+    (newSession) => {
       setActiveSession(newSession);
       setChatsActive(true);
       setSessionError(null);
-    }, []);
+
+      if (location.pathname !== CHAT_ROUTE) {
+        navigate(CHAT_ROUTE);
+      }
+    },
+    [location.pathname, navigate]
+  );
+
+  // ===================================================
+  // ACTIVE SESSION DELETED
+  // ===================================================
 
   const handleActiveSessionDeleted =
     useCallback(() => {
       setActiveSession(null);
     }, []);
 
-  /*
-   * Chats behaves like a toggle.
-   *
-   * First click:
-   *   Chats becomes active.
-   *
-   * Second click:
-   *   Chats becomes inactive.
-   */
+  // ===================================================
+  // TOGGLE CHATS
+  // ===================================================
+
   const handleToggleChats = () => {
+    // If already inside Chats and Chats is active,
+    // clicking it again hides the chat area.
     if (
       location.pathname === CHAT_ROUTE &&
       chatsActive
@@ -118,32 +151,43 @@ export default function AppLayout() {
       return;
     }
 
-    if (
-      location.pathname !== CHAT_ROUTE
-    ) {
+    // If we are somewhere else, go to Chats.
+    if (location.pathname !== CHAT_ROUTE) {
       navigate(CHAT_ROUTE);
     }
 
     setChatsActive(true);
   };
+
+  // ===================================================
+  // NEW CHAT
+  // ===================================================
 
   const handleRequestNewChat = () => {
-    if (
-      location.pathname !== CHAT_ROUTE
-    ) {
+    if (location.pathname !== CHAT_ROUTE) {
       navigate(CHAT_ROUTE);
     }
 
     setChatsActive(true);
   };
+
+  // ===================================================
+  // CHECK CHAT ROUTE
+  // ===================================================
 
   const isChatRoute =
     location.pathname === CHAT_ROUTE;
 
+  // ===================================================
+  // RENDER
+  // ===================================================
+
   return (
     <div className="flex h-screen w-full overflow-hidden bg-[#080809]">
 
-      {/* ================= SIDEBAR ================= */}
+      {/* =================================================
+          SIDEBAR
+          ================================================= */}
 
       <Sidebar
         collapsed={collapsed}
@@ -152,7 +196,9 @@ export default function AppLayout() {
             (previous) => !previous
           )
         }
+
         mobileOpen={mobileOpen}
+
         onCloseMobile={() =>
           setMobileOpen(false)
         }
@@ -161,7 +207,10 @@ export default function AppLayout() {
           activeSession?.id ?? null
         }
 
-        onSelectSession={selectSession}
+        onSelectSession={
+          selectSession
+        }
+
         onSessionCreated={
           handleSessionCreated
         }
@@ -183,7 +232,9 @@ export default function AppLayout() {
         }
       />
 
-      {/* ================= MOBILE BACKDROP ================= */}
+      {/* =================================================
+          MOBILE BACKDROP
+          ================================================= */}
 
       {mobileOpen && (
         <div
@@ -199,11 +250,15 @@ export default function AppLayout() {
         />
       )}
 
-      {/* ================= MAIN ================= */}
+      {/* =================================================
+          MAIN CONTENT
+          ================================================= */}
 
       <div className="flex min-w-0 flex-1 flex-col">
 
-        {/* Mobile top bar */}
+        {/* =================================================
+            MOBILE TOP BAR
+            ================================================= */}
 
         <header
           className="
@@ -216,6 +271,7 @@ export default function AppLayout() {
           "
         >
           <button
+            type="button"
             onClick={() =>
               setMobileOpen(true)
             }
@@ -238,7 +294,18 @@ export default function AppLayout() {
           </span>
         </header>
 
-        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+        {/* =================================================
+            PAGE
+            ================================================= */}
+
+        <main
+          className="
+            min-h-0
+            min-w-0
+            flex-1
+            overflow-hidden
+          "
+        >
           <Outlet
             context={{
               activeSession,

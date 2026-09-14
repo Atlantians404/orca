@@ -29,6 +29,7 @@ Analyze the user's request and extract the following fields.
      or asks how to reach/travel to a specific PFZ.
    - otherwise false.
 
+IMPORTANT:
 5. fishing_time:
    - Extract the fishing/travel time if the user explicitly provides one.
    - Preserve the user's intended time in a clear 24-hour HH:MM format.
@@ -63,6 +64,7 @@ Return ONLY valid JSON in exactly this format:
     "query_type": "general",
     "distance_km": null,
     "selected_pfz_name": null,
+    "route_required": false
     "route_required": false,
     "fishing_time": null
 }}
