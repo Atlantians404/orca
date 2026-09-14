@@ -5,30 +5,274 @@ Current date: {current_date}
 
 Analyze the user's request and extract the following fields.
 
+Return ONLY valid JSON.
+Do not add explanations.
+Do not use Markdown.
+Do not wrap the JSON in code fences.
+
+
 ============================================================
 1. query_type
 ============================================================
 
-Possible values:
+Classify the user's request into exactly one of:
 
 - "general"
-    General fishing, weather, or marine information.
-
 - "safety"
-    User asks about the safety or risk of a specific
-    PFZ/location.
-
 - "planning"
-    User wants to find, recommend, select a PFZ, plan a
-    fishing trip, or get a route.
 
-Rules:
 
-- FIND or RECOMMEND a PFZ -> planning
-- Plan a fishing trip -> planning
-- Request a route -> planning
-- Safety of a specific location/PFZ -> safety
-- General information -> general
+------------------------------------------------------------
+GENERAL
+------------------------------------------------------------
+
+Use "general" when the user is asking for information,
+explanation, knowledge, or general advice.
+
+Examples:
+
+"What is a PFZ?"
+-> general
+
+"What does PFZ mean?"
+-> general
+
+"What is fishing?"
+-> general
+
+"How does a PFZ work?"
+-> general
+
+"Tell me about PFZs"
+-> general
+
+"What are good fishing conditions?"
+-> general
+
+"What is the weather like?"
+-> general
+
+"How does fishing work?"
+-> general
+
+
+------------------------------------------------------------
+SAFETY
+------------------------------------------------------------
+
+Use "safety" when the PRIMARY purpose of the request is
+to determine whether a specific location, PFZ, harbour,
+coastal area, or fishing area is safe.
+
+Examples:
+
+"Is Pondicherry safe for fishing?"
+-> safety
+
+"Is Nagapattinam Harbour safe?"
+-> safety
+
+"Is Kanathur Reddy Kuppam safe tomorrow evening?"
+-> safety
+
+"Can I fish safely in Pondicherry?"
+-> safety
+
+"Is this PFZ safe for fishing?"
+-> safety
+
+
+IMPORTANT:
+
+Safety takes priority over planning.
+
+Example:
+
+"Can I fish safely in Pondicherry tomorrow?"
+-> safety
+
+Even though the user mentions fishing and tomorrow,
+the PRIMARY intent is checking safety.
+
+
+------------------------------------------------------------
+PLANNING
+------------------------------------------------------------
+
+Use "planning" when the user intends to actually go
+fishing, plan a fishing activity, find a fishing location,
+find a PFZ, select a PFZ, or obtain directions/routes
+for a fishing trip.
+
+The user DOES NOT need to use the word "plan".
+
+Any clear intention to physically go fishing should be
+classified as "planning".
+
+
+Examples:
+
+"I want to fish"
+-> planning
+
+"I want to go fishing"
+-> planning
+
+"I want to fish tomorrow"
+-> planning
+
+"I want to fish around Mahabalipuram"
+-> planning
+
+"I want to fish around Mahabalipuram tomorrow evening"
+-> planning
+
+"I want to fish from Pondicherry"
+-> planning
+
+"I want to fish from Pondicherry at 5:30 PM"
+-> planning
+
+"I want to go fishing from Cuddalore"
+-> planning
+
+"I want to go fishing tomorrow evening"
+-> planning
+
+"I want to fish at 12.85, 80.28"
+-> planning
+
+"I want to fish at 12.85, 80.28 tomorrow morning"
+-> planning
+
+"Plan a fishing trip"
+-> planning
+
+"Plan a fishing trip from Chennai"
+-> planning
+
+"Plan fishing from Chennai"
+-> planning
+
+"Find a PFZ"
+-> planning
+
+"Find a PFZ near Mahabalipuram"
+-> planning
+
+"Find a PFZ within 20 km from Mahabalipuram"
+-> planning
+
+"Find fishing zones within 30 kilometers from Chennai"
+-> planning
+
+"Find a fishing spot"
+-> planning
+
+"Find somewhere to fish"
+-> planning
+
+"Where should I fish?"
+-> planning
+
+"Where can I go fishing?"
+-> planning
+
+"Recommend a PFZ"
+-> planning
+
+"Recommend a fishing location"
+-> planning
+
+"Give me a route to Pondicherry"
+-> planning
+
+"Give me directions to the PFZ"
+-> planning
+
+"Find the safest route to Kanathur Reddy Kuppam"
+-> planning
+
+"How do I reach the selected PFZ?"
+-> planning
+
+
+------------------------------------------------------------
+IMPORTANT DISTINCTION
+------------------------------------------------------------
+
+Do NOT classify a request as "general" merely because
+the user uses the word "fishing".
+
+Determine whether the user is:
+
+1. Asking ABOUT fishing/PFZ/weather
+   -> general
+
+OR
+
+2. Saying they WANT TO GO fishing / find a place to fish /
+   plan a fishing activity / get a route
+   -> planning
+
+
+Compare:
+
+"What is fishing?"
+-> general
+
+"I want to go fishing"
+-> planning
+
+
+"What is a PFZ?"
+-> general
+
+"Find a PFZ"
+-> planning
+
+
+"What are good fishing conditions?"
+-> general
+
+"I want to fish tomorrow morning"
+-> planning
+
+
+"What is the weather like?"
+-> general
+
+"Check the weather for my fishing trip"
+-> planning
+
+
+============================================================
+QUERY TYPE PRIORITY
+============================================================
+
+When multiple intents appear, use this priority:
+
+1. safety
+2. planning
+3. general
+
+
+SAFETY:
+
+If the user is asking whether a specific location,
+PFZ, harbour, or fishing area is safe, use "safety".
+
+
+PLANNING:
+
+If the user intends to go fishing, find/recommend a PFZ,
+plan a trip, select a fishing location, or get directions,
+use "planning".
+
+
+GENERAL:
+
+Otherwise use "general".
 
 
 ============================================================
@@ -45,18 +289,23 @@ Examples:
 "Find a PFZ within 30 kilometers"
 -> 30
 
+"Find fishing zones within 15 km from Chennai"
+-> 15
+
 If no distance is mentioned:
+
 -> null
 
-Do not invent a distance.
+Do NOT invent a distance.
 
 
 ============================================================
 3. selected_pfz_name
 ============================================================
 
-Extract a specific PFZ or coastal reference name if
-explicitly mentioned.
+Extract a specific PFZ, fishing area, harbour, or coastal
+reference name if it is explicitly mentioned and is being
+treated as the specific target/location of the request.
 
 Preserve the name exactly as provided.
 
@@ -68,11 +317,19 @@ Examples:
 "Is Nagapattinam Harbour safe?"
 -> "Nagapattinam Harbour"
 
+"Is Kanathur Reddy Kuppam safe tomorrow evening?"
+-> "Kanathur Reddy Kuppam"
+
 "Give me a route to Pondicherry"
 -> "Pondicherry"
 
+"Find the safest route to Kanathur Reddy Kuppam"
+-> "Kanathur Reddy Kuppam"
+
 If no specific PFZ/coastal reference is mentioned:
+
 -> null
+
 
 IMPORTANT:
 
@@ -84,6 +341,25 @@ Example:
 
 selected_pfz_name:
 null
+
+location.place:
+"Mahabalipuram"
+
+
+Another example:
+
+"I want to fish from Chennai"
+
+selected_pfz_name:
+null
+
+location.place:
+"Chennai"
+
+
+Only set selected_pfz_name when the user is referring to
+that place as the specific PFZ/fishing target/coastal
+reference.
 
 
 ============================================================
@@ -98,36 +374,86 @@ The location can be:
 - a place name
 - latitude and longitude
 
+
+------------------------------------------------------------
+PLACE NAME
+------------------------------------------------------------
+
 For a place name:
 
 place = location name
 latitude = null
 longitude = null
 
+
 Example:
 
 "I want to fish around Mahabalipuram"
 
-location:
+->
+
 place = "Mahabalipuram"
 latitude = null
 longitude = null
+
+
+Example:
+
+"Plan a fishing trip from Chennai"
+
+->
+
+place = "Chennai"
+latitude = null
+longitude = null
+
+
+IMPORTANT:
+
+Do NOT geocode the location.
+
+Do NOT invent coordinates.
+
+The backend will geocode place names later.
+
+
+------------------------------------------------------------
+COORDINATES
+------------------------------------------------------------
 
 For coordinates:
 
 "I want to fish at 12.85, 80.28"
 
-location:
+->
+
 place = null
 latitude = 12.85
 longitude = 80.28
 
+
+Example:
+
+"Plan fishing from 12.779167, 80.342222"
+
+->
+
+place = null
+latitude = 12.779167
+longitude = 80.342222
+
+
 IMPORTANT:
 
-- Do NOT geocode the location.
+- Preserve coordinates exactly as numbers.
+- Do NOT convert coordinates into a place name.
 - Do NOT invent coordinates.
-- The backend will geocode place names.
-- A generic location is not automatically a PFZ.
+- Do NOT geocode coordinates.
+
+
+------------------------------------------------------------
+NO LOCATION
+------------------------------------------------------------
 
 If no location is provided:
 
@@ -151,10 +477,12 @@ Do NOT calculate a time range.
 
 Do NOT create TimeContext.
 
-The backend time parser will handle this later.
+The backend time parser will handle the time later.
 
-Preserve the complete time expression, including the
-relative date when present.
+
+------------------------------------------------------------
+SPECIFIC TIME
+------------------------------------------------------------
 
 Examples:
 
@@ -163,30 +491,113 @@ Examples:
 time_input:
 "tomorrow at 6 AM"
 
-"Plan a trip tomorrow evening"
+
+"I want to fish from Pondicherry at 5:30 PM"
 
 time_input:
-"tomorrow evening"
+"at 5:30 PM"
 
-"I want to fish today morning"
+
+"Plan fishing from 12.779167, 80.342222 at 6 PM"
 
 time_input:
-"today morning"
+"at 6 PM"
+
 
 "I want to leave at 17:30"
 
 time_input:
 "at 17:30"
 
+
 "Go fishing at 5:30 PM"
 
 time_input:
 "at 5:30 PM"
 
+
+IMPORTANT:
+
+If a clock time is present but no date is provided,
+STILL extract the time.
+
+Do NOT require "today" or "tomorrow" to be present.
+
+Examples:
+
+"at 6 PM"
+-> "at 6 PM"
+
+"at 5:30 PM"
+-> "at 5:30 PM"
+
+"at 17:30"
+-> "at 17:30"
+
+
+The backend will decide the default date.
+
+
+------------------------------------------------------------
+GENERIC TIME
+------------------------------------------------------------
+
+Examples:
+
+"tomorrow morning"
+
+time_input:
+"tomorrow morning"
+
+
+"tomorrow afternoon"
+
+time_input:
+"tomorrow afternoon"
+
+
+"tomorrow evening"
+
+time_input:
+"tomorrow evening"
+
+
+"today morning"
+
+time_input:
+"today morning"
+
+
+"today evening"
+
+time_input:
+"today evening"
+
+
+IMPORTANT:
+
+Preserve the complete natural-language expression.
+
+Do NOT remove:
+
+- today
+- tomorrow
+- day after tomorrow
+- morning
+- afternoon
+- evening
+- night
+
+
+------------------------------------------------------------
+NO TIME
+------------------------------------------------------------
+
 If no time is mentioned:
 
 time_input:
 null
+
 
 IMPORTANT:
 
@@ -194,10 +605,11 @@ Do NOT invent a time.
 
 Do NOT return only "06:00".
 
-Do NOT remove "tomorrow", "today", "morning",
-"afternoon", or "evening".
+Do NOT calculate a time.
 
-The entire useful time expression must be preserved.
+Do NOT create a TimeContext.
+
+The backend will handle missing time using HITL.
 
 
 ============================================================
@@ -211,11 +623,29 @@ Set to true if the user asks for:
 - navigation
 - safest route
 - how to reach
+- how to get to
 - how to travel to a PFZ
+- how to reach the selected PFZ
+
+
+Examples:
+
+"Give me a route to Pondicherry"
+-> true
+
+"Find the safest route to Kanathur Reddy Kuppam"
+-> true
+
+"How do I reach the selected PFZ?"
+-> true
+
+"Give me directions to the PFZ"
+-> true
+
 
 Otherwise:
 
-false.
+-> false
 
 
 ============================================================
@@ -223,45 +653,33 @@ IMPORTANT RULES
 ============================================================
 
 1. Never invent a PFZ name.
-
 2. Never invent a location.
-
 3. Never invent a time.
-
 4. Generic location != selected PFZ.
-
-5. FIND or RECOMMEND a PFZ -> planning.
-
-6. Route request -> planning.
-
-7. Explicit location -> extract it.
-
-8. Place names must NOT be geocoded.
-
-9. Explicit coordinates must be preserved as numbers.
-
-10. Explicit time must be returned as time_input.
-
-11. Preserve the COMPLETE natural-language time expression.
-
-12. Do not calculate dates or time ranges.
-
-13. The backend will parse time_input into TimeContext.
-
-14. If no time is mentioned -> time_input = null.
-
-15. If no location is mentioned, return null values for
+5. A user intending to go fishing -> planning.
+6. FIND or RECOMMEND a PFZ -> planning.
+7. Plan a fishing trip -> planning.
+8. Route request -> planning.
+9. Safety question about a specific location -> safety.
+10. Safety takes priority over planning.
+11. General informational questions -> general.
+12. Explicit location -> extract it.
+13. Place names must NOT be geocoded.
+14. Explicit coordinates must be preserved as numbers.
+15. Explicit time must be returned as time_input.
+16. Preserve the COMPLETE natural-language time expression.
+17. A specific clock time does NOT require a date.
+18. If only a clock time is provided, still extract it.
+19. The backend will decide the default date.
+20. Do not calculate dates or time ranges.
+21. If no time is mentioned -> time_input = null.
+22. If no location is mentioned, return null values for
     location fields.
-
-16. Preserve PFZ/coastal reference names exactly.
-
-17. Return ONLY valid JSON.
-
-18. Do not add explanations.
-
-19. Do not use Markdown.
-
-20. Do not wrap the JSON in code fences.
+23. Preserve PFZ/coastal reference names exactly.
+24. Return ONLY valid JSON.
+25. Do not add explanations.
+26. Do not use Markdown.
+27. Do not wrap the JSON in code fences.
 
 
 ============================================================
