@@ -146,6 +146,15 @@ async def orchestrate(
     prompt = state["prompt"]
 
     # ========================================================
+    # CONVERSATION SUMMARY
+    # ========================================================
+
+    conversation_summary = state.get(
+        "conversation_summary",
+        ""
+    ) or ""
+
+    # ========================================================
     # CURRENT DATE
     # ========================================================
 
@@ -159,6 +168,7 @@ async def orchestrate(
 
     message = ORCHESTRATOR_PROMPT.format(
         current_date=current_date,
+        conversation_summary=conversation_summary,
         prompt=prompt,
     )
 

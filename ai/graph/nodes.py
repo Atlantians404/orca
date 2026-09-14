@@ -206,16 +206,58 @@ def failed_response(
 # GENERAL
 # ============================================================
 
+# ============================================================
+# GENERAL
+# ============================================================
+
 async def general_node(
     state: AgentState,
 ) -> dict:
 
     try:
+
+        conversation_summary = (
+            state.get("conversation_summary")
+            or ""
+        )
+
+        # -----------------------------------------------------
+        # Build prompt with conversation memory
+        # -----------------------------------------------------
+
+        if conversation_summary:
+
+            user_prompt = f"""
+Previous conversation summary:
+
+{conversation_summary}
+
+Current user message:
+
+{state["prompt"]}
+
+Use the previous conversation summary when it is
+relevant to the current message.
+
+Do not invent information that is not present in
+the summary or current message.
+
+Answer the current user message directly.
+"""
+
+        else:
+
+            user_prompt = state["prompt"]
+
+        # -----------------------------------------------------
+        # General Agent
+        # -----------------------------------------------------
+
         result = await general_agent(
             [
                 {
                     "role": "user",
-                    "content": state["prompt"],
+                    "content": user_prompt,
                 }
             ]
         )
@@ -236,8 +278,6 @@ async def general_node(
         return failed_response(
             f"Unable to process the request: {exc}"
         )
-
-
 # ============================================================
 # SAFETY
 # ============================================================
