@@ -1,19 +1,11 @@
 import asyncio
-import json
 
 from langgraph.types import Command
 
 from ai.graph.graph import build_graph
 
 
-SESSION_ID = "test-route-flow-001"
-
-
-async def main():
-
-    print("\n" + "=" * 70)
-    print("ORCA FULL ROUTE FLOW TEST")
-    print("=" * 70)
+async def test_graph():
 
     # ------------------------------------------------------------
     # Build graph
@@ -21,12 +13,15 @@ async def main():
 
     graph = build_graph()
 
+    session_id = "graph-route-test-001"
+
     config = {
         "configurable": {
-            "thread_id": SESSION_ID
+            "thread_id": session_id
         }
     }
 
+<<<<<<< HEAD
     # ============================================================
     # STEP 1
     # Initial user request
@@ -41,10 +36,25 @@ async def main():
     result = await graph.ainvoke(
         {
             "prompt": "Plan a Trip with route"
+=======
+    # =========================================================
+    # STEP 1 — Initial request
+    # =========================================================
+
+    print("\n========== STEP 1 ==========")
+
+    result = await graph.ainvoke(
+        {
+            "thread_id": session_id,
+            "prompt": "Plan a fishing trip with route",
+            "workflow_status": "IN_PROGRESS",
+            "route_required": True,
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
         },
         config=config,
     )
 
+<<<<<<< HEAD
     print("\nGraph response:")
     print(
         json.dumps(
@@ -62,6 +72,22 @@ async def main():
     print("\n" + "-" * 70)
     print("[STEP 2] Providing location")
     print("-" * 70)
+=======
+    print("Pending action:")
+    print(result.get("pending_action"))
+
+    print("Workflow status:")
+    print(result.get("workflow_status"))
+
+    print("Interrupt:")
+    print(result.get("__interrupt__"))
+
+    # =========================================================
+    # STEP 2 — Location
+    # =========================================================
+
+    print("\n========== STEP 2 ==========")
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
 
     location = {
         "latitude": 13.0827,
@@ -77,6 +103,7 @@ async def main():
         config=config,
     )
 
+<<<<<<< HEAD
     print("\nGraph response:")
     print(
         json.dumps(
@@ -94,6 +121,22 @@ async def main():
     print("\n" + "-" * 70)
     print("[STEP 3] Providing fishing time")
     print("-" * 70)
+=======
+    print("Pending action:")
+    print(result.get("pending_action"))
+
+    print("Workflow status:")
+    print(result.get("workflow_status"))
+
+    print("Interrupt:")
+    print(result.get("__interrupt__"))
+
+    # =========================================================
+    # STEP 3 — Time
+    # =========================================================
+
+    print("\n========== STEP 3 ==========")
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
 
     fishing_time = "tomorrow at 6 AM"
 
@@ -106,6 +149,7 @@ async def main():
         config=config,
     )
 
+<<<<<<< HEAD
     print("\nGraph response:")
     print(
         json.dumps(
@@ -127,6 +171,25 @@ async def main():
     print("\n" + "-" * 70)
     print("[STEP 4] Selecting PFZ")
     print("-" * 70)
+=======
+    print("Pending action:")
+    print(result.get("pending_action"))
+
+    print("Workflow status:")
+    print(result.get("workflow_status"))
+
+    print("Interrupt:")
+    print(result.get("__interrupt__"))
+
+    print("\nRoute required:")
+    print(result.get("route_required"))
+
+    # =========================================================
+    # STEP 4 — PFZ selection
+    # =========================================================
+
+    print("\n========== STEP 4 ==========")
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
 
     selected_pfz_name = "Kanathur Reddy Kuppam"
 
@@ -134,11 +197,16 @@ async def main():
 
     result = await graph.ainvoke(
         Command(
+<<<<<<< HEAD
             resume=selected_pfz_name
+=======
+            resume="Kanathur Reddy Kuppam"
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
         ),
         config=config,
     )
 
+<<<<<<< HEAD
     print("\nGraph response:")
     print(
         json.dumps(
@@ -152,11 +220,18 @@ async def main():
     # DEBUG
     # Inspect state immediately after PFZ selection
     # ============================================================
+=======
+    print("Pending action:")
+    print(result.get("pending_action"))
 
-    state_after_selection = await graph.aget_state(
-        config
-    )
+    print("Workflow status:")
+    print(result.get("workflow_status"))
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
 
+    print("\nRoute required:")
+    print(result.get("route_required"))
+
+<<<<<<< HEAD
     print("\n" + "=" * 70)
     print("STATE AFTER PFZ SELECTION")
     print("=" * 70)
@@ -272,9 +347,13 @@ async def main():
     )
 
     # ============================================================
+=======
+    # =========================================================
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
     # ROUTE RESULT
-    # ============================================================
+    # =========================================================
 
+<<<<<<< HEAD
     route_result = final_values.get(
         "route_result"
     )
@@ -521,11 +600,21 @@ async def main():
                 f"→ risk={node.get('risk_score')} "
                 f"safe={node.get('safe')}"
             )
+=======
+    print("\n========== ROUTE RESULT ==========")
 
+    route_result = result.get("route_result")
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f
+
+    if route_result is None:
+        print("❌ route_result = None")
     else:
+        print("✅ route_result exists")
 
-        print("⚠️ No safe route was found.")
+        print("\nRoute result:")
+        print(route_result)
 
+<<<<<<< HEAD
     # ============================================================
     # FINAL RESPONSE
     # ============================================================
@@ -621,3 +710,81 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+=======
+        print("\nSafe route:")
+        print(
+            route_result.get("safe_route")
+        )
+
+        print("\nCandidate routes:")
+        candidate_routes = route_result.get(
+            "candidate_routes",
+            []
+        )
+
+        print(
+            f"Number of candidates: "
+            f"{len(candidate_routes)}"
+        )
+
+        for route in candidate_routes:
+            print(
+                f"\n{route.get('route_id')}"
+            )
+            print(
+                f"Distance: "
+                f"{route.get('distance_km')}"
+            )
+            print(
+                f"Risk: "
+                f"{route.get('risk_score')}"
+            )
+            print(
+                f"Safe: "
+                f"{route.get('safe')}"
+            )
+            print(
+                f"Waypoints: "
+                f"{len(route.get('waypoints', []))}"
+            )
+
+    # =========================================================
+    # FINAL RESPONSE
+    # =========================================================
+
+    print("\n========== FINAL RESPONSE ==========")
+
+    response = result.get("response")
+
+    print(response)
+
+    # =========================================================
+    # IMPORTANT STATE CHECKS
+    # =========================================================
+
+    print("\n========== STATE CHECK ==========")
+
+    print(
+        "selected_pfz_name:",
+        result.get("selected_pfz_name")
+    )
+
+    print(
+        "selected_pfz:",
+        result.get("selected_pfz")
+    )
+
+    print(
+        "route_required:",
+        result.get("route_required")
+    )
+
+    print(
+        "route_result exists:",
+        result.get("route_result") is not None
+    )
+
+
+if __name__ == "__main__":
+    asyncio.run(test_graph())
+>>>>>>> 479652e453fc0229fd9753d7fa899567fc40351f

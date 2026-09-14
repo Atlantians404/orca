@@ -17,7 +17,7 @@ def route_query(state: AgentState) -> str:
 
 def route_after_pfz_selection(state: AgentState) -> str:
 
-    if state.get("route_required", False):
+    if state.get("route_required", True):
         return "route"
 
     return "final_response"
