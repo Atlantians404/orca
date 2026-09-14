@@ -26,6 +26,15 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
 
+from ai.schemas.agent_response import (
+    AgentResponse,
+    PFZData,
+    RiskData,
+    WaypointData,
+    RouteData,
+    MapData,
+)
+
 
 DEFAULT_RADIUS_KM = 50.0
 MAX_PFZ_CANDIDATES = 20
@@ -1164,215 +1173,306 @@ async def route_node(
 # FINAL RESPONSE
 # ============================================================
 
-async def final_response_node(
-    state: AgentState,
-) -> dict:
+async def final_response_node(state: AgentState):
 
-    workflow_status = state.get(
-        "workflow_status"
-    )
+    workflow_status = state.get("workflow_status")
 
-    # ========================================================
+    # ============================================================
     # CANCELLED
-    # ========================================================
+    # ============================================================
 
     if workflow_status == "CANCELLED":
 
-        reason = state.get(
-            "cancellation_reason",
-            "User cancelled the workflow.",
-        )
-
         return {
-            "response": {
-                "message": reason,
-            },
-            "pending_action": None,
-            "workflow_status": "CANCELLED",
+            "response": AgentResponse(
+                message=(
+                    state.get("cancellation_reason")
+                    or "The fishing trip planning was cancelled."
+                )
+            )
         }
 
-    # ========================================================
+    # ============================================================
     # FAILED
-    # ========================================================
+    # ============================================================
 
     if workflow_status == "FAILED":
 
-        error_message = state.get(
-            "error_message",
-            "The ORCA workflow could not be completed.",
-        )
-
         return {
-            "response": {
-                "message": error_message,
-            },
-            "pending_action": None,
-            "workflow_status": "FAILED",
+            "response": AgentResponse(
+                message=(
+                    state.get("error_message")
+                    or "Unable to complete the fishing trip planning."
+                )
+            )
         }
 
-    # ========================================================
-    # NORMAL RESPONSE
-    # ========================================================
+    # ============================================================
+    # GET STATE DATA
+    # ============================================================
 
-    risk_result = state.get(
-        "risk_result"
-    )
+    selected_pfz = state.get("selected_pfz")
+    selected_pfz_name = state.get("selected_pfz_name")
 
-    selected_pfz_name = state.get(
-        "selected_pfz_name"
-    )
+    risk_result = state.get("risk_result") or {}
 
-    route_result = state.get(
-        "route_result"
-    )
+    route_result = state.get("route_result") or {}
 
-    lines = []
+    # ============================================================
+    # PFZ DATA
+    # ============================================================
 
-    # --------------------------------------------------------
-    # Selected PFZ
-    # --------------------------------------------------------
+    pfz_data = None
 
-    if selected_pfz_name:
+    if selected_pfz:
 
-        lines.append(
-            f"Selected PFZ: {selected_pfz_name}"
+        pfz_data = PFZData(
+            name=selected_pfz.get(
+                "name",
+                selected_pfz_name or "",
+            ),
+            latitude=selected_pfz.get(
+                "latitude",
+                0.0,
+            ),
+            longitude=selected_pfz.get(
+                "longitude",
+                0.0,
+            ),
+            distance_from_source_km=selected_pfz.get(
+                "distance_from_source_km"
+            ),
         )
 
-    # --------------------------------------------------------
-    # Risk
-    # --------------------------------------------------------
+    # ============================================================
+    # RISK DATA
+    # ============================================================
 
-    if (
-        risk_result
-        and selected_pfz_name
-    ):
+    risk_data = None
 
-        ranked_results = risk_result.get(
-            "ranked_results",
-            [],
-        )
+    ranked_results = risk_result.get(
+        "ranked_results",
+        []
+    )
+
+    if selected_pfz_name and ranked_results:
 
         selected_risk = None
 
         for result in ranked_results:
 
-            pfz_name = result.get(
-                "pfz_name",
-                "",
-            )
-
             if (
-                pfz_name.strip().casefold()
-                == selected_pfz_name.strip().casefold()
+                result.get("pfz_name", "").lower()
+                == selected_pfz_name.lower()
             ):
-
                 selected_risk = result
                 break
 
         if selected_risk:
 
-            lines.append("")
-            lines.append(
-                "Risk Assessment:"
+            times = selected_risk.get(
+                "times",
+                []
             )
 
-            for time_result in selected_risk.get(
-                "times",
-                [],
-            ):
+            if times:
 
-                lines.append(
-                    f"- {time_result.get('time')}: "
-                    f"{time_result.get('risk_score')} "
-                    f"({time_result.get('risk_level')})"
+                selected_time = times[0]
+
+                risk_data = RiskData(
+                    score=float(
+                        selected_time.get(
+                            "risk_score",
+                            0.0,
+                        )
+                    ),
+                    level=selected_time.get(
+                        "risk_level",
+                        "UNKNOWN",
+                    ),
                 )
 
-    # --------------------------------------------------------
-    # Route
-    # --------------------------------------------------------
+    # ============================================================
+    # ROUTE DATA
+    # ============================================================
 
-    if route_result:
+    route_data = None
 
-        safe_route = route_result.get(
-            "safe_route"
+    safe_route = route_result.get(
+        "safe_route"
+    )
+
+    if safe_route:
+
+        waypoints = []
+
+        for waypoint in safe_route.get(
+            "nodes",
+            []
+        ):
+
+            waypoints.append(
+                WaypointData(
+                    latitude=float(
+                        waypoint.get(
+                            "latitude",
+                            0.0,
+                        )
+                    ),
+                    longitude=float(
+                        waypoint.get(
+                            "longitude",
+                            0.0,
+                        )
+                    ),
+                    risk_score=(
+                        float(
+                            waypoint["risk_score"]
+                        )
+                        if waypoint.get("risk_score")
+                        is not None
+                        else None
+                    ),
+                    safe=waypoint.get(
+                        "safe"
+                    ),
+                )
+            )
+
+        route_data = RouteData(
+            route_id=safe_route.get(
+                "route_id",
+                "",
+            ),
+            distance_km=float(
+                safe_route.get(
+                    "distance_km",
+                    0.0,
+                )
+            ),
+            risk_score=float(
+                safe_route.get(
+                    "risk_score",
+                    0.0,
+                )
+            ),
+            safe=bool(
+                safe_route.get(
+                    "safe",
+                    False,
+                )
+            ),
+            waypoints=waypoints,
+            geojson=safe_route.get(
+                "geojson"
+            ),
         )
 
-        candidate_routes = route_result.get(
-            "candidate_routes",
-            [],
+    # ============================================================
+    # MAP DATA
+    # ============================================================
+
+    map_data = None
+
+    if safe_route:
+
+        geojson = safe_route.get(
+            "geojson"
         )
 
-        lines.append("")
+        if geojson:
 
-        if safe_route:
-
-            lines.append(
-                "Recommended Route:"
+            geometry = geojson.get(
+                "geometry",
+                {}
             )
 
-            lines.append(
-                f"- Route ID: "
-                f"{safe_route.get('route_id')}"
+            coordinates = geometry.get(
+                "coordinates",
+                []
             )
 
-            lines.append(
-                f"- Distance: "
-                f"{safe_route.get('distance_km', 0):.2f} km"
+            if coordinates:
+
+                map_data = MapData(
+                    coordinates=coordinates
+                )
+
+    # ============================================================
+    # HUMAN READABLE MESSAGE
+    # ============================================================
+
+    if selected_pfz_name:
+
+        message_parts = [
+            f"Fishing trip planned successfully.",
+            "",
+            f"Selected PFZ: {selected_pfz_name}",
+        ]
+
+        if risk_data:
+
+            message_parts.extend(
+                [
+                    "",
+                    "Risk Assessment:",
+                    (
+                        f"- Score: {risk_data.score:.2f}"
+                        f" ({risk_data.level})"
+                    ),
+                ]
             )
 
-            lines.append(
-                f"- Route Risk: "
-                f"{safe_route.get('risk_score')}"
+        if route_data:
+
+            message_parts.extend(
+                [
+                    "",
+                    "Recommended Route:",
+                    f"- Route ID: {route_data.route_id}",
+                    (
+                        f"- Distance: "
+                        f"{route_data.distance_km:.2f} km"
+                    ),
+                    (
+                        f"- Route Risk: "
+                        f"{route_data.risk_score:.2f}"
+                    ),
+                    (
+                        f"- Status: "
+                        f"{'SAFE' if route_data.safe else 'UNSAFE'}"
+                    ),
+                ]
             )
 
-            lines.append(
-                f"- Status: "
-                f"{'SAFE' if safe_route.get('safe') else 'UNSAFE'}"
-            )
-
-        elif candidate_routes:
-
-            lines.append(
-                "No safe route was found."
-            )
-
-            lines.append(
-                f"Candidate routes evaluated: "
-                f"{len(candidate_routes)}"
-            )
-
-        else:
-
-            lines.append(
-                "Route engine returned no candidate routes."
-            )
-
-    # --------------------------------------------------------
-    # No route result
-    # --------------------------------------------------------
+        message = "\n".join(
+            message_parts
+        )
 
     else:
 
-        lines.append("")
-
-        lines.append(
-            "No route result was returned."
+        message = (
+            "Fishing trip planning completed."
         )
 
-    # --------------------------------------------------------
-    # Fallback
-    # --------------------------------------------------------
+    # ============================================================
+    # BUILD STRUCTURED RESPONSE
+    # ============================================================
 
-    if not lines:
+    response = AgentResponse(
+        message=message,
+        map=map_data,
+        pfz=pfz_data,
+        risk=risk_data,
+        route=route_data,
+    )
 
-        lines.append(
-            "Your ORCA request has been completed."
-        )
+    # ============================================================
+    # RETURN
+    # ============================================================
 
     return {
-        "response": {
-            "message": "\n".join(lines),
-        },
-        "pending_action": None,
+        "response": response,
         "workflow_status": "COMPLETED",
+        "pending_action": None,
     }
