@@ -13,8 +13,8 @@ import axios from "axios";
  * getToken() implementation below — nothing else needs to change.
  */
  
-const baseURL = import.meta.env.VITE_API_BASE_URL || "/api";
- 
+const baseURL = import.meta.env.VITE_API_BASE_URL || "https://orca-qlqz.onrender.com";
+
 const api = axios.create({
   baseURL,
   headers: {
