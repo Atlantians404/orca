@@ -6,6 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from langgraph.types import Command
 
 from ai.graph.graph import app_graph
+from ai.services.conversation_summary import (
+    update_conversation_summary,
+)
 
 from backend.models.sessions import Session
 from backend.models.messages import Message
@@ -28,9 +31,7 @@ def _build_response(result: dict) -> dict:
         Returns message + pending action + options.
 
     Normal/final response:
-        Preserves the complete structured AgentResponse
-        so the frontend can access PFZ, risk, route,
-        waypoints and map data.
+        Preserves the complete structured AgentResponse.
     """
 
     interrupt = _get_interrupt(result)
@@ -63,12 +64,10 @@ def _build_response(result: dict) -> dict:
         message = ""
 
     elif hasattr(response, "model_dump"):
-        # Pydantic AgentResponse
         response_data = response.model_dump()
         message = response.message
 
     elif isinstance(response, dict):
-        # In case LangGraph returns a dictionary
         response_data = response
         message = response.get("message", "")
 
@@ -156,6 +155,8 @@ async def send_message(
         response_data=None
     )
 
+    db.add(user_message)
+
     # ---------------------------------------------------------
     # SAVE ASSISTANT MESSAGE
     # ---------------------------------------------------------
@@ -167,8 +168,19 @@ async def send_message(
         response_data=response["response_data"],
     )
 
-    db.add(user_message)
     db.add(assistant_message)
+
+    # ---------------------------------------------------------
+    # UPDATE CONVERSATION SUMMARY
+    # ---------------------------------------------------------
+
+    new_summary = await update_conversation_summary(
+        existing_summary=session.summary,
+        user_message=message,
+        assistant_response=response["message"],
+    )
+
+    session.summary = new_summary
 
     await db.commit()
 
@@ -182,7 +194,7 @@ async def resume_chat(
     db: AsyncSession
 ) -> dict:
 
-    await _get_session(
+    session = await _get_session(
         session_id=session_id,
         user_id=user_id,
         db=db
@@ -202,7 +214,20 @@ async def resume_chat(
     response = _build_response(result)
 
     # ---------------------------------------------------------
-    # SAVE ASSISTANT MESSAGE
+    # SAVE USER HITL RESPONSE
+    # ---------------------------------------------------------
+
+    user_message = Message(
+        session_id=session_id,
+        role="user",
+        content=str(value),
+        response_data=None
+    )
+
+    db.add(user_message)
+
+    # ---------------------------------------------------------
+    # SAVE ASSISTANT RESPONSE
     # ---------------------------------------------------------
 
     assistant_message = Message(
@@ -213,6 +238,18 @@ async def resume_chat(
     )
 
     db.add(assistant_message)
+
+    # ---------------------------------------------------------
+    # UPDATE CONVERSATION SUMMARY
+    # ---------------------------------------------------------
+
+    new_summary = await update_conversation_summary(
+        existing_summary=session.summary,
+        user_message=str(value),
+        assistant_response=response["message"],
+    )
+
+    session.summary = new_summary
 
     await db.commit()
 
