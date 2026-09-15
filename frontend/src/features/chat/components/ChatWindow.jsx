@@ -3,6 +3,7 @@ import { Compass, MapPinned, ShieldAlert, Waves } from "lucide-react";
 
 import ChatMessage from "./ChatMessage";
 import ChatInput from "./ChatInput";
+import LocationPicker from "./LocationPicker";
 import logo from "../../../assets/logo.png";
 
 import {
@@ -68,6 +69,7 @@ export default function ChatWindow({ session }) {
   const [sending, setSending] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [error, setError] = useState(null);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const bottomRef = useRef(null);
   const requestRef = useRef(0);
@@ -256,6 +258,66 @@ const pendingTurn =
   },
   [sessionId, sending, pendingTurn]
 );
+
+  // ============================================================
+  // LOCATION CONFIRMED
+  //
+  // When the user confirms their GPS position in the LocationPicker,
+  // this sends the coordinate string through /resume.
+  // ============================================================
+
+  const handleLocationConfirm = useCallback(
+    async (coordString) => {
+      setShowLocationPicker(false);
+
+      if (!sessionId || sending || !pendingTurn) return;
+
+      setError(null);
+      setSending(true);
+
+      const userMessage = makeUserMessage(coordString);
+      const pendingAssistant = makePendingAssistantMessage();
+
+      setMessages((previous) => [
+        ...previous,
+        userMessage,
+        pendingAssistant,
+      ]);
+
+      try {
+        const assistantMessage = await resumeChat(
+          sessionId,
+          coordString
+        );
+
+        setMessages((previous) => {
+          const withoutPlaceholder = previous.filter(
+            (message) => message.id !== pendingAssistant.id
+          );
+          return [...withoutPlaceholder, assistantMessage];
+        });
+      } catch (err) {
+        setMessages((previous) =>
+          previous.filter(
+            (message) => message.id !== pendingAssistant.id
+          )
+        );
+
+        setError({
+          message:
+            err?.message ||
+            "ORCA couldn't complete that request.",
+          action: {
+            type: "resume",
+            payload: coordString,
+          },
+        });
+      } finally {
+        setSending(false);
+      }
+    },
+    [sessionId, sending, pendingTurn]
+  );
   // ============================================================
   // RETRY
   // ============================================================
@@ -354,6 +416,7 @@ const pendingTurn =
   // ============================================================
 
   return (
+    <>
     <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#080809]">
 
       {/* ======================================================
@@ -414,6 +477,9 @@ const pendingTurn =
                 isLatest={
                   index === messages.length - 1
                 }
+                onRequestLocation={() =>
+                  setShowLocationPicker(true)
+                }
               />
             ))}
 
@@ -456,6 +522,7 @@ const pendingTurn =
             value={inputValue}
             onChange={setInputValue}
             onSend={handleSend}
+            onLocationClick={() => setShowLocationPicker(true)}
             disabled={sending || historyLoading}
             placeholder="Ask ORCA about ocean, weather, PFZ, risk, or routes..."
           />
@@ -469,6 +536,15 @@ const pendingTurn =
       </footer>
 
     </div>
+
+      {/* Location Picker Modal */}
+      {showLocationPicker && (
+        <LocationPicker
+          onConfirm={handleLocationConfirm}
+          onClose={() => setShowLocationPicker(false)}
+        />
+      )}
+    </>
   );
 }
 

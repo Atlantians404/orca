@@ -11,6 +11,7 @@ import logo from "../../../assets/logo.png";
 export default function ChatMessage({
   message,
   isLatest = false,
+  onRequestLocation,
 }) {
   const isUser = message.role === "user";
 
@@ -22,6 +23,7 @@ export default function ChatMessage({
     <AssistantTurn
       message={message}
       isLatest={isLatest}
+      onRequestLocation={onRequestLocation}
     />
   );
 }
@@ -146,6 +148,7 @@ function formatBackendText(text) {
 function AssistantTurn({
   message,
   isLatest,
+  onRequestLocation,
 }) {
   const isThinking =
     message.pending === true;
@@ -198,12 +201,21 @@ function AssistantTurn({
             ================================================== */}
 
             {message.pending_action ===
-              "location" && (
-              <p className="mt-2 text-sm leading-6 text-[#77777C]">
-                Please enter a place name or
-                coordinates in latitude, longitude
-                format.
-              </p>
+              "location" && isLatest && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="text-sm leading-6 text-[#77777C]">
+                  Please share your location or enter
+                  coordinates manually.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onRequestLocation?.()}
+                  className="flex w-fit items-center gap-2 rounded-xl border border-[#202023] bg-[#111113] px-4 py-2.5 text-sm font-medium text-[#3DA7B7] transition hover:border-[#3DA7B7]/40 hover:bg-[#161616]"
+                >
+                  <Navigation size={14} aria-hidden="true" />
+                  Use My GPS Location
+                </button>
+              </div>
             )}
 
             {message.pending_action ===

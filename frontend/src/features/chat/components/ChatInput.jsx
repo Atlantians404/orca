@@ -6,6 +6,7 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
+  onLocationClick,
   disabled = false,
   placeholder = "Ask ORCA anything...",
 }) {
@@ -93,6 +94,7 @@ export default function ChatInput({
        {/* Location button */}
       <button
         type="button"
+        onClick={() => onLocationClick?.()}
         aria-label="Choose location"
         title="Choose location"
         className="
