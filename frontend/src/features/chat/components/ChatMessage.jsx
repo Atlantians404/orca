@@ -1,253 +1,774 @@
-import { useEffect, useRef, useState } from "react";
-import { Pencil, RotateCcw, ThumbsDown, ThumbsUp, X, Check } from "lucide-react";
+import {
+  Compass,
+  MapPin,
+  Navigation,
+  ShieldAlert,
+  Waypoints,
+} from "lucide-react";
+
 import logo from "../../../assets/logo.png";
 
 export default function ChatMessage({
   message,
-  isEditing = false,
-  isRegenerating = false,
-  onStartEdit,
-  onCancelEdit,
-  onSubmitEdit,
-  onRegenerate,
-  onFeedback,
+  isLatest = false,
+  onRequestLocation,
 }) {
   const isUser = message.role === "user";
 
   if (isUser) {
-    return (
-      <UserTurn
-        message={message}
-        isEditing={isEditing}
-        onStartEdit={onStartEdit}
-        onCancelEdit={onCancelEdit}
-        onSubmitEdit={onSubmitEdit}
-      />
-    );
+    return <UserTurn message={message} />;
   }
 
   return (
     <AssistantTurn
       message={message}
-      isRegenerating={isRegenerating}
-      onRegenerate={onRegenerate}
-      onFeedback={onFeedback}
+      isLatest={isLatest}
+      onRequestLocation={onRequestLocation}
     />
   );
 }
 
-function formatTime(iso) {
-  if (!iso) return "";
+// ============================================================
+// USER MESSAGE
+// ============================================================
+
+function UserTurn({ message }) {
+  return (
+    <div className="group flex flex-col items-end">
+
+      <div className="max-w-[min(85%,640px)] rounded-2xl border border-[#202023] bg-[#161616] px-4 py-3 text-sm leading-relaxed text-white">
+        {message.content}
+      </div>
+
+      {message.created_at && (
+        <div className="mt-1.5 pr-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <span className="text-[11px] text-[#5C5C5C]">
+            {formatTime(message.created_at)}
+          </span>
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ============================================================
+// ASSISTANT MESSAGE
+// ============================================================
+
+function formatBackendText(text) {
+  if (!text) return null;
+
+  const lines = String(text).split("\n");
+
+  return (
+    <div className="space-y-2">
+      {lines.map((line, index) => {
+        const trimmed = line.trim();
+
+        // Preserve empty lines as small spacing
+        if (!trimmed) {
+          return (
+            <div
+              key={index}
+              className="h-1"
+            />
+          );
+        }
+
+        // Detect backend Markdown bullet
+        const isBullet =
+          trimmed.startsWith("- ");
+
+        const content = isBullet
+          ? trimmed.slice(2)
+          : trimmed;
+
+        // Split **bold text** from normal text
+        const parts =
+          content.split(/(\*\*.*?\*\*)/g);
+
+        const formatted = parts.map(
+          (part, partIndex) => {
+            const isBold =
+              part.startsWith("**") &&
+              part.endsWith("**");
+
+            if (isBold) {
+              return (
+                <strong
+                  key={partIndex}
+                  className="font-semibold text-white"
+                >
+                  {part.slice(2, -2)}
+                </strong>
+              );
+            }
+
+            return (
+              <span key={partIndex}>
+                {part}
+              </span>
+            );
+          }
+        );
+
+        // Render bullets cleanly
+        if (isBullet) {
+          return (
+            <div
+              key={index}
+              className="flex gap-2"
+            >
+              <span className="shrink-0 text-[#3DA7B7]">
+                •
+              </span>
+
+              <span>
+                {formatted}
+              </span>
+            </div>
+          );
+        }
+
+        // Normal paragraph
+        return (
+          <p
+            key={index}
+            className="leading-7"
+          >
+            {formatted}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function AssistantTurn({
+  message,
+  isLatest,
+  onRequestLocation,
+}) {
+  const isThinking =
+    message.pending === true;
+
+  return (
+    <div className="group flex items-start gap-3">
+
+      {/* ==================================================
+          ORCA LOGO
+      ================================================== */}
+
+      <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center">
+
+        <img
+          src={logo}
+          alt="ORCA"
+          className="h-7 w-7 object-contain"
+        />
+
+      </div>
+
+      {/* ==================================================
+          RESPONSE
+      ================================================== */}
+
+      <div className="min-w-0 flex-1">
+
+        {isThinking ? (
+          <ThinkingIndicator />
+        ) : (
+          <>
+            {/* ==================================================
+                MAIN BACKEND RESPONSE
+            ================================================== */}
+
+            {message.content && (
+              <div className="text-sm text-[#E5E5E7]">
+                {formatBackendText(
+                  message.content
+                )}
+              </div>
+            )}
+
+            {/* ==================================================
+                WORKFLOW INSTRUCTION
+
+                TEXT ONLY.
+                NOT A BUTTON.
+                User answers through the normal composer.
+            ================================================== */}
+
+            {message.pending_action ===
+              "location" && isLatest && (
+              <div className="mt-3 flex flex-col gap-2">
+                <p className="text-sm leading-6 text-[#77777C]">
+                  Please share your location or enter
+                  coordinates manually.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onRequestLocation?.()}
+                  className="flex w-fit items-center gap-2 rounded-xl border border-[#202023] bg-[#111113] px-4 py-2.5 text-sm font-medium text-[#3DA7B7] transition hover:border-[#3DA7B7]/40 hover:bg-[#161616]"
+                >
+                  <Navigation size={14} aria-hidden="true" />
+                  Use My GPS Location
+                </button>
+              </div>
+            )}
+
+            {message.pending_action ===
+              "time" && (
+              <p className="mt-2 text-sm leading-6 text-[#77777C]">
+                Please enter a suitable fishing
+                time, for example 8 AM.
+              </p>
+            )}
+
+            {/* ==================================================
+                STRUCTURED BACKEND DATA
+            ================================================== */}
+
+            {message.response_data && (
+              <ResponseDataPanel
+                data={message.response_data}
+                showMessage={!message.content}
+              />
+            )}
+
+            {/* ==================================================
+                WORKFLOW STATUS
+            ================================================== */}
+
+            {message.workflow_status &&
+              message.workflow_status !==
+                "COMPLETED" && (
+                <div className="mt-3">
+
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-[#5C5C5C]">
+                    {formatWorkflowStatus(
+                      message.workflow_status
+                    )}
+                  </span>
+
+                </div>
+              )}
+
+            {/* ==================================================
+                COMPLETED
+            ================================================== */}
+
+            {message.workflow_status ===
+              "COMPLETED" && (
+              <div className="mt-3">
+
+                <span className="text-[10px] font-medium uppercase tracking-wide text-[#5C5C5C]">
+                  COMPLETED
+                </span>
+
+              </div>
+            )}
+
+            {/* ==================================================
+                TIMESTAMP
+            ================================================== */}
+
+            {message.created_at && (
+              <div className="mt-2 flex items-center gap-3">
+
+                <span className="text-[11px] text-[#5C5C5C]">
+                  {formatTime(
+                    message.created_at
+                  )}
+                </span>
+
+              </div>
+            )}
+          </>
+        )}
+
+      </div>
+
+    </div>
+  );
+}
+
+// ============================================================
+// THINKING INDICATOR
+// ============================================================
+
+function ThinkingIndicator() {
+  return (
+    <div
+      className="flex items-center gap-1.5 py-2"
+      role="status"
+      aria-label="ORCA is thinking"
+    >
+
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-[#5C5C5C]"
+        style={{
+          animation:
+            "pulseDot 1.2s ease-in-out infinite",
+        }}
+      />
+
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-[#5C5C5C]"
+        style={{
+          animation:
+            "pulseDot 1.2s ease-in-out infinite",
+          animationDelay: "0.15s",
+        }}
+      />
+
+      <span
+        className="h-1.5 w-1.5 rounded-full bg-[#5C5C5C]"
+        style={{
+          animation:
+            "pulseDot 1.2s ease-in-out infinite",
+          animationDelay: "0.3s",
+        }}
+      />
+
+    </div>
+  );
+}
+
+// ============================================================
+// RESPONSE DATA
+// ============================================================
+
+function ResponseDataPanel({
+  data,
+  showMessage = false,
+}) {
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
+    return null;
+  }
+
+  const {
+    message,
+    map,
+    pfz,
+    risk,
+    route,
+    plan,
+  } = data;
+
+  // ==========================================================
+  // CHECK AVAILABLE STRUCTURED DATA
+  // ==========================================================
+
+  const hasMap =
+    map &&
+    Array.isArray(map.coordinates) &&
+    map.coordinates.length > 0;
+
+  const hasPfz =
+    pfz &&
+    (
+      pfz.latitude != null ||
+      pfz.longitude != null ||
+      pfz.name
+    );
+
+  const hasRisk =
+    risk &&
+    (
+      risk.level ||
+      risk.score != null
+    );
+
+  const hasRoute =
+    route &&
+    (
+      route.distance_km != null ||
+      route.route_id
+    );
+
+  const hasPlan =
+    plan &&
+    typeof plan === "object" &&
+    Object.keys(plan).length > 0;
+
+  const hasResponseMessage =
+    typeof message === "string" &&
+    message.trim().length > 0;
+
+  // Nothing to display
+  if (
+    !hasResponseMessage &&
+    !hasMap &&
+    !hasPfz &&
+    !hasRisk &&
+    !hasRoute &&
+    !hasPlan
+  ) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4 flex max-w-[620px] flex-col gap-2.5">
+
+      {/* ======================================================
+          BACKEND RESPONSE MESSAGE
+
+          Only show this if message.content was not
+          already displayed above.
+      ====================================================== */}
+
+      {hasResponseMessage &&
+        showMessage && (
+          <div className="rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+              ORCA PLAN
+            </span>
+
+            <div className="mt-2 text-sm text-[#E5E5E7]">
+              {formatBackendText(message)}
+            </div>
+
+          </div>
+        )}
+
+      {/* ======================================================
+          PLAN OBJECT
+      ====================================================== */}
+
+      {hasPlan && (
+        <PlanPanel plan={plan} />
+      )}
+
+      {/* ======================================================
+          PFZ
+      ====================================================== */}
+
+      {hasPfz && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+          <MapPin
+            size={15}
+            className="mt-0.5 shrink-0 text-[#3DA7B7]"
+            aria-hidden="true"
+          />
+
+          <div className="min-w-0">
+
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+              Fishing zone
+            </span>
+
+            <p className="mt-0.5 text-xs text-white/90">
+              {pfz.name ||
+                "Selected zone"}
+
+              {pfz.distance_from_source_km !=
+                null && (
+                <span className="text-[#77777C]">
+                  {" "}
+                  ·{" "}
+                  {Number(
+                    pfz.distance_from_source_km
+                  ).toFixed(1)}{" "}
+                  km away
+                </span>
+              )}
+            </p>
+
+            {pfz.latitude != null &&
+              pfz.longitude != null && (
+                <p className="mt-0.5 text-[11px] text-[#5C5C5C]">
+                  {formatNumber(
+                    pfz.latitude,
+                    4
+                  )}
+                  ,{" "}
+                  {formatNumber(
+                    pfz.longitude,
+                    4
+                  )}
+                </p>
+              )}
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================
+          RISK
+      ====================================================== */}
+
+      {hasRisk && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+          <ShieldAlert
+            size={15}
+            className="shrink-0 text-[#3DA7B7]"
+            aria-hidden="true"
+          />
+
+          <div className="min-w-0">
+
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+              Risk assessment
+            </span>
+
+            <p className="mt-0.5 text-xs text-white/90">
+              {risk.level || "—"}
+
+              {risk.score != null && (
+                <span className="text-[#77777C]">
+                  {" "}
+                  · score{" "}
+                  {formatNumber(
+                    risk.score,
+                    2
+                  )}
+                </span>
+              )}
+            </p>
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================
+          ROUTE
+      ====================================================== */}
+
+      {hasRoute && (
+        <div className="flex items-start gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+          <Navigation
+            size={15}
+            className="mt-0.5 shrink-0 text-[#3DA7B7]"
+            aria-hidden="true"
+          />
+
+          <div className="min-w-0">
+
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+              Route
+            </span>
+
+            <p className="mt-0.5 text-xs text-white/90">
+
+              {route.distance_km !=
+              null
+                ? `${formatNumber(
+                    route.distance_km,
+                    1
+                  )} km`
+                : route.route_id}
+
+              {route.safe != null && (
+                <span className="text-[#77777C]">
+                  {" "}
+                  ·{" "}
+                  {route.safe
+                    ? "within safe limits"
+                    : "caution advised"}
+                </span>
+              )}
+
+            </p>
+
+            {Array.isArray(
+              route.waypoints
+            ) &&
+              route.waypoints.length >
+                0 && (
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#5C5C5C]">
+
+                  <Waypoints
+                    size={11}
+                    aria-hidden="true"
+                  />
+
+                  {route.waypoints.length}{" "}
+                  waypoints plotted
+
+                </p>
+              )}
+
+          </div>
+
+        </div>
+      )}
+
+      {/* ======================================================
+          MAP
+      ====================================================== */}
+
+      {hasMap && (
+        <div className="flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+          <Compass
+            size={15}
+            className="shrink-0 text-[#3DA7B7]"
+            aria-hidden="true"
+          />
+
+          <div className="min-w-0">
+
+            <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+              Map data
+            </span>
+
+            <p className="mt-0.5 text-xs text-white/90">
+              {map.coordinates.length}{" "}
+              coordinate
+              {map.coordinates.length === 1
+                ? ""
+                : "s"}{" "}
+              returned by the backend.
+            </p>
+
+          </div>
+
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ============================================================
+// PLAN PANEL
+// ============================================================
+
+function PlanPanel({ plan }) {
+  return (
+    <div className="rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
+
+      <div className="mb-3 flex items-center gap-2">
+
+        <Compass
+          size={15}
+          className="text-[#3DA7B7]"
+          aria-hidden="true"
+        />
+
+        <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
+          Fishing trip plan
+        </span>
+
+      </div>
+
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+
+        {Object.entries(plan).map(
+          ([key, value]) => (
+            <div
+              key={key}
+              className="rounded-lg border border-[#202023] bg-[#0A0A0A] px-3 py-2.5"
+            >
+
+              <p className="text-[10px] uppercase tracking-wide text-[#5C5C5C]">
+                {formatLabel(key)}
+              </p>
+
+              <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-white/90">
+                {formatValue(value)}
+              </p>
+
+            </div>
+          )
+        )}
+
+      </div>
+
+    </div>
+  );
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+
+function formatTime(value) {
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date(
+      value
+    ).toLocaleTimeString(
+      [],
+      {
+        hour: "numeric",
+        minute: "2-digit",
+      }
+    );
   } catch {
     return "";
   }
 }
 
-function autoResize(el) {
-  if (!el) return;
-  el.style.height = "auto";
-  el.style.height = `${el.scrollHeight}px`;
+function formatWorkflowStatus(value) {
+  return String(value)
+    .replaceAll("_", " ")
+    .toUpperCase();
 }
 
-function UserTurn({ message, isEditing, onStartEdit, onCancelEdit, onSubmitEdit }) {
-  const [draft, setDraft] = useState(message.content);
-  const textareaRef = useRef(null);
+function formatLabel(value) {
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(
+      /\b\w/g,
+      (char) =>
+        char.toUpperCase()
+    );
+}
 
-  useEffect(() => {
-    if (isEditing) {
-      setDraft(message.content);
-      requestAnimationFrame(() => {
-        autoResize(textareaRef.current);
-        textareaRef.current?.focus();
-        textareaRef.current?.setSelectionRange(
-          textareaRef.current.value.length,
-          textareaRef.current.value.length
-        );
-      });
-    }
-  }, [isEditing, message.content]);
-
-  function submit() {
-    const trimmed = draft.trim();
-    if (!trimmed || trimmed === message.content) {
-      onCancelEdit();
-      return;
-    }
-    onSubmitEdit(message.id, trimmed);
+function formatValue(value) {
+  if (
+    value === null ||
+    value === undefined
+  ) {
+    return "—";
   }
 
-  function handleKeyDown(e) {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
-    } else if (e.key === "Escape") {
-      onCancelEdit();
-    }
+  if (Array.isArray(value)) {
+    return value
+      .map((item) =>
+        formatValue(item)
+      )
+      .join(", ");
   }
 
-  return (
-    <div className="group flex flex-col items-end">
-      {isEditing ? (
-        <div className="w-full max-w-[min(85%,640px)]">
-          <textarea
-            ref={textareaRef}
-            value={draft}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              autoResize(e.target);
-            }}
-            onKeyDown={handleKeyDown}
-            rows={1}
-            aria-label="Edit message"
-            className="w-full resize-none rounded-2xl border border-[#3DA7B7]/40 bg-surface2 px-4 py-3 text-sm text-ink leading-relaxed outline-none focus:border-[#3DA7B7] focus:ring-1 focus:ring-[#3DA7B7]/40 transition-colors"
-          />
-          <div className="mt-2 flex items-center justify-end gap-2">
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs text-mute hover:text-ink hover:bg-white/5 transition-colors"
-            >
-              <X size={13} aria-hidden="true" />
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={submit}
-              className="inline-flex items-center gap-1 rounded-full bg-ink px-3 py-1.5 text-xs font-medium text-void hover:bg-white/90 transition-colors"
-            >
-              <Check size={13} aria-hidden="true" />
-              Save & send
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="max-w-[min(85%,640px)] rounded-2xl border border-line bg-surface2 px-4 py-3 text-sm leading-relaxed text-ink">
-            {message.content}
-          </div>
-          <div className="mt-1.5 flex items-center gap-3 pr-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-            <span className="text-[11px] text-mute2">{formatTime(message.created_at)}</span>
-            <button
-              type="button"
-              onClick={() => onStartEdit(message.id)}
-              aria-label="Edit message"
-              className="inline-flex items-center gap-1 text-[11px] text-mute hover:text-ink transition-colors"
-            >
-              <Pencil size={12} aria-hidden="true" />
-              Edit
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
+  if (
+    typeof value === "object"
+  ) {
+    return Object.entries(value)
+      .map(
+        ([key, val]) =>
+          `${formatLabel(
+            key
+          )}: ${formatValue(val)}`
+      )
+      .join(" · ");
+  }
+
+  return String(value);
 }
 
-function AssistantTurn({ message, isRegenerating, onRegenerate, onFeedback }) {
-  const busy = message.pending || isRegenerating;
+function formatNumber(
+  value,
+  digits = 2
+) {
+  const number = Number(value);
 
-  return (
-    <div className="group flex items-start gap-3">
-      <img
-        src={logo}
-        alt=""
-        aria-hidden="true"
-        className="mt-0.5 h-6 w-6 shrink-0 rounded-full object-contain"
-      />
-      <div className="min-w-0 flex-1">
-        {busy ? (
-          <ThinkingDots />
-        ) : (
-          <>
-            <p className="text-sm leading-relaxed text-ink/90 whitespace-pre-wrap">
-              {message.content}
-            </p>
+  if (!Number.isFinite(number)) {
+    return String(value);
+  }
 
-            {message.response_data && <StructuredDataPanel data={message.response_data} />}
-
-            <div className="mt-2 flex items-center gap-3">
-              <span className="text-[11px] text-mute2">{formatTime(message.created_at)}</span>
-
-              <div className="flex items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                <button
-                  type="button"
-                  onClick={() => onRegenerate(message.id)}
-                  aria-label="Regenerate response"
-                  title="Regenerate"
-                  className="rounded-full p-1.5 text-mute hover:text-ink hover:bg-white/5 transition-colors"
-                >
-                  <RotateCcw size={13} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onFeedback(message.id, "positive")}
-                  aria-label="Good response"
-                  aria-pressed={message.feedback === "positive"}
-                  title="Good response"
-                  className={`rounded-full p-1.5 transition-colors hover:bg-white/5 ${
-                    message.feedback === "positive" ? "text-[#3DA7B7]" : "text-mute hover:text-ink"
-                  }`}
-                >
-                  <ThumbsUp size={13} aria-hidden="true" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onFeedback(message.id, "negative")}
-                  aria-label="Poor response"
-                  aria-pressed={message.feedback === "negative"}
-                  title="Poor response"
-                  className={`rounded-full p-1.5 transition-colors hover:bg-white/5 ${
-                    message.feedback === "negative" ? "text-[#3DA7B7]" : "text-mute hover:text-ink"
-                  }`}
-                >
-                  <ThumbsDown size={13} aria-hidden="true" />
-                </button>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ThinkingDots() {
-  return (
-    <div className="flex items-center gap-1 py-1.5" role="status" aria-label="ORCA is thinking">
-      {[0, 1, 2].map((i) => (
-        <span
-          key={i}
-          className="h-1.5 w-1.5 rounded-full bg-mute"
-          style={{ animation: "pulseDot 1.2s ease-in-out infinite", animationDelay: `${i * 0.15}s` }}
-        />
-      ))}
-    </div>
-  );
-}
-
-function StructuredDataPanel({ data }) {
-  const { type, summary, fields } = data ?? {};
-
-  return (
-    <div className="mt-3 max-w-[520px] rounded-xl border border-line bg-surface px-4 py-3">
-      {type && (
-        <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
-          {type}
-        </span>
-      )}
-      {summary && <p className="mt-1 text-xs text-mute">{summary}</p>}
-      {Array.isArray(fields) && fields.length > 0 && (
-        <dl className="mt-2.5 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-          {fields.map((f) => (
-            <div key={f.label} className="flex items-baseline justify-between gap-3 sm:block">
-              <dt className="text-[11px] text-mute2">{f.label}</dt>
-              <dd className="text-xs text-ink/90">{f.value}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
-    </div>
+  return number.toFixed(
+    digits
   );
 }

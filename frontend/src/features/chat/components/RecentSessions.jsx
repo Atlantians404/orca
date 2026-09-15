@@ -606,52 +606,43 @@ const RecentSessions = forwardRef(function RecentSessions(
   // ===================================================
 
   const handleDelete = async (session) => {
+  try {
+    setBusyId(session.id);
+    setMenu(null);
 
-    const confirmed = window.confirm(
-      `Delete "${session.title}"?`
+    await deleteSession(session.id);
+
+    setSessions((previous) =>
+      previous.filter(
+        (item) => item.id !== session.id
+      )
     );
 
-    if (!confirmed) return;
+    setPinnedSessions((previous) =>
+      previous.filter(
+        (item) => item.id !== session.id
+      )
+    );
 
-    try {
-      setBusyId(session.id);
-      setMenu(null);
+    setArchivedSessions((previous) =>
+      previous.filter(
+        (item) => item.id !== session.id
+      )
+    );
 
-      await deleteSession(session.id);
-
-      setSessions((previous) =>
-        previous.filter(
-          (item) => item.id !== session.id
-        )
-      );
-
-      setPinnedSessions((previous) =>
-        previous.filter(
-          (item) => item.id !== session.id
-        )
-      );
-
-      setArchivedSessions((previous) =>
-        previous.filter(
-          (item) => item.id !== session.id
-        )
-      );
-
-      if (activeSessionId === session.id) {
-        onActiveSessionDeleted?.();
-      }
-
-    } catch (error) {
-      console.error(
-        "Failed to delete session:",
-        error
-      );
-    } finally {
-      setBusyId(null);
+    if (activeSessionId === session.id) {
+      onActiveSessionDeleted?.();
     }
-  };
 
-
+  } catch (error) {
+    console.error(
+      "Failed to delete session:",
+      error
+    );
+  } finally {
+    setBusyId(null);
+  }
+};
   // ===================================================
   // PIN / UNPIN
   // ===================================================

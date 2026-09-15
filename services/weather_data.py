@@ -1,12 +1,34 @@
 from api.weather.weather import get_open_meteo_data
 
 
+# Cache weather data for the current request/location/time
+_weather_cache = {}
+
+
+async def _get_weather_data(
+    latitude: float,
+    longitude: float,
+    time: str
+) -> dict:
+    key = (round(latitude, 4), round(longitude, 4), time)
+
+    if key not in _weather_cache:
+        _weather_cache[key] = await get_open_meteo_data(
+            latitude,
+            longitude,
+            time
+        )
+
+    return _weather_cache[key]
+
+
 async def get_temperature(
     latitude: float,
     longitude: float,
     time: str
 ) -> float:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["temperature"]
 
 
@@ -15,7 +37,8 @@ async def get_wind_speed(
     longitude: float,
     time: str
 ) -> float:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["wind_speed"]
 
 
@@ -24,7 +47,8 @@ async def get_wind_direction(
     longitude: float,
     time: str
 ) -> int:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["wind_direction"]
 
 
@@ -33,7 +57,8 @@ async def get_wind_gust(
     longitude: float,
     time: str
 ) -> float:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["wind_gust"]
 
 
@@ -42,7 +67,8 @@ async def get_visibility(
     longitude: float,
     time: str
 ) -> float:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["visibility"]
 
 
@@ -51,7 +77,8 @@ async def get_precipitation(
     longitude: float,
     time: str
 ) -> float:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["precipitation"]
 
 
@@ -60,7 +87,8 @@ async def get_weather_code(
     longitude: float,
     time: str
 ) -> int:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["weather_code"]
 
 
@@ -69,7 +97,8 @@ async def get_weather_condition(
     longitude: float,
     time: str
 ) -> str:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["weather_condition"]
 
 
@@ -78,5 +107,6 @@ async def get_thunderstorm(
     longitude: float,
     time: str
 ) -> bool:
-    data = await get_open_meteo_data(latitude, longitude, time)
+
+    data = await _get_weather_data(latitude, longitude, time)
     return data["thunderstorm"]
