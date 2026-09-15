@@ -200,8 +200,9 @@ function AssistantTurn({
                 User answers through the normal composer.
             ================================================== */}
 
-            {message.pending_action ===
-              "location" && isLatest && (
+            {message.pending_action === "location" &&
+              message.workflow_status === "WAITING_FOR_USER" &&
+              isLatest && (
               <div className="mt-3 flex flex-col gap-2">
                 <p className="text-sm leading-6 text-[#77777C]">
                   Please share your location or enter
