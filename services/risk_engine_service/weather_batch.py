@@ -20,6 +20,8 @@ def coordinate_key(node):
 
 
 async def get_weather_data_batch(nodes, time):
+    if nodes:
+        print("First node:", nodes[0])
 
     if not nodes:
         return {}
