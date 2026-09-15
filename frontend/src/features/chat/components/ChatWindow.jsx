@@ -300,37 +300,49 @@ const pendingTurn =
   // ============================================================
 
   if (!session) {
-    return (
-      <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#080809]">
+  return (
+    <div className="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden bg-[#080809]">
+      <main className="flex min-h-0 flex-1 items-center justify-center px-6">
+        <div className="flex max-w-[560px] flex-col items-center text-center">
 
-        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-6 lg:px-7">
-          <EmptyState
-            suggestions={SUGGESTIONS}
-            onSuggestionClick={handleSuggestionClick}
+          {/* ORCA Logo */}
+          <img
+            src={logo}
+            alt="ORCA"
+            className="h-28 w-28 object-contain"
           />
-        </main>
 
-        <footer className="shrink-0 border-t border-[#202023] bg-[#080809] px-4 py-4 lg:px-7">
-          <div className="mx-auto w-full max-w-[720px]">
+          {/* ORCA Name */}
+          <h1 className="mt-5 font-display text-3xl font-semibold tracking-[0.35em] text-white sm:text-4xl">
+            O R C A
+          </h1>
 
-            <ChatInput
-              value={inputValue}
-              onChange={setInputValue}
-              onSend={handleSend}
-              disabled={true}
-              placeholder="Select a conversation to start chatting..."
-            />
+          {/* Tagline */}
+          <p className="mt-3 text-sm text-[#9A9A9A] sm:text-base">
+            Marine intelligence, in conversation.
+          </p>
 
-            <p className="mt-2 text-center text-[10px] text-[#4F4F55]">
-              Select a conversation to connect with ORCA.
-            </p>
+          {/* Description */}
+          <p className="mt-6 max-w-[500px] text-sm leading-7 text-[#77777D] sm:text-[15px]">
+            ORCA is your intelligent marine assistant for understanding
+            fishing conditions, Potential Fishing Zones, marine safety,
+            weather, and voyage planning.
+          </p>
 
-          </div>
-        </footer>
+          {/* Instruction */}
+          <p className="mt-8 text-sm text-[#9A9A9A]">
+            Click{" "}
+            <span className="font-medium text-white">
+              + New chat
+            </span>{" "}
+            in the sidebar to start a conversation with ORCA.
+          </p>
 
-      </div>
-    );
-  }
+        </div>
+      </main>
+    </div>
+  );
+}
 
   const showEmptyState =
     !historyLoading &&
@@ -477,7 +489,7 @@ function EmptyState({
           src={logo}
           alt=""
           aria-hidden="true"
-          className="h-10 w-10 shrink-0 object-contain"
+          className="h-16 w-16 shrink-0 object-contain"
         />
 
         <h1 className="font-display text-2xl font-semibold tracking-tightest text-white sm:text-3xl">

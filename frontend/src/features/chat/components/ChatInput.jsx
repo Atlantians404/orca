@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
-import { ArrowUp } from "lucide-react";
+import { ArrowUp, Compass } from "lucide-react";
+
 
 export default function ChatInput({
   value,
@@ -89,7 +90,34 @@ export default function ChatInput({
           disabled:opacity-50
         "
       />
+       {/* Location button */}
+      <button
+        type="button"
+        aria-label="Choose location"
+        title="Choose location"
+        className="
+          flex
+          h-9
+          w-9
+          shrink-0
+          items-center
+          justify-center
+          rounded-full
+          text-[#77777D]
+          transition
+          hover:bg-white/5
+          hover:text-[#3DA7B7]
+        "
+      >
+        <Compass
+          size={18}
+          strokeWidth={1.8}
+          aria-hidden="true"
+        />
+      </button>
 
+      {/* Send button */}
+      
       <button
         type="button"
         onClick={handleSend}
