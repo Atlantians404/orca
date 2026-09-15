@@ -38,6 +38,7 @@ function RegisterPageWrapper() {
         onSwitchToLogin={() => navigate('/login')}
         onRegister={async (payload) => {
           await registerUser(payload);
+          await loginUser({ email: payload.email, password: payload.password });
           navigate('/chat');
         }}
       />

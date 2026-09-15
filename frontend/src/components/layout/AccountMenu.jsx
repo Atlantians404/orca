@@ -53,11 +53,15 @@ export default function AccountMenu({ collapsed }) {
         }
       })
       .catch((err) => {
+<<<<<<< HEAD
         console.error("Failed to load current user:", err);
 
         if (!cancelled) {
           setStatus("error");
         }
+=======
+        if (!cancelled) setStatus("error");
+>>>>>>> origin/main
       });
 
     return () => {

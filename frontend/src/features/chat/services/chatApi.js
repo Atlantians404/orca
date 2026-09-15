@@ -2,12 +2,14 @@ import api from "../../../services/api";
 
 // Get all sessions
 export const getAllSessions = async () => {
+  if (!localStorage.getItem("authToken")) return [];
   const response = await api.get("/sessions");
   return response.data;
 };
 
 // Get one session
 export const getSession = async (sessionId) => {
+  if (!localStorage.getItem("authToken")) return null;
   const response = await api.get(`/sessions/${sessionId}`);
   return response.data;
 };
@@ -37,6 +39,7 @@ export const deleteSession = async (sessionId) => {
 
 // Get pinned sessions
 export const getPinnedSessions = async (page = 1, limit = 100) => {
+  if (!localStorage.getItem("authToken")) return [];
   const response = await api.get("/sessions/pinned", {
     params: {
       page,
@@ -66,6 +69,7 @@ export const unpinSession = async (sessionId) => {
 
 // Get archived sessions
 export const getArchivedSessions = async (page = 1, limit = 100) => {
+  if (!localStorage.getItem("authToken")) return [];
   const response = await api.get("/sessions/archived", {
     params: {
       page,
@@ -85,5 +89,48 @@ export const archiveSession = async (sessionId) => {
 // Unarchive session
 export const unarchiveSession = async (sessionId) => {
   const response = await api.delete(`/sessions/${sessionId}/archive`);
+  return response.data;
+};
+// =====================================================
+// CHAT
+// =====================================================
+
+// Get chat history for a session
+export const getChatHistory = async (sessionId) => {
+  const response = await api.get(
+    `/chat/${sessionId}/history`
+  );
+
+  return response.data;
+};
+
+// Send message
+export const sendChatMessage = async (
+  sessionId,
+  message
+) => {
+  const response = await api.post(
+    "/chat",
+    {
+      session_id: sessionId,
+      message,
+    }
+  );
+
+  return response.data;
+};
+
+// Resume pending chat workflow
+export const resumeChat = async (
+  sessionId,
+  value
+) => {
+  const response = await api.post(
+    `/chat/${sessionId}/resume`,
+    {
+      value,
+    }
+  );
+
   return response.data;
 };
