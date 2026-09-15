@@ -1,5 +1,4 @@
 import asyncio
-from pprint import pprint
 
 from langgraph.types import Command
 
@@ -10,342 +9,676 @@ from ai.graph.graph import app_graph
 # CONFIG
 # ============================================================
 
-THREAD_ID = "test-thread-time-debug"
+THREAD_ID = "test-thread-pfz-route-001"
 
 config = {
     "configurable": {
-        "thread_id": THREAD_ID
+        "thread_id": THREAD_ID,
     }
 }
 
 
 # ============================================================
-# STATE DEBUG
+# HELPERS
 # ============================================================
 
-async def print_state(title: str):
+def print_separator(title: str):
     print("\n")
     print("=" * 80)
     print(title)
     print("=" * 80)
 
-    state = await app_graph.aget_state(config)
 
-    values = state.values
+def print_interrupts(result):
+    """
+    Safely print LangGraph interrupt information.
+
+    Options may be:
+        - strings
+        - dictionaries
+    """
+
+    interrupts = result.get("__interrupt__")
+
+    if not interrupts:
+        return
+
+    print_separator("INTERRUPT")
+
+    for interrupt in interrupts:
+
+        value = interrupt.value
+
+        print("Action :", value.get("action"))
+        print("Message:", value.get("message"))
+
+        options = value.get("options")
+
+        if not options:
+            continue
+
+        print("\nOptions:")
+
+        for index, option in enumerate(options, start=1):
+
+            # ------------------------------------------------
+            # Option is a string
+            # ------------------------------------------------
+
+            if isinstance(option, str):
+
+                print(f"{index}. {option}")
+
+                continue
+
+            # ------------------------------------------------
+            # Option is a dictionary
+            # ------------------------------------------------
+
+            if isinstance(option, dict):
+
+                pfz_name = option.get("pfz_name")
+
+                times = option.get("times", [])
+
+                if times and isinstance(times, list):
+
+                    time_info = times[0]
+
+                    if isinstance(time_info, dict):
+
+                        print(
+                            f"{index}. {pfz_name} | "
+                            f"Risk: {time_info.get('risk_score')} | "
+                            f"Level: {time_info.get('risk_level')} | "
+                            f"Time: {time_info.get('time')}"
+                        )
+
+                    else:
+
+                        print(
+                            f"{index}. {pfz_name} | "
+                            f"Time: {time_info}"
+                        )
+
+                else:
+
+                    print(f"{index}. {pfz_name}")
+
+                continue
+
+            # ------------------------------------------------
+            # Unknown option type
+            # ------------------------------------------------
+
+            print(f"{index}. {option}")
+
+
+def print_state(state):
+    """
+    Print important AgentState fields.
+    """
+
+    print_separator("CURRENT STATE")
+
+    # ========================================================
+    # WORKFLOW
+    # ========================================================
 
     print("\n--- WORKFLOW ---")
-    print("workflow_status :", values.get("workflow_status"))
-    print("pending_action  :", values.get("pending_action"))
-    print("query_type      :", values.get("query_type"))
-    print("route_required  :", values.get("route_required"))
+
+    print(
+        "workflow_status :",
+        state.get("workflow_status"),
+    )
+
+    print(
+        "pending_action  :",
+        state.get("pending_action"),
+    )
+
+    print(
+        "query_type      :",
+        state.get("query_type"),
+    )
+
+    print(
+        "route_required  :",
+        state.get("route_required"),
+    )
+
+    # ========================================================
+    # LOCATION
+    # ========================================================
 
     print("\n--- LOCATION ---")
-    print("location        :", values.get("location"))
-    print("distance_km     :", values.get("distance_km"))
+
+    print(
+        "location   :",
+        state.get("location"),
+    )
+
+    print(
+        "distance_km:",
+        state.get("distance_km"),
+    )
+
+    # ========================================================
+    # TIME
+    # ========================================================
 
     print("\n--- TIME ---")
-    print("time_context    :", values.get("time_context"))
 
-    if values.get("time_context"):
-        time_context = values["time_context"]
+    time_context = state.get("time_context")
 
-        print("timezone        :", getattr(time_context, "timezone", None))
-        print("slots           :", getattr(time_context, "slots", None))
+    print(
+        "time_context:",
+        time_context,
+    )
 
-        if getattr(time_context, "slots", None):
-            for i, slot in enumerate(time_context.slots, 1):
-                print(f"  Slot {i}:")
-                print("    date       :", getattr(slot, "date", None))
-                print("    start_time :", getattr(slot, "start_time", None))
-                print("    end_time   :", getattr(slot, "end_time", None))
+    if time_context:
+
+        print(
+            "timezone:",
+            getattr(
+                time_context,
+                "timezone",
+                None,
+            ),
+        )
+
+        print(
+            "slots:",
+            getattr(
+                time_context,
+                "slots",
+                None,
+            ),
+        )
+
+    # ========================================================
+    # PFZ
+    # ========================================================
 
     print("\n--- PFZ ---")
-    pfz_candidates = values.get("pfz_candidates")
 
-    if isinstance(pfz_candidates, dict):
-        print("PFZ count      :", len(pfz_candidates))
-    elif isinstance(pfz_candidates, list):
-        print("PFZ count      :", len(pfz_candidates))
-    else:
-        print("PFZ candidates :", pfz_candidates)
+    pfz_candidates = state.get(
+        "pfz_candidates",
+        {},
+    )
 
-    print("selected_pfz_name :", values.get("selected_pfz_name"))
-    print("selected_pfz      :", values.get("selected_pfz"))
+    print(
+        "PFZ count:",
+        len(pfz_candidates)
+        if isinstance(pfz_candidates, dict)
+        else 0,
+    )
+
+    print(
+        "selected_pfz_name:",
+        state.get("selected_pfz_name"),
+    )
+
+    print(
+        "selected_pfz:",
+        state.get("selected_pfz"),
+    )
+
+    # ========================================================
+    # DATA
+    # ========================================================
 
     print("\n--- DATA ---")
-    agent_data = values.get("agent_data")
+
+    agent_data = state.get(
+        "agent_data",
+        {},
+    )
+
+    print(
+        "agent_data count:",
+        len(agent_data)
+        if isinstance(agent_data, dict)
+        else 0,
+    )
 
     if isinstance(agent_data, dict):
-        print("agent_data keys :", list(agent_data.keys())[:10])
-        print("agent_data count:", len(agent_data))
-    else:
-        print("agent_data :", agent_data)
+
+        print(
+            "agent_data keys:",
+            list(agent_data.keys())[:20],
+        )
+
+    # ========================================================
+    # RISK
+    # ========================================================
 
     print("\n--- RISK ---")
-    pprint(values.get("risk_result"))
+
+    risk_result = state.get(
+        "risk_result"
+    )
+
+    print(risk_result)
+
+    # ========================================================
+    # ROUTE
+    # ========================================================
 
     print("\n--- ROUTE ---")
-    pprint(values.get("route_result"))
+
+    route_result = state.get(
+        "route_result"
+    )
+
+    print(route_result)
+
+    # ========================================================
+    # RESPONSE
+    # ========================================================
 
     print("\n--- RESPONSE ---")
-    pprint(values.get("response"))
+
+    response = state.get(
+        "response"
+    )
+
+    print(response)
+
+    # ========================================================
+    # ERROR
+    # ========================================================
 
     print("\n--- ERROR ---")
-    print("error_message      :", values.get("error_message"))
-    print("cancellation_reason:", values.get("cancellation_reason"))
 
-    print("\n--- INTERRUPTS ---")
-    print(state.tasks)
+    print(
+        "error_message:",
+        state.get("error_message"),
+    )
 
-    print("=" * 80)
-
-
-# ============================================================
-# GRAPH RESULT DEBUG
-# ============================================================
-
-def print_result(title: str, result):
-    print("\n")
-    print("#" * 80)
-    print(title)
-    print("#" * 80)
-
-    print("\nResult:")
-    pprint(result)
-
-    print("\nInterrupts:")
-
-    if "__interrupt__" in result:
-        pprint(result["__interrupt__"])
-    else:
-        print("No __interrupt__")
-
-    print("\nState returned by invoke:")
-    pprint(result)
-
-    print("#" * 80)
+    print(
+        "cancellation_reason:",
+        state.get("cancellation_reason"),
+    )
 
 
 # ============================================================
-# MAIN TEST
+# MAIN
 # ============================================================
 
 async def main():
 
-    print("\n")
-    print("*" * 80)
-    print("ORCA GRAPH FULL HITL TEST")
-    print("*" * 80)
-
-    print("\nThread ID:", THREAD_ID)
-
     # ========================================================
     # STEP 1
+    # INITIAL USER REQUEST
     # ========================================================
 
-    print("\n\nSTEP 1")
-    print("-" * 80)
+    print_separator(
+        "STEP 1 - INITIAL REQUEST"
+    )
 
-    user_message = "Plan a fishing trip with route"
+    prompt = "Plan a fishing trip with route"
 
-    print("User:", user_message)
+    print("User:", prompt)
 
     result = await app_graph.ainvoke(
         {
             "thread_id": THREAD_ID,
-            "prompt": user_message,
+            "prompt": prompt,
             "conversation_summary": "",
         },
         config=config,
     )
 
-    print_result("STEP 1 RESULT", result)
-
-    await print_state("STATE AFTER STEP 1")
+    print_interrupts(result)
 
     # ========================================================
-    # STEP 2 - LOCATION
+    # STEP 2
+    # LOCATION
     # ========================================================
 
-    print("\n\nSTEP 2")
-    print("-" * 80)
+    print_separator(
+        "STEP 2 - PROVIDE LOCATION"
+    )
 
     location = {
         "latitude": 13.0827,
         "longitude": 80.2707,
     }
 
-    print("User:", location)
+    print(
+        "User:",
+        location,
+    )
 
     result = await app_graph.ainvoke(
-        Command(resume=location),
+        Command(
+            resume=location
+        ),
         config=config,
     )
 
-    print_result("STEP 2 RESULT", result)
-
-    await print_state("STATE AFTER LOCATION")
+    print_interrupts(result)
 
     # ========================================================
-    # STEP 3 - TIME
+    # STEP 3
+    # TIME
     # ========================================================
 
-    print("\n\nSTEP 3")
-    print("-" * 80)
+    print_separator(
+        "STEP 3 - PROVIDE TIME"
+    )
 
     user_time = "tomorrow at 6 AM"
 
-    print("User:", user_time)
+    print(
+        "User:",
+        user_time,
+    )
 
     result = await app_graph.ainvoke(
-        Command(resume=user_time),
+        Command(
+            resume=user_time
+        ),
         config=config,
     )
 
-    print_result("STEP 3 RESULT", result)
-
-    # --------------------------------------------------------
-    # IMPORTANT:
-    # Check state immediately after time processing
-    # --------------------------------------------------------
-
-    await print_state("STATE IMMEDIATELY AFTER TIME")
+    print_interrupts(result)
 
     # ========================================================
-    # EXPLICIT TIME CHECK
+    # STEP 4
+    # PFZ SELECTION
     # ========================================================
 
-    print("\n\n")
-    print("=" * 80)
-    print("TIME CONTEXT CHECK")
-    print("=" * 80)
+    print_separator(
+        "STEP 4 - SELECT PFZ"
+    )
 
-    state = await app_graph.aget_state(config)
+    interrupts = result.get(
+        "__interrupt__"
+    )
 
-    time_context = state.values.get("time_context")
+    # --------------------------------------------------------
+    # Make sure an interrupt exists
+    # --------------------------------------------------------
 
-    if time_context is None:
+    if not interrupts:
 
-        print("\n❌ TIME CONTEXT IS NONE")
+        print(
+            "❌ No interrupt returned after time."
+        )
 
-        print("\nThis means the time node did NOT successfully store")
-        print("the parsed TimeContext in graph state.")
+        print_state(result)
 
-    else:
+        return
 
-        print("\n✅ TIME CONTEXT EXISTS")
+    # --------------------------------------------------------
+    # Read interrupt
+    # --------------------------------------------------------
 
-        print("\nTimeContext:")
-        pprint(time_context)
+    interrupt_value = interrupts[0].value
 
-        slots = getattr(time_context, "slots", None)
+    action = interrupt_value.get(
+        "action"
+    )
 
-        if slots:
+    print(
+        "Pending action:",
+        action,
+    )
 
-            print("\n✅ TIME SLOTS EXIST")
+    # --------------------------------------------------------
+    # Verify PFZ selection
+    # --------------------------------------------------------
 
-            for slot in slots:
-                print("\nSlot:")
-                print("  date      :", getattr(slot, "date", None))
-                print("  start     :", getattr(slot, "start_time", None))
-                print("  end       :", getattr(slot, "end_time", None))
+    if action != "SELECT_PFZ":
+
+        print(
+            "❌ Expected SELECT_PFZ."
+        )
+
+        print_state(result)
+
+        return
+
+    # --------------------------------------------------------
+    # Get PFZ options
+    # --------------------------------------------------------
+
+    options = interrupt_value.get(
+        "options",
+        [],
+    )
+
+    print(
+        "\nAvailable PFZs:"
+    )
+
+    for index, option in enumerate(
+        options,
+        start=1,
+    ):
+
+        # ----------------------------------------------------
+        # String option
+        # ----------------------------------------------------
+
+        if isinstance(
+            option,
+            str,
+        ):
+
+            print(
+                f"{index}. {option}"
+            )
+
+        # ----------------------------------------------------
+        # Dictionary option
+        # ----------------------------------------------------
+
+        elif isinstance(
+            option,
+            dict,
+        ):
+
+            pfz_name = option.get(
+                "pfz_name"
+            )
+
+            times = option.get(
+                "times",
+                [],
+            )
+
+            if times:
+
+                time_info = times[0]
+
+                if isinstance(
+                    time_info,
+                    dict,
+                ):
+
+                    print(
+                        f"{index}. {pfz_name} | "
+                        f"Risk: "
+                        f"{time_info.get('risk_score')} | "
+                        f"Level: "
+                        f"{time_info.get('risk_level')} | "
+                        f"Time: "
+                        f"{time_info.get('time')}"
+                    )
+
+                else:
+
+                    print(
+                        f"{index}. "
+                        f"{pfz_name} | "
+                        f"Time: {time_info}"
+                    )
+
+            else:
+
+                print(
+                    f"{index}. "
+                    f"{pfz_name}"
+                )
+
+        # ----------------------------------------------------
+        # Unknown option
+        # ----------------------------------------------------
 
         else:
 
-            print("\n❌ TIME SLOTS ARE EMPTY")
-
-    print("=" * 80)
+            print(
+                f"{index}. {option}"
+            )
 
     # ========================================================
-    # STEP 4 - PFZ SELECTION
+    # SELECT PFZ
     # ========================================================
 
-    print("\n\nSTEP 4")
-    print("-" * 80)
+    selected_pfz = (
+        "Kanathur Reddy Kuppam"
+    )
 
-    print("Checking whether PFZ selection is required...")
-
-    state = await app_graph.aget_state(config)
-
-    print("\nCurrent workflow status:")
-    print(state.values.get("workflow_status"))
-
-    print("\nPending action:")
-    print(state.values.get("pending_action"))
-
-    print("\nSelected PFZ:")
-    print(state.values.get("selected_pfz_name"))
-
-    print("\nRisk result:")
-    pprint(state.values.get("risk_result"))
+    print(
+        "\nUser selected:",
+        selected_pfz,
+    )
 
     # --------------------------------------------------------
-    # Only resume PFZ if the graph actually reached selection
+    # Resume graph
     # --------------------------------------------------------
 
-    pending_action = state.values.get("pending_action")
+    result = await app_graph.ainvoke(
+        Command(
+            resume=selected_pfz
+        ),
+        config=config,
+    )
 
-    if pending_action == "SELECT_PFZ":
+    print_interrupts(result)
 
-        pfz_name = "Kanathur Reddy Kuppam"
+    # ========================================================
+    # STEP 5
+    # FINAL RESULT
+    # ========================================================
 
-        print("\nUser selects PFZ:")
-        print(pfz_name)
+    print_separator(
+        "STEP 5 - FINAL RESULT"
+    )
 
-        result = await app_graph.ainvoke(
-            Command(resume=pfz_name),
-            config=config,
+    print_state(result)
+
+    # ========================================================
+    # FINAL VALIDATION
+    # ========================================================
+
+    print_separator(
+        "FINAL VALIDATION"
+    )
+
+    selected_name = result.get(
+        "selected_pfz_name"
+    )
+
+    route_result = result.get(
+        "route_result"
+    )
+
+    response = result.get(
+        "response"
+    )
+
+    workflow_status = result.get(
+        "workflow_status"
+    )
+
+    interrupts = result.get(
+        "__interrupt__"
+    )
+
+    print(
+        "Workflow status :",
+        workflow_status,
+    )
+
+    print(
+        "Selected PFZ    :",
+        selected_name,
+    )
+
+    print(
+        "Route result    :",
+        "✅ EXISTS"
+        if route_result
+        else "❌ MISSING",
+    )
+
+    print(
+        "Response        :",
+        "✅ EXISTS"
+        if response
+        else "❌ MISSING",
+    )
+
+    print(
+        "Interrupt       :",
+        "⏸️ WAITING"
+        if interrupts
+        else "✅ NONE",
+    )
+
+    # ========================================================
+    # SUCCESS
+    # ========================================================
+
+    if (
+        selected_name
+        and route_result
+        and response
+        and not interrupts
+    ):
+
+        print(
+            "\n🎉 FULL PLANNING FLOW COMPLETED!"
         )
 
-        print_result("STEP 4 RESULT", result)
+    # ========================================================
+    # PARTIAL SUCCESS
+    # ========================================================
 
-        await print_state("STATE AFTER PFZ SELECTION")
+    elif selected_name and route_result:
+
+        print(
+            "\n✅ PFZ + ROUTE completed."
+        )
+
+        if interrupts:
+
+            print(
+                "⚠️ Graph is still waiting "
+                "for another input."
+            )
+
+        if not response:
+
+            print(
+                "⚠️ Final response is missing."
+            )
+
+    # ========================================================
+    # FAILURE
+    # ========================================================
 
     else:
 
-        print("\n⚠️ PFZ selection interrupt was NOT reached.")
+        print(
+            "\n❌ FULL FLOW DID NOT COMPLETE."
+        )
 
-        print("pending_action:", pending_action)
-
-    # ========================================================
-    # FINAL STATE
-    # ========================================================
-
-    await print_state("FINAL GRAPH STATE")
-
-    # ========================================================
-    # FINAL SUMMARY
-    # ========================================================
-
-    state = await app_graph.aget_state(config)
-    values = state.values
-
-    print("\n")
-    print("*" * 80)
-    print("FINAL TEST SUMMARY")
-    print("*" * 80)
-
-    print("\nQuery type       :", values.get("query_type"))
-    print("Route required   :", values.get("route_required"))
-    print("Location         :", values.get("location"))
-    print("Time context     :", values.get("time_context"))
-    print("Selected PFZ     :", values.get("selected_pfz_name"))
-    print("Workflow status  :", values.get("workflow_status"))
-    print("Pending action   :", values.get("pending_action"))
-
-    print("\nRisk result:")
-    pprint(values.get("risk_result"))
-
-    print("\nRoute result:")
-    pprint(values.get("route_result"))
-
-    print("\nResponse:")
-    pprint(values.get("response"))
-
-    print("\n")
-    print("*" * 80)
-    print("TEST FINISHED")
-    print("*" * 80)
+        print_state(result)
 
 
 # ============================================================
