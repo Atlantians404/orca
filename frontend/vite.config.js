@@ -22,11 +22,22 @@ export default defineConfig({
         target: 'https://orca-qlqz.onrender.com',
         changeOrigin: true,
         secure: false,
+        bypass: (req) => {
+          // If browser is requesting the HTML page for the /chat route, don't proxy to backend
+          if (req.headers.accept?.includes('text/html')) {
+            return '/index.html';
+          }
+        },
       },
       '/profile': {
         target: 'https://orca-qlqz.onrender.com',
         changeOrigin: true,
         secure: false,
+        bypass: (req) => {
+          if (req.headers.accept?.includes('text/html')) {
+            return '/index.html';
+          }
+        },
       },
       '/api': {
         target: 'https://orca-qlqz.onrender.com',
