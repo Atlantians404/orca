@@ -2,7 +2,27 @@ import { Trash2 } from 'lucide-react';
 import { getRiskLabel, formatRiskScore, formatDistance } from '../../../utils/risk';
 
 export default function SavedMapCard({ map, active, onOpen, onDelete, deleting }) {
-  const riskLabel = getRiskLabel(map);
+  if (!map) return null;
+
+  const inner = map.route_data || map;
+  const safeRoute = inner.safe_route || inner.safeRoute || inner;
+
+  const pfzName =
+    map.title ||
+    inner.pfz?.name ||
+    inner.pfz_name ||
+    inner.name ||
+    'Saved route';
+
+  const routeId =
+    safeRoute?.route_id ||
+    safeRoute?.routeId ||
+    inner.route_id ||
+    inner.routeId ||
+    '—';
+
+  const riskObj = safeRoute || inner || map;
+  const riskLabel = getRiskLabel(riskObj);
 
   return (
     <div
@@ -13,9 +33,9 @@ export default function SavedMapCard({ map, active, onOpen, onDelete, deleting }
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm text-ink font-medium truncate">
-            {map.pfz_name || map.name || 'Saved route'}
+            {pfzName}
           </p>
-          <p className="mt-1 text-xs text-mute">Route: {map.route_id || map.routeId || '—'}</p>
+          <p className="mt-1 text-xs text-mute">Route: {routeId}</p>
         </div>
         <button
           type="button"
@@ -29,7 +49,7 @@ export default function SavedMapCard({ map, active, onOpen, onDelete, deleting }
       </div>
 
       <div className="mt-3 flex items-center gap-4 text-xs text-mute">
-        <span>{formatDistance(map)}</span>
+        <span>{formatDistance(riskObj)}</span>
         {riskLabel && (
           <span className="inline-flex items-center gap-1.5">
             <span
@@ -37,7 +57,7 @@ export default function SavedMapCard({ map, active, onOpen, onDelete, deleting }
                 riskLabel === 'HIGH' ? 'bg-white' : riskLabel === 'MEDIUM' ? 'bg-white/60' : 'border border-white/70'
               }`}
             />
-            {formatRiskScore(map)} · {riskLabel}
+            {formatRiskScore(riskObj)} · {riskLabel}
           </span>
         )}
       </div>

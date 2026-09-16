@@ -76,8 +76,13 @@ export default function MapsPage() {
     [selectedId]
   );
 
-  const safeRoute = selectedMap?.safe_route || selectedMap?.safeRoute || selectedMap;
-  const candidateRoutes = selectedMap?.candidate_routes || selectedMap?.candidateRoutes || [];
+  const innerMap = selectedMap?.route_data || selectedMap;
+  const safeRoute = innerMap?.safe_route || innerMap?.safeRoute || innerMap;
+  const candidateRoutes = innerMap?.candidate_routes || innerMap?.candidateRoutes || [];
+  const displayedMarineZones =
+    innerMap?.marine_zones && innerMap?.marine_zones.length > 0
+      ? innerMap.marine_zones
+      : marineZones;
 
   return (
     <div className="h-full w-full flex flex-col lg:flex-row overflow-hidden bg-void">
@@ -160,13 +165,13 @@ export default function MapsPage() {
                 showZones={showZones}
                 onToggleZones={() => setShowZones((v) => !v)}
                 hasCandidates={candidateRoutes.length > 0}
-                hasZones={marineZones.length > 0}
+                hasZones={displayedMarineZones.length > 0}
               />
-              <div className="flex-1 min-h-0">
+              <div className="flex-1 min-h-0 min-h-[360px] relative rounded-xl overflow-hidden border border-line">
                 <MapView
                   safeRoute={safeRoute}
                   candidateRoutes={showCandidates ? candidateRoutes : []}
-                  marineZones={showZones ? marineZones : []}
+                  marineZones={showZones ? displayedMarineZones : []}
                 />
               </div>
             </div>
