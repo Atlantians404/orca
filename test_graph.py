@@ -245,55 +245,43 @@ async def main():
     separator("STEP 5 - FINAL RESULT")
     print_state(result)
 
-    # ========================================================
-    # FINAL VALIDATION
-    # ========================================================
+    # ================================================================================
+    # STEP 5 - FINAL RESULT
+    # ================================================================================
 
-    separator("FINAL VALIDATION")
+    print("\n")
+    print("=" * 80)
+    print("STEP 5 - FINAL RESULT")
+    print("=" * 80)
 
-    selected_name = result.get("selected_pfz_name")
-    selected_pfz_object = result.get("selected_pfz")
-    route_result = result.get("route_result")
-    response = result.get("response")
-    workflow_status = result.get("workflow_status")
-    interrupts = result.get("__interrupt__")
+    final_state = result
 
-    print("Workflow status :", workflow_status)
-    print("Selected PFZ    :", selected_name)
-    print(
-        "Selected PFZ obj:",
-        "✅ EXISTS" if selected_pfz_object else "❌ MISSING",
-    )
-    print(
-        "Route result    :",
-        "✅ EXISTS" if route_result else "❌ MISSING",
-    )
-    print(
-        "Response        :",
-        "✅ EXISTS" if response else "❌ MISSING",
-    )
-    print(
-        "Interrupt       :",
-        "⏸️ WAITING" if interrupts else "✅ NONE",
-    )
+    # ================================================================================
+    # AI FINAL RESPONSE
+    # ================================================================================
 
-    if (
-        selected_name
-        and selected_pfz_object
-        and route_result
-        and response
-        and not interrupts
-    ):
-        print("\n🎉 FULL PLANNING FLOW COMPLETED!")
+    print("\n")
+    print("=" * 80)
+    print("🤖 FINAL RESPONSE BY AI")
+    print("=" * 80)
 
-    elif selected_name and selected_pfz_object:
-        print("\n⚠️ PFZ SELECTION SUCCEEDED.")
-        print("But route generation did not complete.")
-        print_state(result)
+    response = final_state.get("response")
 
+    if response:
+        if hasattr(response, "model_dump"):
+            response_data = response.model_dump()
+
+            print("\n" + response_data.get("message", ""))
+
+            print("\n--- STRUCTURED RESPONSE ---")
+            print(response_data)
+
+        else:
+            print(response)
     else:
-        print("\n❌ FULL FLOW DID NOT COMPLETE.")
-        print_state(result)
+        print("❌ No AI response generated.")
+
+    print("=" * 80)
 
 
 if __name__ == "__main__":
