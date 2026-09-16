@@ -1,3 +1,4 @@
+
 import { useEffect, useRef } from "react";
 import { ArrowUp, Compass } from "lucide-react";
 
@@ -6,7 +7,6 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
-  onLocationClick,
   disabled = false,
   placeholder = "Ask ORCA anything...",
 }) {
@@ -63,7 +63,7 @@ export default function ChatInput({
         px-3
         py-2.5
         transition
-        focus-within:border-[#3DA7B7]/50
+        focus-within:border-white/60
       "
     >
       <textarea
@@ -94,7 +94,6 @@ export default function ChatInput({
        {/* Location button */}
       <button
         type="button"
-        onClick={() => onLocationClick?.()}
         aria-label="Choose location"
         title="Choose location"
         className="

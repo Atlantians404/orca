@@ -81,3 +81,26 @@ button:focus-visible {
     transform: scale(1.15);
   }
 }
+
+/* ORCA dark scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2A2A2A #080809;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: #080809;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 10px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #3A3A3A;
+}
