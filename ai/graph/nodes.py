@@ -1234,7 +1234,21 @@ async def final_response_node(state: AgentState):
 
     risk_result = state.get("risk_result") or {}
 
-    route_result = state.get("route_result") or {}
+    # route_result is produced by route_node.
+    #
+    # route_node returns:
+    #
+    # {
+    #     "route_result": {
+    #         "candidate_routes": [...],
+    #         "safe_route": {...}
+    #     },
+    #     "nodes": [...]
+    # }
+    #
+    route_engine_result = state.get(
+        "route_result"
+    ) or {}
 
     # ============================================================
     # PFZ DATA
@@ -1247,16 +1261,23 @@ async def final_response_node(state: AgentState):
         pfz_data = PFZData(
             name=selected_pfz.get(
                 "name",
-                selected_pfz_name or "",
+                selected_pfz_name or ""
             ),
-            latitude=selected_pfz.get(
-                "latitude",
-                0.0,
+
+            latitude=float(
+                selected_pfz.get(
+                    "latitude",
+                    0.0
+                )
             ),
-            longitude=selected_pfz.get(
-                "longitude",
-                0.0,
+
+            longitude=float(
+                selected_pfz.get(
+                    "longitude",
+                    0.0
+                )
             ),
+
             distance_from_source_km=selected_pfz.get(
                 "distance_from_source_km"
             ),
@@ -1279,10 +1300,16 @@ async def final_response_node(state: AgentState):
 
         for result in ranked_results:
 
+            pfz_name = result.get(
+                "pfz_name",
+                ""
+            )
+
             if (
-                result.get("pfz_name", "").lower()
-                == selected_pfz_name.lower()
+                pfz_name.strip().casefold()
+                == selected_pfz_name.strip().casefold()
             ):
+
                 selected_risk = result
                 break
 
@@ -1301,14 +1328,41 @@ async def final_response_node(state: AgentState):
                     score=float(
                         selected_time.get(
                             "risk_score",
-                            0.0,
+                            0.0
                         )
                     ),
+
                     level=selected_time.get(
                         "risk_level",
-                        "UNKNOWN",
+                        "UNKNOWN"
                     ),
                 )
+
+    # ============================================================
+    # UNWRAP ROUTE RESULT
+    # ============================================================
+
+    # The actual route engine result is nested:
+    #
+    # state["route_result"]
+    #       ↓
+    # {
+    #     "route_result": {
+    #         "candidate_routes": [...],
+    #         "safe_route": {...}
+    #     },
+    #     "nodes": [...]
+    # }
+    #
+    # So extract the inner route_result first.
+
+    route_result_data = route_engine_result.get(
+        "route_result"
+    ) or {}
+
+    safe_route = route_result_data.get(
+        "safe_route"
+    )
 
     # ============================================================
     # ROUTE DATA
@@ -1316,41 +1370,45 @@ async def final_response_node(state: AgentState):
 
     route_data = None
 
-    safe_route = route_result.get(
-        "safe_route"
-    )
-
     if safe_route:
 
         waypoints = []
 
+        # IMPORTANT:
+        # The route engine uses "waypoints", not "nodes".
+
         for waypoint in safe_route.get(
-            "nodes",
+            "waypoints",
             []
         ):
 
             waypoints.append(
                 WaypointData(
+
                     latitude=float(
                         waypoint.get(
                             "latitude",
-                            0.0,
+                            0.0
                         )
                     ),
+
                     longitude=float(
                         waypoint.get(
                             "longitude",
-                            0.0,
+                            0.0
                         )
                     ),
+
                     risk_score=(
                         float(
                             waypoint["risk_score"]
                         )
-                        if waypoint.get("risk_score")
-                        is not None
+                        if waypoint.get(
+                            "risk_score"
+                        ) is not None
                         else None
                     ),
+
                     safe=waypoint.get(
                         "safe"
                     ),
@@ -1358,29 +1416,35 @@ async def final_response_node(state: AgentState):
             )
 
         route_data = RouteData(
+
             route_id=safe_route.get(
                 "route_id",
-                "",
+                ""
             ),
+
             distance_km=float(
                 safe_route.get(
                     "distance_km",
-                    0.0,
+                    0.0
                 )
             ),
+
             risk_score=float(
                 safe_route.get(
                     "risk_score",
-                    0.0,
+                    0.0
                 )
             ),
+
             safe=bool(
                 safe_route.get(
                     "safe",
-                    False,
+                    False
                 )
             ),
+
             waypoints=waypoints,
+
             geojson=safe_route.get(
                 "geojson"
             ),
@@ -1423,10 +1487,14 @@ async def final_response_node(state: AgentState):
     if selected_pfz_name:
 
         message_parts = [
-            f"Fishing trip planned successfully.",
+            "Fishing trip planned successfully.",
             "",
             f"Selected PFZ: {selected_pfz_name}",
         ]
+
+        # --------------------------------------------------------
+        # Risk information
+        # --------------------------------------------------------
 
         if risk_data:
 
@@ -1440,6 +1508,10 @@ async def final_response_node(state: AgentState):
                     ),
                 ]
             )
+
+        # --------------------------------------------------------
+        # Route information
+        # --------------------------------------------------------
 
         if route_data:
 
@@ -1474,14 +1546,38 @@ async def final_response_node(state: AgentState):
         )
 
     # ============================================================
+    # DEBUG
+    # ============================================================
+
+    print("\n")
+    print("========== FINAL RESPONSE DEBUG ==========")
+    print("selected_pfz:", selected_pfz)
+    print("selected_pfz_name:", selected_pfz_name)
+    print("risk_result:", risk_result)
+    print("route_engine_result:", route_engine_result)
+    print("route_result_data:", route_result_data)
+    print("safe_route:", safe_route)
+    print("pfz_data:", pfz_data)
+    print("risk_data:", risk_data)
+    print("route_data:", route_data)
+    print("map_data:", map_data)
+    print("==========================================")
+    print("\n")
+
+    # ============================================================
     # BUILD STRUCTURED RESPONSE
     # ============================================================
 
     response = AgentResponse(
+
         message=message,
+
         map=map_data,
+
         pfz=pfz_data,
+
         risk=risk_data,
+
         route=route_data,
     )
 
@@ -1491,6 +1587,8 @@ async def final_response_node(state: AgentState):
 
     return {
         "response": response,
+
         "workflow_status": "COMPLETED",
+
         "pending_action": None,
     }
