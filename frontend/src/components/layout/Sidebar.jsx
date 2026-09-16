@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 import AccountMenu from "./AccountMenu";
 import RecentSessions from "../../features/chat/components/RecentSessions";
 import orcaLogo from "../../assets/log.png";
+import ProfileCard from "../../features/chat/components/ProfileCard";
 
 
 // =====================================================
@@ -125,7 +126,7 @@ export default function Sidebar({
 
   const [width, setWidth] = useState(270);
   const [isDragging, setIsDragging] = useState(false);
-
+  const [showProfile, setShowProfile] = useState(false);
   const draggingRef = useRef(false);
   const recentSessionsRef = useRef(null);
 
@@ -531,9 +532,11 @@ export default function Sidebar({
 
               <NavLink
                 to="/profile"
-                onClick={onCloseMobile}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setShowProfile((prev) => !prev);
+                }}
                 title="Profile"
-
                 className={({ isActive }) =>
                   navigationClass(isActive)
                 }
@@ -552,8 +555,12 @@ export default function Sidebar({
                 </span>
 
               </NavLink>
-
-            </nav>
+              {showProfile && (
+                <div className="absolute left-full bottom-20 z-50 ml-3">
+                  <ProfileCard onClose={() => setShowProfile(false)} />
+                </div>
+              )}
+              </nav>
 
 
             {/* =============================================

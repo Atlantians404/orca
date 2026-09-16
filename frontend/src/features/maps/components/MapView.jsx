@@ -1,5 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { MapContainer, TileLayer, GeoJSON, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useMemo } from 'react';
+import {
+  MapContainer,
+  TileLayer,
+  GeoJSON,
+  Polyline,
+  Polygon,
+  Marker,
+  Popup,
+  useMap,
+} from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -36,32 +45,63 @@ function dotIcon({ ring = false, filled = true, size = 16 }) {
 const startIcon = dotIcon({ filled: false, size: 14 });
 const destinationIcon = dotIcon({ filled: true, ring: true, size: 16 });
 
-// Extracts a Leaflet LatLng bounds source from whatever combination of
-// route/marker data is currently available, so the map can fit to it.
+// Helper to fit bounds around all route and marker points
 function FitBounds({ points }) {
   const map = useMap();
   useEffect(() => {
     if (!points || points.length === 0) return;
-    const bounds = L.latLngBounds(points);
+    const validPoints = points.filter(
+      (pt) => Array.isArray(pt) && pt.length >= 2 && !isNaN(pt[0]) && !isNaN(pt[1])
+    );
+    if (!validPoints.length) return;
+    const bounds = L.latLngBounds(validPoints);
     if (bounds.isValid()) {
-      map.fitBounds(bounds, { padding: [32, 32] });
+      map.fitBounds(bounds, { padding: [36, 36] });
     }
   }, [points, map]);
   return null;
 }
 
+// Fix Leaflet tile loading inside dynamic containers / modals / tabs
+function MapResizeFix() {
+  const map = useMap();
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [map]);
+  return null;
+}
+
 function waypointLatLngs(route) {
   if (!route) return [];
+
+  // Check route waypoints array
   if (Array.isArray(route.waypoints) && route.waypoints.length) {
     return route.waypoints
-      .filter((w) => typeof w.latitude === 'number' && typeof w.longitude === 'number')
-      .map((w) => [w.latitude, w.longitude]);
+      .map((w) => {
+        if (!w) return null;
+        if (typeof w.latitude === 'number' && typeof w.longitude === 'number') {
+          return [w.latitude, w.longitude];
+        }
+        if (typeof w.lat === 'number' && typeof w.lng === 'number') {
+          return [w.lat, w.lng];
+        }
+        if (Array.isArray(w) && w.length >= 2) {
+          return [Number(w[0]), Number(w[1])];
+        }
+        return null;
+      })
+      .filter(Boolean);
   }
-  const coords = route.geojson?.geometry?.coordinates;
+
+  // GeoJSON is [longitude, latitude] — Leaflet wants [latitude, longitude]
+  const coords = route.geojson?.geometry?.coordinates || route.geojson?.coordinates;
   if (Array.isArray(coords)) {
-    // GeoJSON is [lon, lat] — Leaflet wants [lat, lon]
     return coords.map(([lon, lat]) => [lat, lon]);
   }
+
   return [];
 }
 
@@ -70,7 +110,7 @@ function waypointLatLngs(route) {
  *
  * Renders the safest route (solid, heavier line), any candidate routes
  * (dashed, lighter), marine zones (restricted = dashed border,
- * protected = dotted border — no color per the ORCA monochrome rule),
+ * protected = dotted border — monochrome ORCA styling),
  * and start/destination markers. Auto-fits bounds to whatever is
  * currently displayed.
  */
@@ -88,8 +128,7 @@ export default function MapView({
   );
 
   const allPoints = useMemo(() => {
-    const pts = [...safePoints, ...candidatePointSets.flat()];
-    return pts;
+    return [...safePoints, ...candidatePointSets.flat()];
   }, [safePoints, candidatePointSets]);
 
   const startPoint = safePoints[0];
@@ -109,76 +148,171 @@ export default function MapView({
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
+        <MapResizeFix />
         {allPoints.length > 0 && <FitBounds points={allPoints} />}
 
-        {/* Marine zones — rendered from real geometry when present */}
-        {marineZones.map((zone) => {
-          const isRestricted = (zone.type || '').toLowerCase() === 'restricted';
-          if (!zone.geometry) return null;
-          return (
-            <GeoJSON
-              key={zone.id}
-              data={zone.geometry}
-              style={{
-                color: '#FFFFFF',
-                weight: 1.2,
-                opacity: 0.6,
-                fillColor: '#FFFFFF',
-                fillOpacity: isRestricted ? 0.06 : 0.03,
-                dashArray: isRestricted ? '6 4' : '1 5',
-              }}
-              eventHandlers={{
-                click: () => onZoneClick?.(zone),
-              }}
-            >
-              <Popup>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
-                  <strong>{zone.name || 'Marine zone'}</strong>
-                  <div>Type: {zone.type || 'unknown'}</div>
-                  {zone.restriction_level && <div>Restriction: {zone.restriction_level}</div>}
-                  {zone.state && <div>State: {zone.state}</div>}
-                </div>
-              </Popup>
-            </GeoJSON>
-          );
+        {/* Marine zones — normalized restriction handling */}
+        {marineZones.map((zone, idx) => {
+          const zoneType = (zone.type || '').toLowerCase();
+          const restrictionLevel = (zone.restriction_level || '').toLowerCase();
+
+          const isRestricted = zoneType.includes('restricted') || restrictionLevel === 'restricted';
+          const isProtected = zoneType.includes('protected') || restrictionLevel === 'protected';
+
+          const style = {
+            color: '#FFFFFF',
+            weight: 1.2,
+            opacity: 0.65,
+            fillColor: '#FFFFFF',
+            fillOpacity: isRestricted ? 0.08 : 0.04,
+            dashArray: isRestricted ? '6 4' : isProtected ? '1 5' : '4 4',
+          };
+
+          const key = zone.id || zone.name || idx;
+
+          if (zone.geometry) {
+            return (
+              <GeoJSON
+                key={key}
+                data={zone.geometry}
+                style={style}
+                eventHandlers={{
+                  click: () => onZoneClick?.(zone),
+                }}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{zone.name || (isRestricted ? 'Restricted Zone' : 'Protected Zone')}</strong>
+                    <div>Type: {zone.type || 'Marine Zone'}</div>
+                    {zone.restriction_level && <div>Restriction: {zone.restriction_level}</div>}
+                    {zone.state && <div>State: {zone.state}</div>}
+                  </div>
+                </Popup>
+              </GeoJSON>
+            );
+          }
+
+          if (Array.isArray(zone.coordinates) && zone.coordinates.length > 0) {
+            const polygonCoords = zone.coordinates.map((ring) =>
+              Array.isArray(ring)
+                ? ring.map((pt) => (Array.isArray(pt) && pt.length >= 2 ? [pt[1], pt[0]] : pt))
+                : ring
+            );
+
+            return (
+              <Polygon
+                key={key}
+                positions={polygonCoords}
+                pathOptions={style}
+                eventHandlers={{
+                  click: () => onZoneClick?.(zone),
+                }}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{zone.name || (isRestricted ? 'Restricted Zone' : 'Protected Zone')}</strong>
+                    <div>Type: {zone.type || 'Marine Zone'}</div>
+                    {zone.restriction_level && <div>Restriction: {zone.restriction_level}</div>}
+                  </div>
+                </Popup>
+              </Polygon>
+            );
+          }
+
+          return null;
         })}
 
         {/* Candidate routes — dashed, lower emphasis */}
-        {candidateRoutes.map((route, i) =>
-          route?.geojson ? (
-            <GeoJSON
-              key={route.route_id || i}
-              data={route.geojson}
-              style={{ color: '#FFFFFF', weight: 2, opacity: 0.4, dashArray: '5 5' }}
-              eventHandlers={{ click: () => onRouteClick?.(route) }}
-            >
-              <Popup>
-                <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
-                  <strong>{route.route_id || `Route ${i + 1}`}</strong>
-                  <div>{route.distance_km?.toFixed?.(2) ?? '—'} km</div>
-                  <div>Risk score {route.risk_score ?? '—'}</div>
-                </div>
-              </Popup>
-            </GeoJSON>
-          ) : null
-        )}
+        {candidateRoutes.map((route, i) => {
+          if (!route) return null;
+          const points = waypointLatLngs(route);
+          const key = route.route_id || `candidate-${i}`;
+          const eventHandlers = { click: () => onRouteClick?.(route) };
+
+          if (route.geojson) {
+            return (
+              <GeoJSON
+                key={key}
+                data={route.geojson}
+                style={{ color: '#FFFFFF', weight: 2, opacity: 0.45, dashArray: '5 5' }}
+                eventHandlers={eventHandlers}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{route.route_id || `Candidate Route ${i + 1}`}</strong>
+                    <div>{route.distance_km?.toFixed?.(2) ?? '—'} km</div>
+                    <div>Risk score: {route.risk_score ?? '—'}</div>
+                  </div>
+                </Popup>
+              </GeoJSON>
+            );
+          }
+
+          if (points.length > 1) {
+            return (
+              <Polyline
+                key={key}
+                positions={points}
+                pathOptions={{ color: '#FFFFFF', weight: 2, opacity: 0.45, dashArray: '5 5' }}
+                eventHandlers={eventHandlers}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{route.route_id || `Candidate Route ${i + 1}`}</strong>
+                    <div>{route.distance_km?.toFixed?.(2) ?? '—'} km</div>
+                    <div>Risk score: {route.risk_score ?? '—'}</div>
+                  </div>
+                </Popup>
+              </Polyline>
+            );
+          }
+
+          return null;
+        })}
 
         {/* Safest route — solid, heaviest line */}
-        {safeRoute?.geojson && (
-          <GeoJSON
-            data={safeRoute.geojson}
-            style={{ color: '#FFFFFF', weight: 4, opacity: 0.95 }}
-            eventHandlers={{ click: () => onRouteClick?.(safeRoute) }}
-          >
-            <Popup>
-              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
-                <strong>{safeRoute.route_id || 'Safest route'}</strong>
-                <div>{safeRoute.distance_km?.toFixed?.(2) ?? '—'} km</div>
-                <div>Risk score {safeRoute.risk_score ?? '—'}</div>
-              </div>
-            </Popup>
-          </GeoJSON>
-        )}
+        {safeRoute && (() => {
+          const points = safePoints;
+          const eventHandlers = { click: () => onRouteClick?.(safeRoute) };
+
+          if (safeRoute.geojson) {
+            return (
+              <GeoJSON
+                data={safeRoute.geojson}
+                style={{ color: '#FFFFFF', weight: 4, opacity: 0.95 }}
+                eventHandlers={eventHandlers}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{safeRoute.route_id || 'Safest route'}</strong>
+                    <div>{safeRoute.distance_km?.toFixed?.(2) ?? '—'} km</div>
+                    <div>Risk score: {safeRoute.risk_score ?? '—'}</div>
+                  </div>
+                </Popup>
+              </GeoJSON>
+            );
+          }
+
+          if (points.length > 1) {
+            return (
+              <Polyline
+                positions={points}
+                pathOptions={{ color: '#FFFFFF', weight: 4, opacity: 0.95 }}
+                eventHandlers={eventHandlers}
+              >
+                <Popup>
+                  <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 13 }}>
+                    <strong>{safeRoute.route_id || 'Safest route'}</strong>
+                    <div>{safeRoute.distance_km?.toFixed?.(2) ?? '—'} km</div>
+                    <div>Risk score: {safeRoute.risk_score ?? '—'}</div>
+                  </div>
+                </Popup>
+              </Polyline>
+            );
+          }
+
+          return null;
+        })()}
 
         {startPoint && (
           <Marker position={startPoint} icon={startIcon}>
