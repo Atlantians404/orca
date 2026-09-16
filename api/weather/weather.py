@@ -1,7 +1,32 @@
+import asyncio
+import time
+
 import httpx
+
 
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
+
+# ---------------------------------------------------------
+# Configuration
+# ---------------------------------------------------------
+
+MAX_RETRIES = 4
+DEFAULT_RETRY_DELAY = 5
+
+# Cache weather results for 10 minutes.
+# Same location + same time will not trigger another API call.
+CACHE_TTL = 60 * 10
+
+_weather_cache: dict[
+    tuple[float, float, str | None],
+    tuple[float, dict]
+] = {}
+
+
+# ---------------------------------------------------------
+# Weather helpers
+# ---------------------------------------------------------
 
 def get_weather_condition(weather_code):
     conditions = {
@@ -42,11 +67,83 @@ def is_thunderstorm(weather_code):
     return weather_code in [95, 96, 99]
 
 
+# ---------------------------------------------------------
+# Cache helpers
+# ---------------------------------------------------------
+
+def _cache_key(
+    latitude: float,
+    longitude: float,
+    time: str | None
+):
+    return (
+        round(float(latitude), 4),
+        round(float(longitude), 4),
+        time
+    )
+
+
+def _get_cached_weather(key):
+
+    cached = _weather_cache.get(key)
+
+    if cached is None:
+        return None
+
+    cached_time, data = cached
+
+    if time_module_now() - cached_time > CACHE_TTL:
+        _weather_cache.pop(key, None)
+        return None
+
+    return data
+
+
+def _set_cached_weather(key, data):
+
+    _weather_cache[key] = (
+        time_module_now(),
+        data
+    )
+
+
+def time_module_now():
+    return time.time()
+
+
+# ---------------------------------------------------------
+# Main Open-Meteo request
+# ---------------------------------------------------------
+
 async def get_open_meteo_data(
     latitude: float,
     longitude: float,
     time: str | None = None
 ) -> dict:
+
+    key = _cache_key(
+        latitude,
+        longitude,
+        time
+    )
+
+    # -----------------------------------------------------
+    # CACHE
+    # -----------------------------------------------------
+
+    cached = _get_cached_weather(key)
+
+    if cached is not None:
+        print(
+            f"[OPEN-METEO] CACHE HIT "
+            f"{latitude}, {longitude}, {time}"
+        )
+        return cached
+
+    print(
+        f"[OPEN-METEO] API REQUEST "
+        f"{latitude}, {longitude}, {time}"
+    )
 
     weather_params = {
         "latitude": latitude,
@@ -67,122 +164,315 @@ async def get_open_meteo_data(
         weather_params["start_hour"] = time
         weather_params["end_hour"] = time
 
+    # -----------------------------------------------------
+    # RETRY LOOP
+    # -----------------------------------------------------
+
     async with httpx.AsyncClient(timeout=15) as client:
-        response = await client.get(
-            WEATHER_URL,
-            params=weather_params,
-        )
 
-    response.raise_for_status()
+        for attempt in range(MAX_RETRIES):
 
-    data = response.json()
+            try:
 
-    hourly = data.get("hourly", {})
+                response = await client.get(
+                    WEATHER_URL,
+                    params=weather_params,
+                )
 
-    weather_code = hourly.get(
-        "weather_code",
-        [None]
-    )[0]
+                # -----------------------------------------
+                # RATE LIMIT
+                # -----------------------------------------
 
-    return {
-        "latitude": latitude,
-        "longitude": longitude,
+                if response.status_code == 429:
 
-        "time": hourly.get(
-            "time",
-            [time]
-        )[0],
+                    if attempt == MAX_RETRIES - 1:
+                        print(
+                            "[OPEN-METEO] "
+                            "429 - retries exhausted"
+                        )
+                        response.raise_for_status()
 
-        "timezone": data.get(
-            "timezone"
-        ),
+                    retry_after = response.headers.get(
+                        "Retry-After"
+                    )
 
-        "temperature": hourly.get(
-            "temperature_2m",
-            [None]
-        )[0],
+                    if retry_after:
 
-        "wind_speed": hourly.get(
-            "wind_speed_10m",
-            [None]
-        )[0],
+                        try:
+                            wait_time = float(
+                                retry_after
+                            )
+                        except ValueError:
+                            wait_time = DEFAULT_RETRY_DELAY
 
-        "wind_direction": hourly.get(
-            "wind_direction_10m",
-            [None]
-        )[0],
+                    else:
 
-        "wind_gust": hourly.get(
-            "wind_gusts_10m",
-            [None]
-        )[0],
+                        # 5, 10, 20, 40 seconds
+                        wait_time = min(
+                            DEFAULT_RETRY_DELAY
+                            * (2 ** attempt),
+                            60
+                        )
 
-        "visibility": hourly.get(
-            "visibility",
-            [None]
-        )[0],
+                    print(
+                        f"[OPEN-METEO] 429 - "
+                        f"waiting {wait_time}s "
+                        f"(attempt {attempt + 1}/"
+                        f"{MAX_RETRIES})"
+                    )
 
-        "precipitation": hourly.get(
-            "precipitation",
-            [None]
-        )[0],
+                    await asyncio.sleep(
+                        wait_time
+                    )
 
-        "weather_code": weather_code,
+                    continue
 
-        "weather_condition": get_weather_condition(
-            weather_code
-        ),
+                # -----------------------------------------
+                # OTHER HTTP ERRORS
+                # -----------------------------------------
 
-        "thunderstorm": is_thunderstorm(
-            weather_code
-        ),
-    }
+                response.raise_for_status()
+
+                # -----------------------------------------
+                # SUCCESS
+                # -----------------------------------------
+
+                data = response.json()
+
+                hourly = data.get(
+                    "hourly",
+                    {}
+                )
+
+                weather_code = hourly.get(
+                    "weather_code",
+                    [None]
+                )[0]
+
+                result = {
+                    "latitude": latitude,
+                    "longitude": longitude,
+
+                    "time": hourly.get(
+                        "time",
+                        [time]
+                    )[0],
+
+                    "timezone": data.get(
+                        "timezone"
+                    ),
+
+                    "temperature": hourly.get(
+                        "temperature_2m",
+                        [None]
+                    )[0],
+
+                    "wind_speed": hourly.get(
+                        "wind_speed_10m",
+                        [None]
+                    )[0],
+
+                    "wind_direction": hourly.get(
+                        "wind_direction_10m",
+                        [None]
+                    )[0],
+
+                    "wind_gust": hourly.get(
+                        "wind_gusts_10m",
+                        [None]
+                    )[0],
+
+                    "visibility": hourly.get(
+                        "visibility",
+                        [None]
+                    )[0],
+
+                    "precipitation": hourly.get(
+                        "precipitation",
+                        [None]
+                    )[0],
+
+                    "weather_code": weather_code,
+
+                    "weather_condition":
+                        get_weather_condition(
+                            weather_code
+                        ),
+
+                    "thunderstorm":
+                        is_thunderstorm(
+                            weather_code
+                        ),
+                }
+
+                # -----------------------------------------
+                # SAVE TO CACHE
+                # -----------------------------------------
+
+                _set_cached_weather(
+                    key,
+                    result
+                )
+
+                print(
+                    f"[OPEN-METEO] SUCCESS "
+                    f"{latitude}, {longitude}, {time}"
+                )
+
+                return result
+
+            except httpx.RequestError as exc:
+
+                if attempt == MAX_RETRIES - 1:
+                    raise
+
+                wait_time = min(
+                    DEFAULT_RETRY_DELAY
+                    * (2 ** attempt),
+                    60
+                )
+
+                print(
+                    f"[OPEN-METEO] "
+                    f"Network error: {exc}. "
+                    f"Retrying in {wait_time}s"
+                )
+
+                await asyncio.sleep(
+                    wait_time
+                )
+
+    raise RuntimeError(
+        "Open-Meteo API failed after retries"
+    )
 
 
 # ---------------------------------------------------------
 # Individual helpers
 # ---------------------------------------------------------
 
-async def get_temperature(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_temperature(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["temperature"]
 
 
-async def get_wind_speed(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_wind_speed(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["wind_speed"]
 
 
-async def get_wind_direction(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_wind_direction(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["wind_direction"]
 
 
-async def get_wind_gust(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_wind_gust(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["wind_gust"]
 
 
-async def get_visibility(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_visibility(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["visibility"]
 
 
-async def get_precipitation(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_precipitation(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["precipitation"]
 
 
-async def get_weather_code(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_weather_code(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["weather_code"]
 
 
-async def get_weather_condition(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_weather_condition(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["weather_condition"]
 
 
-async def get_thunderstorm(latitude, longitude, time):
-    data = await get_open_meteo_data(latitude, longitude, time)
+async def get_thunderstorm(
+    latitude,
+    longitude,
+    time
+):
+    data = await get_open_meteo_data(
+        latitude,
+        longitude,
+        time
+    )
+
     return data["thunderstorm"]
+
