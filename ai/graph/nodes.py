@@ -887,6 +887,11 @@ async def pfz_selection_node(
 
     if selected_pfz:
 
+        print("\n========== PFZ ALREADY SELECTED ==========")
+        print("selected_pfz:", selected_pfz)
+        print("selected_pfz_name:", state.get("selected_pfz_name"))
+        print("==========================================\n")
+
         return {
             "pending_action": None,
             "workflow_status": "IN_PROGRESS",
@@ -1031,6 +1036,14 @@ async def pfz_selection_node(
 
     if selected_result is None:
 
+        print("\n========== INVALID PFZ SELECTION ==========")
+        print("User selected:", selected_name)
+        print("Available:", [
+            r.get("pfz_name")
+            for r in ranked_results
+        ])
+        print("===========================================\n")
+
         return {
             "pending_action": "SELECT_PFZ",
             "workflow_status": "WAITING_FOR_USER",
@@ -1071,12 +1084,29 @@ async def pfz_selection_node(
         "pfz_name"
     )
 
+    # --------------------------------------------------------
+    # FINAL SELECTION
+    # --------------------------------------------------------
+
+    final_selected_pfz = (
+        selected_pfz
+        or selected_result
+    )
+
+    print("\n")
+    print("======= PFZ SELECTION DEBUG =======")
+    print("User selected       :", selected_name)
+    print("Actual PFZ name     :", actual_name)
+    print("selected_pfz        :", selected_pfz)
+    print("selected_result     :", selected_result)
+    print("final_selected_pfz  :", final_selected_pfz)
+    print("final type          :", type(final_selected_pfz))
+    print("===================================")
+    print("\n")
+
     return {
         "selected_pfz_name": actual_name,
-        "selected_pfz": (
-            selected_pfz
-            or selected_result
-        ),
+        "selected_pfz": final_selected_pfz,
         "pending_action": None,
         "workflow_status": "IN_PROGRESS",
     }
@@ -1086,86 +1116,74 @@ async def pfz_selection_node(
 # ROUTE
 # ============================================================
 
-async def route_node(
-    state: AgentState,
-) -> dict:
-
+async def route_node(state: AgentState) -> dict:
     try:
-
-        # -----------------------------------------------------
-        # Validate required state before calling route engine
-        # -----------------------------------------------------
-
         selected_pfz = state.get("selected_pfz")
+        selected_pfz_name = state.get("selected_pfz_name")
         location = state.get("location")
         time_context = state.get("time_context")
 
+        # =========================================================
+        # DEBUG
+        # =========================================================
+        print("\n")
+        print("========== ROUTE DEBUG ==========")
+        print("selected_pfz:", selected_pfz)
+        print("selected_pfz_name:", selected_pfz_name)
+        print("location:", location)
+        print("time_context:", time_context)
+        print("route_required:", state.get("route_required"))
+        print("workflow_status:", state.get("workflow_status"))
+        print("=================================")
+        print("\n")
+
+        # =========================================================
+        # VALIDATION
+        # =========================================================
         if not selected_pfz:
+            print("❌ ROUTE ERROR: selected_pfz is None")
+
             return failed_response(
                 "Cannot generate route because no PFZ was selected."
             )
 
         if not location:
+            print("❌ ROUTE ERROR: location is None")
+
             return failed_response(
-                "Cannot generate route because the fishing location is missing."
+                "Cannot generate route because no location was provided."
             )
 
         if not time_context:
-            return failed_response(
-                "Cannot generate route because the fishing time is missing."
-            )
-
-        # -----------------------------------------------------
-        # Route engine
-        # -----------------------------------------------------
-
-        result = await route_engine_node(
-            state
-        )
-
-        # -----------------------------------------------------
-        # Validate route-engine response
-        # -----------------------------------------------------
-
-        if not isinstance(result, dict):
+            print("❌ ROUTE ERROR: time_context is None")
 
             return failed_response(
-                "Route engine returned an invalid response."
+                "Cannot generate route because no time information was provided."
             )
 
-        route_result = result.get(
-            "route_result"
-        )
+        # =========================================================
+        # ROUTE ENGINE
+        # =========================================================
+        print("✅ selected_pfz exists")
+        print("✅ location exists")
+        print("✅ time_context exists")
+        print("➡️ Calling route_engine_node()")
 
-        if route_result is None:
+        result = await route_engine_node(state)
 
-            return failed_response(
-                "Route engine did not return a route result."
-            )
-
-        if not isinstance(route_result, dict):
-
-            return failed_response(
-                "Route engine returned an invalid route result."
-            )
-
-        # -----------------------------------------------------
-        # Return route result
-        # -----------------------------------------------------
+        print("➡️ route_engine_node result:", result)
 
         return {
-            "route_result": route_result,
-            "pending_action": None,
-            "workflow_status": result.get(
-                "workflow_status",
-                "IN_PROGRESS",
-            ),
+            "route_result": result,
+            "workflow_status": "COMPLETED",
         }
 
-    except Exception as exc:
+    except Exception as e:
+        print("\n❌ ROUTE NODE EXCEPTION:", repr(e))
+        print("\n")
 
         return failed_response(
-            f"Unable to generate a route: {exc}"
+            f"Route generation failed: {str(e)}"
         )
 
 
