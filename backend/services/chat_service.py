@@ -6,9 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from langgraph.types import Command
 
 from ai.graph.graph import app_graph
-from ai.services.conversation_summary import (
-    update_conversation_summary,
-)
 
 from backend.models.sessions import Session
 from backend.models.messages import Message
@@ -137,6 +134,10 @@ async def send_message(
         "route_required": True,
     }
 
+    # ---------------------------------------------------------
+    # RUN LANGGRAPH
+    # ---------------------------------------------------------
+
     result = await app_graph.ainvoke(
         initial_state,
         config=config
@@ -171,16 +172,18 @@ async def send_message(
     db.add(assistant_message)
 
     # ---------------------------------------------------------
-    # UPDATE CONVERSATION SUMMARY
+    # CONVERSATION SUMMARY
     # ---------------------------------------------------------
-
-    new_summary = await update_conversation_summary(
-        existing_summary=session.summary,
-        user_message=message,
-        assistant_response=response["message"],
-    )
-
-    session.summary = new_summary
+    #
+    # Temporarily disabled to reduce Groq API calls.
+    #
+    # update_conversation_summary() makes another LLM call
+    # after every chat message.
+    #
+    # We will re-enable this later with a better strategy
+    # such as summarizing every N messages.
+    #
+    # ---------------------------------------------------------
 
     await db.commit()
 
@@ -205,6 +208,10 @@ async def resume_chat(
             "thread_id": str(session_id)
         }
     }
+
+    # ---------------------------------------------------------
+    # RESUME LANGGRAPH AFTER HITL
+    # ---------------------------------------------------------
 
     result = await app_graph.ainvoke(
         Command(resume=value),
@@ -240,16 +247,12 @@ async def resume_chat(
     db.add(assistant_message)
 
     # ---------------------------------------------------------
-    # UPDATE CONVERSATION SUMMARY
+    # CONVERSATION SUMMARY
     # ---------------------------------------------------------
-
-    new_summary = await update_conversation_summary(
-        existing_summary=session.summary,
-        user_message=str(value),
-        assistant_response=response["message"],
-    )
-
-    session.summary = new_summary
+    #
+    # Temporarily disabled for the same reason as send_message().
+    #
+    # ---------------------------------------------------------
 
     await db.commit()
 
