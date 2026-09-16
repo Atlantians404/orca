@@ -3,9 +3,10 @@ import httpx
 
 from api.weather.weather import (
     WEATHER_URL,
-    get_weather_condition,
+    weather_condition_from_code,
     is_thunderstorm
 )
+
 
 BATCH_SIZE = 100
 BATCH_DELAY = 2
@@ -26,16 +27,26 @@ async def get_weather_data_batch(nodes, time):
 
     results = {}
 
+    # -----------------------------------------------------
     # Remove duplicate coordinates
+    # -----------------------------------------------------
+
     unique_nodes = {}
 
     for node in nodes:
+
         key = coordinate_key(node)
 
         if key not in unique_nodes:
             unique_nodes[key] = node
 
-    unique_nodes = list(unique_nodes.values())
+    unique_nodes = list(
+        unique_nodes.values()
+    )
+
+    # -----------------------------------------------------
+    # HTTP CLIENT
+    # -----------------------------------------------------
 
     async with httpx.AsyncClient(
         timeout=30,
@@ -44,6 +55,10 @@ async def get_weather_data_batch(nodes, time):
             max_keepalive_connections=1
         )
     ) as client:
+
+        # -------------------------------------------------
+        # Process batches
+        # -------------------------------------------------
 
         for start in range(
             0,
@@ -55,6 +70,10 @@ async def get_weather_data_batch(nodes, time):
                 start:start + BATCH_SIZE
             ]
 
+            # ---------------------------------------------
+            # Build coordinates
+            # ---------------------------------------------
+
             latitudes = ",".join(
                 str(node["latitude"])
                 for node in batch
@@ -65,9 +84,14 @@ async def get_weather_data_batch(nodes, time):
                 for node in batch
             )
 
+            # ---------------------------------------------
+            # Open-Meteo parameters
+            # ---------------------------------------------
+
             params = {
                 "latitude": latitudes,
                 "longitude": longitudes,
+
                 "hourly": ",".join([
                     "wind_speed_10m",
                     "wind_direction_10m",
@@ -75,10 +99,16 @@ async def get_weather_data_batch(nodes, time):
                     "precipitation",
                     "weather_code"
                 ]),
+
                 "timezone": "auto",
+
                 "start_hour": time,
                 "end_hour": time
             }
+
+            # ---------------------------------------------
+            # Retry loop
+            # ---------------------------------------------
 
             for attempt in range(MAX_RETRIES):
 
@@ -89,6 +119,10 @@ async def get_weather_data_batch(nodes, time):
                         params=params
                     )
 
+                    # -------------------------------------
+                    # Rate limit
+                    # -------------------------------------
+
                     if response.status_code == 429:
 
                         retry_after = response.headers.get(
@@ -96,22 +130,57 @@ async def get_weather_data_batch(nodes, time):
                         )
 
                         if retry_after:
-                            wait_time = float(retry_after)
+
+                            try:
+                                wait_time = float(
+                                    retry_after
+                                )
+
+                            except ValueError:
+
+                                wait_time = min(
+                                    5 * (2 ** attempt),
+                                    60
+                                )
+
                         else:
+
                             wait_time = min(
                                 5 * (2 ** attempt),
                                 60
                             )
 
-                        await asyncio.sleep(wait_time)
+                        print(
+                            f"[WEATHER BATCH] 429 - "
+                            f"waiting {wait_time}s "
+                            f"(attempt {attempt + 1}/"
+                            f"{MAX_RETRIES})"
+                        )
+
+                        await asyncio.sleep(
+                            wait_time
+                        )
+
                         continue
 
+                    # -------------------------------------
+                    # Other HTTP errors
+                    # -------------------------------------
+
                     response.raise_for_status()
+
+                    # -------------------------------------
+                    # Parse response
+                    # -------------------------------------
 
                     data = response.json()
 
                     if isinstance(data, dict):
                         data = [data]
+
+                    # -------------------------------------
+                    # Process each PFZ
+                    # -------------------------------------
 
                     for index, node in enumerate(batch):
 
@@ -131,6 +200,7 @@ async def get_weather_data_batch(nodes, time):
                         results[
                             coordinate_key(node)
                         ] = {
+
                             "wind_speed": hourly.get(
                                 "wind_speed_10m",
                                 [None]
@@ -151,48 +221,76 @@ async def get_weather_data_batch(nodes, time):
                                 [None]
                             )[0],
 
-                            "condition": (
-                                get_weather_condition(
+                            # IMPORTANT:
+                            # weather_code is already available
+                            # from the batch API response.
+                            "condition":
+                                weather_condition_from_code(
                                     weather_code
-                                )
-                            ),
+                                ),
 
-                            "lightning": (
+                            "lightning":
                                 is_thunderstorm(
                                     weather_code
                                 )
-                            )
                         }
 
+                    # Successful request
                     break
 
-                except httpx.RequestError:
+                except httpx.RequestError as exc:
 
                     if attempt == MAX_RETRIES - 1:
                         raise
 
+                    wait_time = min(
+                        5 * (2 ** attempt),
+                        60
+                    )
+
+                    print(
+                        f"[WEATHER BATCH] "
+                        f"Network error: {exc}. "
+                        f"Retrying in {wait_time}s"
+                    )
+
                     await asyncio.sleep(
-                        min(5 * (2 ** attempt), 60)
+                        wait_time
                     )
 
             else:
+
                 raise RuntimeError(
                     f"Weather API failed after retries "
                     f"for batch {start}"
                 )
 
+            # ---------------------------------------------
             # Control request rate
-            if start + BATCH_SIZE < len(unique_nodes):
-                await asyncio.sleep(BATCH_DELAY)
+            # ---------------------------------------------
 
+            if (
+                start + BATCH_SIZE
+                < len(unique_nodes)
+            ):
+
+                await asyncio.sleep(
+                    BATCH_DELAY
+                )
+
+    # -----------------------------------------------------
     # Map results back to ALL original nodes
+    # -----------------------------------------------------
+
     final_results = {}
 
     for node in nodes:
 
         key = coordinate_key(node)
 
-        final_results[node["node_id"]] = results.get(
+        final_results[
+            node["node_id"]
+        ] = results.get(
             key,
             {}
         )

@@ -155,7 +155,7 @@ def get_pfz_candidates(
     latitude: float,
     longitude: float,
     radius_km: float | None = None,
-    number_of_zones: int = 20
+    number_of_zones: int = 10
 ):
     """
     Find the nearest PFZ zones to a given latitude/longitude.

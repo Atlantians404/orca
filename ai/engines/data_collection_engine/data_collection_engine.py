@@ -65,7 +65,7 @@ def format_data(
             "wind_direction": weather_data.get(
                 "wind_direction"
             ),
-            
+
             "visibility": weather_data.get(
                 "visibility"
             ),
@@ -125,6 +125,8 @@ async def data_collection_engine(
     state: AgentState
 ) -> AgentState:
 
+    print("\n========== DATA COLLECTION DEBUG ==========")
+
     pfzs = state.get(
         "pfz_candidates",
         []
@@ -134,11 +136,15 @@ async def data_collection_engine(
         "time_context"
     )
 
+    print("PFZ count:", len(pfzs) if pfzs else 0)
+    print("Time context:", time_context)
+
     if (
         not pfzs
         or not time_context
         or not time_context.slots
     ):
+        print("❌ Missing PFZs or time context")
         return {
             **state,
             "agent_data": {}
@@ -149,6 +155,9 @@ async def data_collection_engine(
 
     for index, pfz in enumerate(pfzs):
 
+        print(f"\nPFZ {index + 1}:")
+        print("PFZ:", pfz)
+
         latitude = pfz.get(
             "latitude"
         )
@@ -157,7 +166,11 @@ async def data_collection_engine(
             "longitude"
         )
 
+        print("latitude:", latitude)
+        print("longitude:", longitude)
+
         if latitude is None or longitude is None:
+            print("❌ Missing coordinates")
             continue
 
         node_id = pfz.get(
@@ -173,11 +186,19 @@ async def data_collection_engine(
 
         pfz_map[node_id] = pfz
 
+    print("\nNodes created:", len(nodes))
+    print("Nodes:", nodes)
+
     if not nodes:
+        print("❌ NO NODES CREATED")
         return {
             **state,
             "agent_data": {}
         }
+
+    # -------------------------
+    # GEO
+    # -------------------------
 
     geo_results = {}
 
@@ -185,9 +206,31 @@ async def data_collection_engine(
 
         node_id = node["node_id"]
 
-        geo_results[node_id] = await collect_geo(
-            node
+        print(
+            f"\n🌍 Collecting GEO data for {node_id}"
         )
+
+        try:
+            geo_results[node_id] = await collect_geo(
+                node
+            )
+
+            print(
+                f"✅ GEO result for {node_id}:",
+                geo_results[node_id]
+            )
+
+        except Exception as exc:
+            print(
+                f"❌ GEO failed for {node_id}:",
+                repr(exc)
+            )
+
+            raise
+
+    # -------------------------
+    # DATA COLLECTION
+    # -------------------------
 
     agent_data = {}
 
@@ -203,15 +246,72 @@ async def data_collection_engine(
             f"{slot.start_time}"
         )
 
-        marine_results = await get_marine_batch(
-            nodes,
-            request_time
-        )
+        print("\n================================")
+        print("REQUEST TIME:", request_time)
+        print("OUTPUT TIME:", output_time)
+        print("================================")
 
-        weather_results = await get_weather_data_batch(
-            nodes,
-            request_time
-        )
+        # -------------------------
+        # MARINE
+        # -------------------------
+
+        print("\n🌊 Calling marine batch...")
+
+        try:
+            marine_results = await get_marine_batch(
+                nodes,
+                request_time
+            )
+
+            print(
+                "✅ Marine result count:",
+                len(marine_results)
+            )
+
+            print(
+                "Marine results:",
+                marine_results
+            )
+
+        except Exception as exc:
+            print(
+                "❌ Marine batch failed:",
+                repr(exc)
+            )
+            raise
+
+        # -------------------------
+        # WEATHER
+        # -------------------------
+
+        print("\n🌤️ Calling weather batch...")
+
+        try:
+            weather_results = await get_weather_data_batch(
+                nodes,
+                request_time
+            )
+
+            print(
+                "✅ Weather result count:",
+                len(weather_results)
+            )
+
+            print(
+                "Weather results:",
+                weather_results
+            )
+
+        except Exception as exc:
+            print(
+                "❌ Weather batch failed:",
+                repr(exc)
+            )
+            raise
+
+        # -------------------------
+        # BUILD AGENT DATA
+        # -------------------------
 
         for node in nodes:
 
@@ -245,6 +345,10 @@ async def data_collection_engine(
                 node_id,
                 {}
             )[output_time] = result
+
+    print("\n========== DATA COLLECTION RESULT ==========")
+    print("agent_data count:", len(agent_data))
+    print("agent_data keys:", list(agent_data.keys()))
 
     return {
         **state,
