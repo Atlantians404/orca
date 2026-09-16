@@ -7,6 +7,7 @@ export default function ChatInput({
   value,
   onChange,
   onSend,
+  onLocationClick,
   disabled = false,
   placeholder = "Ask ORCA anything...",
 }) {
@@ -94,6 +95,8 @@ export default function ChatInput({
        {/* Location button */}
       <button
         type="button"
+        onClick={onLocationClick}
+        disabled={disabled}
         aria-label="Choose location"
         title="Choose location"
         className="
@@ -108,6 +111,8 @@ export default function ChatInput({
           transition
           hover:bg-white/5
           hover:text-[#3DA7B7]
+          disabled:opacity-50
+          disabled:cursor-not-allowed
         "
       >
         <Compass
