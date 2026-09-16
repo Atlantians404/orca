@@ -2,8 +2,8 @@ import httpx
 
 WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
-def get_weather_condition(weather_code):
 
+def get_weather_condition(weather_code):
     conditions = {
         0: "Clear sky",
         1: "Mainly clear",
@@ -32,54 +32,21 @@ def get_weather_condition(weather_code):
         86: "Heavy snow showers",
         95: "Thunderstorm",
         96: "Thunderstorm with slight hail",
-        99: "Thunderstorm with heavy hail"
+        99: "Thunderstorm with heavy hail",
     }
 
     return conditions.get(weather_code, "Unknown")
 
 
 def is_thunderstorm(weather_code):
-
     return weather_code in [95, 96, 99]
 
 
-async def get_location_time(latitude, longitude):
-
-    params = {
-        "latitude": latitude,
-        "longitude": longitude,
-        "current": "temperature_2m",
-        "timezone": "auto"
-    }
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.get(
-        WEATHER_URL,
-        params=params
-        )
-
-    response.raise_for_status()
-
-    data = response.json()
-
-    return (
-        data.get("current", {}).get("time"),
-        data.get("timezone")
-    )
-
-
-async def get_open_meteo_data(latitude, longitude, time=None):
-  
-    if time is None:
-        time, timezone = await get_location_time(
-            latitude,
-            longitude
-        )
-    else:
-        _, timezone = await get_location_time(
-            latitude,
-            longitude
-        )
+async def get_open_meteo_data(
+    latitude: float,
+    longitude: float,
+    time: str | None = None
+) -> dict:
 
     weather_params = {
         "latitude": latitude,
@@ -91,17 +58,19 @@ async def get_open_meteo_data(latitude, longitude, time=None):
             "wind_gusts_10m",
             "visibility",
             "precipitation",
-            "weather_code"
+            "weather_code",
         ],
         "timezone": "auto",
-        "start_hour": time,
-        "end_hour": time
     }
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    if time is not None:
+        weather_params["start_hour"] = time
+        weather_params["end_hour"] = time
+
+    async with httpx.AsyncClient(timeout=15) as client:
         response = await client.get(
-        WEATHER_URL,
-        params=weather_params
+            WEATHER_URL,
+            params=weather_params,
         )
 
     response.raise_for_status()
@@ -118,12 +87,15 @@ async def get_open_meteo_data(latitude, longitude, time=None):
     return {
         "latitude": latitude,
         "longitude": longitude,
+
         "time": hourly.get(
             "time",
             [time]
         )[0],
 
-        "timezone": timezone,
+        "timezone": data.get(
+            "timezone"
+        ),
 
         "temperature": hourly.get(
             "temperature_2m",
@@ -163,5 +135,54 @@ async def get_open_meteo_data(latitude, longitude, time=None):
 
         "thunderstorm": is_thunderstorm(
             weather_code
-        )
+        ),
     }
+
+
+# ---------------------------------------------------------
+# Individual helpers
+# ---------------------------------------------------------
+
+async def get_temperature(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["temperature"]
+
+
+async def get_wind_speed(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["wind_speed"]
+
+
+async def get_wind_direction(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["wind_direction"]
+
+
+async def get_wind_gust(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["wind_gust"]
+
+
+async def get_visibility(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["visibility"]
+
+
+async def get_precipitation(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["precipitation"]
+
+
+async def get_weather_code(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["weather_code"]
+
+
+async def get_weather_condition(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["weather_condition"]
+
+
+async def get_thunderstorm(latitude, longitude, time):
+    data = await get_open_meteo_data(latitude, longitude, time)
+    return data["thunderstorm"]
