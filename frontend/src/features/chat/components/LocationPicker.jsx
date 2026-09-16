@@ -1,8 +1,8 @@
-import { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, Marker, useMap } from "react-leaflet";
+import { useEffect, useState, useRef, useCallback } from "react";
+import { MapContainer, TileLayer, Marker, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { X, Loader2, MapPin, Navigation } from "lucide-react";
+import { X, Loader2, MapPin, Navigation, Search, RefreshCw } from "lucide-react";
 
 // ============================================================
 // FIX LEAFLET DEFAULT ICON (Vite bundler issue)
@@ -19,7 +19,7 @@ L.Icon.Default.mergeOptions({
 });
 
 // ============================================================
-// CUSTOM MARKER ICON (ORCA accent)
+// CUSTOM MARKER ICON
 // ============================================================
 
 const orcaIcon = new L.Icon({
@@ -35,8 +35,11 @@ const orcaIcon = new L.Icon({
   shadowSize: [41, 41],
 });
 
+// DEFAULT FALLBACK COORDS (Chennai Coast, India)
+const DEFAULT_COORDS = [13.0827, 80.2707];
+
 // ============================================================
-// HELPER: Fly map to location
+// MAP HELPERS
 // ============================================================
 
 function FlyTo({ position }) {
@@ -44,9 +47,31 @@ function FlyTo({ position }) {
 
   useEffect(() => {
     if (position) {
-      map.flyTo(position, 14, { duration: 1.2 });
+      map.flyTo(position, 13, { duration: 1.2 });
     }
   }, [position, map]);
+
+  return null;
+}
+
+function MapEventsHandler({ onLocationChange }) {
+  useMapEvents({
+    click(e) {
+      onLocationChange([e.latlng.lat, e.latlng.lng]);
+    },
+  });
+  return null;
+}
+
+function MapResizeFix() {
+  const map = useMap();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [map]);
 
   return null;
 }
@@ -56,57 +81,96 @@ function FlyTo({ position }) {
 // ============================================================
 
 export default function LocationPicker({ onConfirm, onClose }) {
-  const [coords, setCoords] = useState(null);
-  const [status, setStatus] = useState("loading"); // loading | ready | error | denied
+  const [coords, setCoords] = useState(DEFAULT_COORDS);
+  const [status, setStatus] = useState("loading"); // loading | ready | fallback
   const [errorMsg, setErrorMsg] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searching, setSearching] = useState(false);
   const overlayRef = useRef(null);
 
   // --------------------------------------------------------
-  // AUTO-DETECT GPS
+  // GPS DETECT
   // --------------------------------------------------------
 
-  useEffect(() => {
+  const detectGPS = useCallback(() => {
     if (!navigator.geolocation) {
-      setStatus("error");
-      setErrorMsg("Geolocation is not supported by your browser.");
+      setStatus("fallback");
+      setErrorMsg(
+        "Geolocation not supported by browser. Search or click on the map to set location."
+      );
       return;
     }
 
     setStatus("loading");
+    setErrorMsg("");
 
-    const watchId = navigator.geolocation.getCurrentPosition(
+    navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude } = position.coords;
         setCoords([latitude, longitude]);
         setStatus("ready");
       },
       (err) => {
+        setStatus("fallback");
         if (err.code === 1) {
-          setStatus("denied");
           setErrorMsg(
-            "Location access was denied. Please enable GPS in your browser settings."
+            "GPS access denied. You can search for a location or click anywhere on the map."
           );
         } else if (err.code === 2) {
-          setStatus("error");
           setErrorMsg(
-            "Location unavailable. Please check your device GPS."
+            "GPS signal unavailable. Search or click on the map below."
           );
         } else {
-          setStatus("error");
-          setErrorMsg("Location request timed out. Please try again.");
+          setErrorMsg(
+            "GPS request timed out. Search or click on the map below."
+          );
         }
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 10000,
         maximumAge: 0,
       }
     );
-
-    return () => {
-      // getCurrentPosition doesn't return a watchId, but this is safe
-    };
   }, []);
+
+  useEffect(() => {
+    detectGPS();
+  }, [detectGPS]);
+
+  // --------------------------------------------------------
+  // SEARCH LOCATION (NOMINATIM GEOCLEANING)
+  // --------------------------------------------------------
+
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    setSearching(true);
+    setErrorMsg("");
+
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+          searchQuery.trim()
+        )}`
+      );
+      const data = await res.json();
+
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat);
+        const lon = parseFloat(data[0].lon);
+        setCoords([lat, lon]);
+        setStatus("ready");
+      } else {
+        setErrorMsg(`No locations found for "${searchQuery}".`);
+      }
+    } catch {
+      setErrorMsg("Failed to search location. Please try again.");
+    } finally {
+      setSearching(false);
+    }
+  };
 
   // --------------------------------------------------------
   // CLOSE ON BACKDROP CLICK
@@ -129,10 +193,6 @@ export default function LocationPicker({ onConfirm, onClose }) {
     }
   };
 
-  // --------------------------------------------------------
-  // RENDER
-  // --------------------------------------------------------
-
   return (
     <div
       ref={overlayRef}
@@ -141,7 +201,7 @@ export default function LocationPicker({ onConfirm, onClose }) {
       style={{ animation: "fadeIn 0.2s ease-out" }}
     >
       <div
-        className="relative mx-4 flex w-full max-w-[480px] flex-col overflow-hidden rounded-2xl border border-[#202023] bg-[#0F0F0F] shadow-2xl"
+        className="relative mx-4 flex w-full max-w-[520px] flex-col overflow-hidden rounded-2xl border border-[#202023] bg-[#0F0F0F] shadow-2xl"
         style={{ animation: "slideUp 0.25s ease-out" }}
       >
         {/* ====== HEADER ====== */}
@@ -154,7 +214,7 @@ export default function LocationPicker({ onConfirm, onClose }) {
               aria-hidden="true"
             />
             <h2 className="text-sm font-medium text-white">
-              Your Current Location
+              Select Location
             </h2>
           </div>
 
@@ -170,101 +230,142 @@ export default function LocationPicker({ onConfirm, onClose }) {
 
         {/* ====== BODY ====== */}
 
-        <div className="px-5 py-4">
+        <div className="space-y-3 px-5 py-4">
 
-          {/* -- LOADING -- */}
-          {status === "loading" && (
-            <div className="flex flex-col items-center justify-center py-12">
-              <Loader2
-                size={28}
-                className="animate-spin text-[#3DA7B7]"
+          {/* SEARCH BAR */}
+          <form onSubmit={handleSearch} className="flex gap-2">
+            <div className="relative flex-1">
+              <Search
+                size={15}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-[#77777D]"
               />
-              <p className="mt-3 text-sm text-[#9A9A9A]">
-                Detecting your GPS location...
-              </p>
-            </div>
-          )}
-
-          {/* -- ERROR / DENIED -- */}
-          {(status === "error" || status === "denied") && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <MapPin
-                size={28}
-                className="text-red-400"
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search city, port, or region (e.g. Chennai)..."
+                className="w-full rounded-xl border border-[#202023] bg-[#0A0A0A] py-2 pl-9 pr-3 text-xs text-white placeholder-[#5F5F65] outline-none transition focus:border-[#3DA7B7]/50"
               />
-              <p className="mt-3 max-w-[320px] text-sm leading-6 text-[#9A9A9A]">
-                {errorMsg}
-              </p>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="mt-5 rounded-lg border border-[#2A2A2E] bg-[#161616] px-5 py-2 text-xs font-medium text-white transition hover:border-[#3DA7B7]/40 hover:bg-[#1A1A1A]"
-              >
-                Close
-              </button>
             </div>
-          )}
+            <button
+              type="submit"
+              disabled={searching || !searchQuery.trim()}
+              className="rounded-xl border border-[#2A2A2E] bg-[#161616] px-3.5 py-2 text-xs font-medium text-white transition hover:bg-[#202025] disabled:opacity-40"
+            >
+              {searching ? (
+                <Loader2 size={14} className="animate-spin text-[#3DA7B7]" />
+              ) : (
+                "Search"
+              )}
+            </button>
+          </form>
 
-          {/* -- MAP -- */}
-          {status === "ready" && coords && (
-            <>
-              {/* Coordinates Display */}
-              <div className="mb-3 flex items-center gap-2 rounded-lg border border-[#202023] bg-[#0A0A0A] px-3 py-2">
-                <MapPin
-                  size={14}
-                  className="shrink-0 text-[#3DA7B7]"
-                />
-                <span className="text-xs text-[#9A9A9A]">
-                  {coords[0].toFixed(6)}, {coords[1].toFixed(6)}
+          {/* GPS DETECT BUTTON & COORDINATES */}
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={detectGPS}
+              disabled={status === "loading"}
+              className="flex items-center gap-1.5 rounded-lg border border-[#202023] bg-[#0A0A0A] px-2.5 py-1.5 text-xs text-[#3DA7B7] transition hover:bg-[#151515] disabled:opacity-50"
+            >
+              <RefreshCw
+                size={12}
+                className={status === "loading" ? "animate-spin" : ""}
+              />
+              {status === "loading" ? "Detecting GPS..." : "Use My GPS"}
+            </button>
+
+            {coords && (
+              <div className="flex items-center gap-1.5 text-xs text-[#9A9A9A]">
+                <MapPin size={13} className="text-[#3DA7B7]" />
+                <span>
+                  {coords[0].toFixed(5)}, {coords[1].toFixed(5)}
                 </span>
               </div>
+            )}
+          </div>
 
-              {/* Leaflet Map */}
-              <div
-                className="overflow-hidden rounded-xl border border-[#202023]"
-                style={{ height: 260 }}
+          {/* ERROR / NOTICE BANNER */}
+          {errorMsg && (
+            <p className="rounded-lg border border-red-900/30 bg-red-950/30 px-3 py-1.5 text-xs text-[#FF8A8A]">
+              {errorMsg}
+            </p>
+          )}
+
+          {/* LOADING STATE */}
+          {status === "loading" && (
+            <div className="flex flex-col items-center justify-center py-10">
+              <Loader2 size={26} className="animate-spin text-[#3DA7B7]" />
+              <p className="mt-2 text-xs text-[#9A9A9A]">Detecting location...</p>
+            </div>
+          )}
+
+          {/* MAP */}
+          {status !== "loading" && coords && (
+            <div
+              className="relative overflow-hidden rounded-xl border border-[#202023]"
+              style={{ height: 260 }}
+            >
+              <MapContainer
+                center={coords}
+                zoom={12}
+                scrollWheelZoom={true}
+                style={{ height: "100%", width: "100%" }}
+                zoomControl={false}
               >
-                <MapContainer
-                  center={coords}
-                  zoom={14}
-                  scrollWheelZoom={true}
-                  style={{ height: "100%", width: "100%" }}
-                  zoomControl={false}
-                >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  <Marker position={coords} icon={orcaIcon} />
-                  <FlyTo position={coords} />
-                </MapContainer>
+                <TileLayer
+                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                />
+                <Marker
+                  position={coords}
+                  icon={orcaIcon}
+                  draggable={true}
+                  eventHandlers={{
+                    dragend(e) {
+                      const latlng = e.target.getLatLng();
+                      setCoords([latlng.lat, latlng.lng]);
+                      setStatus("ready");
+                    },
+                  }}
+                />
+                <FlyTo position={coords} />
+                <MapEventsHandler
+                  onLocationChange={(newCoords) => {
+                    setCoords(newCoords);
+                    setStatus("ready");
+                  }}
+                />
+                <MapResizeFix />
+              </MapContainer>
+
+              <div className="absolute bottom-2 left-2 z-[400] rounded-md bg-black/70 px-2 py-1 text-[10px] text-[#9A9A9A] backdrop-blur-md">
+                Click map or drag marker to adjust location
               </div>
-            </>
+            </div>
           )}
         </div>
 
         {/* ====== FOOTER ====== */}
 
-        {status === "ready" && coords && (
-          <div className="flex items-center justify-end gap-3 border-t border-[#202023] px-5 py-3.5">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-lg border border-[#2A2A2E] bg-transparent px-4 py-2 text-xs font-medium text-[#9A9A9A] transition hover:bg-white/5 hover:text-white"
-            >
-              Cancel
-            </button>
+        <div className="flex items-center justify-end gap-3 border-t border-[#202023] px-5 py-3.5">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-[#2A2A2E] bg-transparent px-4 py-2 text-xs font-medium text-[#9A9A9A] transition hover:bg-white/5 hover:text-white"
+          >
+            Cancel
+          </button>
 
-            <button
-              type="button"
-              onClick={handleConfirm}
-              className="rounded-lg bg-[#3DA7B7] px-5 py-2 text-xs font-semibold text-black transition hover:bg-[#52b8c8]"
-            >
-              Confirm Location
-            </button>
-          </div>
-        )}
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={!coords}
+            className="rounded-lg bg-[#3DA7B7] px-5 py-2 text-xs font-semibold text-black transition hover:bg-[#52b8c8] disabled:opacity-50"
+          >
+            Confirm Location
+          </button>
+        </div>
       </div>
 
       {/* ====== ANIMATIONS ====== */}

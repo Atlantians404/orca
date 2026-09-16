@@ -270,53 +270,57 @@ const pendingTurn =
     async (coordString) => {
       setShowLocationPicker(false);
 
-      if (!sessionId || sending || !pendingTurn) return;
+      if (!sessionId || sending) return;
 
-      setError(null);
-      setSending(true);
+      if (pendingTurn) {
+        setError(null);
+        setSending(true);
 
-      const userMessage = makeUserMessage(coordString);
-      const pendingAssistant = makePendingAssistantMessage();
+        const userMessage = makeUserMessage(coordString);
+        const pendingAssistant = makePendingAssistantMessage();
 
-      setMessages((previous) => [
-        ...previous,
-        userMessage,
-        pendingAssistant,
-      ]);
+        setMessages((previous) => [
+          ...previous,
+          userMessage,
+          pendingAssistant,
+        ]);
 
-      try {
-        const assistantMessage = await resumeChat(
-          sessionId,
-          coordString
-        );
-
-        setMessages((previous) => {
-          const withoutPlaceholder = previous.filter(
-            (message) => message.id !== pendingAssistant.id
+        try {
+          const assistantMessage = await resumeChat(
+            sessionId,
+            coordString
           );
-          return [...withoutPlaceholder, assistantMessage];
-        });
-      } catch (err) {
-        setMessages((previous) =>
-          previous.filter(
-            (message) => message.id !== pendingAssistant.id
-          )
-        );
 
-        setError({
-          message:
-            err?.message ||
-            "ORCA couldn't complete that request.",
-          action: {
-            type: "resume",
-            payload: coordString,
-          },
-        });
-      } finally {
-        setSending(false);
+          setMessages((previous) => {
+            const withoutPlaceholder = previous.filter(
+              (message) => message.id !== pendingAssistant.id
+            );
+            return [...withoutPlaceholder, assistantMessage];
+          });
+        } catch (err) {
+          setMessages((previous) =>
+            previous.filter(
+              (message) => message.id !== pendingAssistant.id
+            )
+          );
+
+          setError({
+            message:
+              err?.message ||
+              "ORCA couldn't complete that request.",
+            action: {
+              type: "resume",
+              payload: coordString,
+            },
+          });
+        } finally {
+          setSending(false);
+        }
+      } else {
+        handleSend(coordString);
       }
     },
-    [sessionId, sending, pendingTurn]
+    [sessionId, sending, pendingTurn, handleSend]
   );
   // ============================================================
   // RETRY
