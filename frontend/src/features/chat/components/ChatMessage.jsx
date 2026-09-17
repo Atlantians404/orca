@@ -306,6 +306,7 @@ function InteractiveRouteMap({ responseData }) {
   const [fetchedZones, setFetchedZones] = useState([]);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error | dismissed
   const [saveError, setSaveError] = useState("");
+  const hasFetchedZonesRef = useRef(false);
 
   const normalized = useMemo(
     () => normalizeRouteData(responseData),
@@ -316,12 +317,16 @@ function InteractiveRouteMap({ responseData }) {
     if (!normalized) return;
     if (normalized.marineZones && normalized.marineZones.length > 0) {
       setFetchedZones(normalized.marineZones);
-    } else {
+      hasFetchedZonesRef.current = true;
+    } else if (!hasFetchedZonesRef.current) {
+      hasFetchedZonesRef.current = true;
       getMarineZones()
         .then((data) =>
           setFetchedZones(Array.isArray(data) ? data : data?.zones || [])
         )
-        .catch(() => {});
+        .catch(() => {
+          hasFetchedZonesRef.current = false;
+        });
     }
   }, [normalized]);
 

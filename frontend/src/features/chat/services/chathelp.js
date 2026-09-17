@@ -154,6 +154,14 @@ export async function getChatHistory(sessionId) {
     return [];
   }
 
+  console.group("[ORCA API REQUEST]");
+  console.log("endpoint:", `/chat/${sessionId}/history`);
+  console.log("method:", "GET");
+  console.log("sessionId:", sessionId);
+  console.log("payload:", null);
+  console.trace("request origin");
+  console.groupEnd();
+
   try {
     const response = await api.get(
       `/chat/${sessionId}/history`
@@ -190,11 +198,21 @@ export async function sendMessage(sessionId, message) {
     throw new Error("Please enter a message.");
   }
 
+  const payload = {
+    session_id: sessionId,
+    message: trimmedMessage,
+  };
+
+  console.group("[ORCA API REQUEST]");
+  console.log("endpoint:", "/chat");
+  console.log("method:", "POST");
+  console.log("sessionId:", sessionId);
+  console.log("payload:", payload);
+  console.trace("request origin");
+  console.groupEnd();
+
   try {
-    const response = await api.post("/chat", {
-      session_id: sessionId,
-      message: trimmedMessage,
-    });
+    const response = await api.post("/chat", payload);
 
     return normalizeChatResponse(response.data);
   } catch (error) {
@@ -228,12 +246,22 @@ export async function resumeChat(sessionId, value) {
     throw new Error("Please enter a value.");
   }
 
+  const payload = {
+    value,
+  };
+
+  console.group("[ORCA API REQUEST]");
+  console.log("endpoint:", `/chat/${sessionId}/resume`);
+  console.log("method:", "POST");
+  console.log("sessionId:", sessionId);
+  console.log("payload:", payload);
+  console.trace("request origin");
+  console.groupEnd();
+
   try {
     const response = await api.post(
       `/chat/${sessionId}/resume`,
-      {
-        value,
-      }
+      payload
     );
 
     return normalizeChatResponse(response.data);

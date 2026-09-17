@@ -15,6 +15,8 @@ import axios from "axios";
  
 const baseURL = import.meta.env.VITE_API_BASE_URL ?? "";
 
+console.log("[ORCA API INIT] API_BASE_URL:", baseURL || "(using Vite proxy target: https://orca-qlqz.onrender.com)");
+
 const api = axios.create({
   baseURL,
   headers: {

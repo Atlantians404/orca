@@ -73,6 +73,7 @@ export default function ChatWindow({ session }) {
 
   const bottomRef = useRef(null);
   const requestRef = useRef(0);
+  const isSendingRef = useRef(false);
 
   // ============================================================
   // RESET INPUT / ERROR WHEN SESSION CHANGES
@@ -84,6 +85,7 @@ export default function ChatWindow({ session }) {
     setPrevSessionId(sessionId);
     setError(null);
     setInputValue("");
+    isSendingRef.current = false;
   }
 
   // ============================================================
@@ -149,30 +151,8 @@ export default function ChatWindow({ session }) {
   //
   // IMPORTANT:
   // Every user response is treated as a normal chat message.
-  //
-  // Example:
-  //
-  // ORCA:
-  // "Please provide your current fishing location."
-  //
-  // User:
-  // "Chennai"
-  //
-  // -> POST /chat
-  // {
-  //   session_id: 1,
-  //   message: "Chennai"
-  // }
-  //
-  // We DO NOT turn backend `options` into clickable buttons.
+  // Synchronous isSendingRef guard enforces ONE user action = ONE request.
   // ============================================================
-
-  // ============================================================
-// PENDING WORKFLOW
-// If ORCA is waiting for additional information, the next
-// message typed by the user is sent through /resume.
-// Backend options are NOT displayed as buttons.
-// ============================================================
 
 function parseLocationInput(text) {
   if (!text || typeof text !== "string") return null;
@@ -209,95 +189,100 @@ const pendingTurn =
     : null;
 
   const handleSend = useCallback(
-  async (text) => {
-    if (!sessionId || sending) return;
+    async (text) => {
+      if (!sessionId || isSendingRef.current) return;
+      if (typeof text !== "string") return;
 
-    const trimmed = text.trim();
+      const trimmed = text.trim();
 
-    if (!trimmed) return;
+      if (!trimmed) return;
 
-    setError(null);
+      isSendingRef.current = true;
+      setSending(true);
+      setError(null);
 
-    let valueToSend = trimmed;
-    if (pendingTurn && pendingTurn.pending_action === "location") {
-      const parsed = parseLocationInput(trimmed);
-      if (parsed) {
-        valueToSend = parsed;
-      } else if (/^[\d.\s,-]+$/.test(trimmed)) {
-        setError({
-          message:
-            "Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).",
-          action: null,
+      let valueToSend = trimmed;
+      if (pendingTurn && pendingTurn.pending_action === "location") {
+        const parsed = parseLocationInput(trimmed);
+        if (parsed) {
+          valueToSend = parsed;
+        } else if (/^[\d.\s,-]+$/.test(trimmed)) {
+          setError({
+            message:
+              "Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).",
+            action: null,
+          });
+          isSendingRef.current = false;
+          setSending(false);
+          return;
+        }
+      }
+
+      setInputValue("");
+
+      const userMessage = makeUserMessage(trimmed);
+      const pendingAssistant = makePendingAssistantMessage();
+
+      setMessages((previous) => [
+        ...previous,
+        userMessage,
+        pendingAssistant,
+      ]);
+
+      try {
+        let assistantMessage;
+
+        if (pendingTurn) {
+          // ORCA is waiting for an answer.
+          // Send the user's value through /resume.
+          assistantMessage = await resumeChat(
+            sessionId,
+            valueToSend
+          );
+        } else {
+          // Normal conversation.
+          assistantMessage = await sendMessage(
+            sessionId,
+            trimmed
+          );
+        }
+
+        setMessages((previous) => {
+          const withoutPlaceholder =
+            previous.filter(
+              (message) =>
+                message.id !== pendingAssistant.id
+            );
+
+          return [
+            ...withoutPlaceholder,
+            assistantMessage,
+          ];
         });
-        return;
-      }
-    }
-
-    setInputValue("");
-    setSending(true);
-
-    const userMessage = makeUserMessage(trimmed);
-    const pendingAssistant = makePendingAssistantMessage();
-
-    setMessages((previous) => [
-      ...previous,
-      userMessage,
-      pendingAssistant,
-    ]);
-
-    try {
-      let assistantMessage;
-
-      if (pendingTurn) {
-        // ORCA is waiting for an answer.
-        // Send the user's value through /resume.
-        assistantMessage = await resumeChat(
-          sessionId,
-          valueToSend
-        );
-      } else {
-        // Normal conversation.
-        assistantMessage = await sendMessage(
-          sessionId,
-          trimmed
-        );
-      }
-
-      setMessages((previous) => {
-        const withoutPlaceholder =
+      } catch (err) {
+        setMessages((previous) =>
           previous.filter(
             (message) =>
               message.id !== pendingAssistant.id
-          );
+          )
+        );
 
-        return [
-          ...withoutPlaceholder,
-          assistantMessage,
-        ];
-      });
-    } catch (err) {
-      setMessages((previous) =>
-        previous.filter(
-          (message) =>
-            message.id !== pendingAssistant.id
-        )
-      );
-
-      setError({
-        message:
-          err?.message ||
-          "ORCA couldn't complete that request.",
-        action: {
-          type: pendingTurn ? "resume" : "send",
-          payload: valueToSend,
-        },
-      });
-    } finally {
-      setSending(false);
-    }
-  },
-  [sessionId, sending, pendingTurn]
-);
+        setError({
+          message:
+            err?.message ||
+            "ORCA couldn't complete that request.",
+          action: {
+            type: pendingTurn ? "resume" : "send",
+            payload: valueToSend,
+          },
+        });
+      } finally {
+        isSendingRef.current = false;
+        setSending(false);
+      }
+    },
+    [sessionId, pendingTurn]
+  );
 
   // ============================================================
   // LOCATION CONFIRMED
@@ -310,7 +295,7 @@ const pendingTurn =
     async (location) => {
       setShowLocationPicker(false);
 
-      if (!sessionId || sending) return;
+      if (!sessionId || isSendingRef.current) return;
 
       const displayContent =
         typeof location === "object" &&
@@ -322,8 +307,9 @@ const pendingTurn =
           : String(location);
 
       if (pendingTurn) {
-        setError(null);
+        isSendingRef.current = true;
         setSending(true);
+        setError(null);
 
         const userMessage = makeUserMessage(displayContent);
         const pendingAssistant = makePendingAssistantMessage();
@@ -363,27 +349,72 @@ const pendingTurn =
             },
           });
         } finally {
+          isSendingRef.current = false;
           setSending(false);
         }
       } else {
         handleSend(displayContent);
       }
     },
-    [sessionId, sending, pendingTurn, handleSend]
+    [sessionId, pendingTurn, handleSend]
   );
+
   // ============================================================
   // RETRY
   // ============================================================
 
-  const handleRetry = useCallback(() => {
-    if (!error?.action) return;
+  const handleRetry = useCallback(async () => {
+    if (!error?.action || !sessionId || isSendingRef.current) return;
 
-    const { payload } = error.action;
-
+    const { type, payload } = error.action;
     setError(null);
 
-    handleSend(payload);
-  }, [error, handleSend]);
+    if (type === "resume") {
+      isSendingRef.current = true;
+      setSending(true);
+
+      const displayContent =
+        typeof payload === "object" && payload?.latitude != null
+          ? `${Number(payload.latitude).toFixed(6)}, ${Number(
+              payload.longitude
+            ).toFixed(6)}`
+          : String(payload);
+
+      const userMessage = makeUserMessage(displayContent);
+      const pendingAssistant = makePendingAssistantMessage();
+
+      setMessages((previous) => [...previous, userMessage, pendingAssistant]);
+
+      try {
+        const assistantMessage = await resumeChat(sessionId, payload);
+
+        setMessages((previous) => {
+          const withoutPlaceholder = previous.filter(
+            (message) => message.id !== pendingAssistant.id
+          );
+          return [...withoutPlaceholder, assistantMessage];
+        });
+      } catch (err) {
+        setMessages((previous) =>
+          previous.filter((message) => message.id !== pendingAssistant.id)
+        );
+
+        setError({
+          message:
+            err?.message || "ORCA couldn't complete that request.",
+          action: {
+            type: "resume",
+            payload,
+          },
+        });
+      } finally {
+        isSendingRef.current = false;
+        setSending(false);
+      }
+    } else {
+      handleSend(typeof payload === "string" ? payload : String(payload));
+    }
+  }, [error, sessionId, handleSend]);
 
   // ============================================================
   // SUGGESTION CLICK
