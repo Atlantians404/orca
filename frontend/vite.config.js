@@ -9,17 +9,17 @@ export default defineConfig({
     cors: true,
     proxy: {
       '/auth': {
-        target: 'https://orca-qlqz.onrender.com',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
       '/sessions': {
-        target: 'https://orca-qlqz.onrender.com',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
       '/chat': {
-        target: 'https://orca-qlqz.onrender.com',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         bypass: (req) => {
@@ -30,7 +30,7 @@ export default defineConfig({
         },
       },
       '/profile': {
-        target: 'https://orca-qlqz.onrender.com',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
         bypass: (req) => {
@@ -40,10 +40,11 @@ export default defineConfig({
         },
       },
       '/api': {
-        target: 'https://orca-qlqz.onrender.com',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         secure: false,
       },
     },
   },
 })
+

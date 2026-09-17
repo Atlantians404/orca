@@ -29,41 +29,43 @@ export default function RouteDetailsPanel({ map, safeRoute }) {
   const isSafe = activeRoute?.safe ?? innerMap?.safe ?? true;
 
   return (
-    <div className="rounded-xl border border-line bg-surface p-5">
-      <p className="text-xs text-mute">{pfzName}</p>
-      <h3 className="mt-1 font-display text-xl text-ink tracking-tightest">
+    <div className="rounded-xl border border-[#202023] bg-[#0A0A0C] p-4 sm:p-5">
+      <p className="text-xs font-semibold uppercase tracking-wider text-[#3DA7B7]">{pfzName}</p>
+      <h3 className="mt-1 font-display text-lg sm:text-xl font-bold text-white tracking-tight">
         {routeId}
       </h3>
 
-      <p className="mt-4 text-2xl font-display text-ink tracking-tightest">
+      <p className="mt-3 text-2xl font-bold text-white tracking-tight">
         {formatDistance(activeRoute)}
       </p>
 
-      <div className="mt-5 grid grid-cols-2 gap-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#202023] pt-4">
         <div>
-          <p className="text-xs text-mute2 uppercase tracking-wide">Risk score</p>
-          <p className="mt-1 text-sm text-ink">{formatRiskScore(activeRoute)}</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[#77777C]">Risk score</p>
+          <p className="mt-1 text-sm font-semibold text-white">{formatRiskScore(activeRoute)}</p>
         </div>
         <div>
-          <p className="text-xs text-mute2 uppercase tracking-wide">Risk level</p>
-          <p className="mt-1 text-sm text-ink">{riskLabel || '—'}</p>
+          <p className="text-[10px] font-medium uppercase tracking-wider text-[#77777C]">Risk level</p>
+          <p className="mt-1 text-sm font-semibold text-[#3DA7B7]">{riskLabel || 'LOW'}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex items-center justify-between border-t border-[#202023] pt-3">
         <span
-          className={`inline-flex items-center gap-1.5 text-xs rounded-full border border-line2 px-2.5 py-1 ${
-            isSafe ? 'text-ink' : 'text-mute'
+          className={`inline-flex items-center gap-1.5 text-[11px] font-bold tracking-wider rounded-md border px-2.5 py-1 uppercase ${
+            isSafe
+              ? 'border-[#3DA7B7]/40 bg-[#3DA7B7]/10 text-[#3DA7B7]'
+              : 'border-amber-500/40 bg-amber-500/10 text-amber-400'
           }`}
         >
-          <span className={`h-1.5 w-1.5 rounded-full ${isSafe ? 'bg-white' : 'border border-white/60'}`} />
+          <span className={`h-1.5 w-1.5 rounded-full ${isSafe ? 'bg-[#3DA7B7]' : 'bg-amber-400'}`} />
           {isSafe ? 'SAFE ROUTE' : 'REVIEW ROUTE'}
         </span>
-      </div>
 
-      {waypointCount != null && (
-        <p className="mt-4 text-xs text-mute">{waypointCount} waypoints</p>
-      )}
+        {waypointCount != null && (
+          <span className="text-xs text-[#77777C] font-medium">{waypointCount} waypoints</span>
+        )}
+      </div>
     </div>
   );
 }
