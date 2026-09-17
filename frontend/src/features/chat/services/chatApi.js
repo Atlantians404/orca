@@ -1,67 +1,131 @@
 import api from "../../../services/api";
 
+// =====================================================
+// SESSION APIs
+// =====================================================
+// These are already used by RecentSessions / session layer.
+// DO NOT REMOVE THEM.
+// =====================================================
+
+export const getAllSessions = async () => {
+  const response = await api.get("/sessions");
+  return response.data;
+};
+
+export const getSession = async (sessionId) => {
+  const response = await api.get(`/sessions/${sessionId}`);
+  return response.data;
+};
+
+export const createSession = async (data = {}) => {
+  const response = await api.post("/sessions", data);
+  return response.data;
+};
+
+export const updateSession = async (sessionId, data) => {
+  const response = await api.patch(`/sessions/${sessionId}`, data);
+  return response.data;
+};
+
+export const deleteSession = async (sessionId) => {
+  const response = await api.delete(`/sessions/${sessionId}`);
+  return response.data;
+};
+
+// =====================================================
+// PIN / UNPIN
+// =====================================================
+
+export const getPinnedSessions = async (page = 1, limit = 100) => {
+  const response = await api.get("/sessions/pinned", {
+    params: {
+      page,
+      limit,
+    },
+  });
+
+  return response.data;
+};
+
+export const pinSession = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/pin`);
+  return response.data;
+};
+
+export const unpinSession = async (sessionId) => {
+  const response = await api.delete(`/sessions/${sessionId}/pin`);
+  return response.data;
+};
+
+// =====================================================
+// ARCHIVE / UNARCHIVE
+// =====================================================
+
+export const getArchivedSessions = async (page = 1, limit = 100) => {
+  const response = await api.get("/sessions/archived", {
+    params: {
+      page,
+      limit,
+    },
+  });
+
+  return response.data;
+};
+
+export const archiveSession = async (sessionId) => {
+  const response = await api.post(`/sessions/${sessionId}/archive`);
+  return response.data;
+};
+
+export const unarchiveSession = async (sessionId) => {
+  const response = await api.delete(`/sessions/${sessionId}/archive`);
+  return response.data;
+};
+
+// =====================================================
+// CHAT APIs — YOUR ACTUAL 3 ENDPOINTS
+// =====================================================
+
 /**
- * Session model (JSDoc, since this is a JS project — not TS).
- * Matches the real /sessions API contract:
+ * GET /chat/{session_id}/history
  *
- * @typedef {Object} Session
- * @property {number} id - integer, not a UUID
- * @property {string} title
- * @property {string} [summary] - present on Create/GetOne/GetAll/Update responses
- * @property {...*} [rest] - any extra fields the backend adds are preserved
+ * Loads the complete conversation for a session.
  */
-
-const SESSIONS_URL = "/sessions";
+export const getChatHistory = async (sessionId) => {
+  const response = await api.get(`/chat/${sessionId}/history`);
+  return response.data;
+};
 
 /**
- * Passes through whatever the backend sends so we never silently drop
- * fields it adds later. Only guarantees id/title exist.
+ * POST /chat
  *
- * NOTE: the real API has no createdAt/updatedAt — don't rely on those.
+ * Request:
+ * {
+ *   session_id: number,
+ *   message: string
+ * }
  */
-function normalizeSession(raw) {
-  if (!raw) return raw;
-  return {
-    id: raw.id,
-    title: raw.title ?? "New Conversation",
-    summary: raw.summary ?? "",
-    ...raw, // keep any additional backend fields
-  };
-}
+export const sendChatMessage = async (sessionId, message) => {
+  const response = await api.post("/chat", {
+    session_id: sessionId,
+    message,
+  });
 
-/** Create a new chat session. Body: { title }. Returns 201 + session. */
-export async function createSession(data) {
-  const res = await api.post(SESSIONS_URL, data);
-  return normalizeSession(res.data);
-}
+  return response.data;
+};
 
 /**
- * Get all chat sessions (paginated).
- * GET /sessions?page=&limit= -> { items, page, limit, total }
+ * POST /chat/{session_id}/resume
  *
- * @param {{page?: number, limit?: number}} [params]
- * @returns {Promise<{items: Session[], page: number, limit: number, total: number}>}
+ * Request:
+ * {
+ *   value: string
+ * }
  */
-export async function getAllSessions(params = {}) {
-  const res = await api.get(SESSIONS_URL, { params });
-  const { items = [], page, limit, total } = res.data ?? {};
-  return { items: items.map(normalizeSession), page, limit, total };
-}
+export const resumeChat = async (sessionId, value) => {
+  const response = await api.post(`/chat/${sessionId}/resume`, {
+    value,
+  });
 
-/** Get a single chat session by id. */
-export async function getSession(id) {
-  const res = await api.get(`${SESSIONS_URL}/${id}`);
-  return normalizeSession(res.data);
-}
-
-/** Update a session (e.g. rename). Body: { title }. */
-export async function updateSession(id, data) {
-  const res = await api.patch(`${SESSIONS_URL}/${id}`, data);
-  return normalizeSession(res.data);
-}
-
-/** Delete a session. Responds 204 with no body — just confirm success. */
-export async function deleteSession(id) {
-  await api.delete(`${SESSIONS_URL}/${id}`);
-  return id;
-}
+  return response.data;
+};
