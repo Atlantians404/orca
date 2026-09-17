@@ -1,288 +1,54 @@
 import asyncio
-from langgraph.types import Command
-from ai.graph.graph import app_graph
+import json
 
-THREAD_ID = "test-thread-pfz-route-001"
-
-config = {
-    "configurable": {
-        "thread_id": THREAD_ID,
-    }
-}
+from ai.orchestrator import orchestrate
 
 
-def separator(title: str):
-    print("\n" + "=" * 80)
-    print(title)
-    print("=" * 80)
+TEST_CASES = [
+    "Hello",
+    "Plan a fishing trip tomorrow at 6 AM from Chennai",
+    "Find a safe PFZ within 30 km tomorrow at 6 AM",
+    "Is Pondicherry safe?",
+    "Give me a route to Pondicherry",
+    "I want to go fishing at 5:30 PM",
+]
 
 
-def print_interrupts(result):
-    interrupts = result.get("__interrupt__")
+async def test_orchestrator():
 
-    if not interrupts:
-        return
+    for i, prompt in enumerate(TEST_CASES, 1):
 
-    separator("INTERRUPT")
+        print("\n" + "=" * 70)
+        print(f"TEST {i}")
+        print(f"USER: {prompt}")
+        print("=" * 70)
 
-    for interrupt in interrupts:
-        value = interrupt.value
-
-        print("Action :", value.get("action"))
-        print("Message:", value.get("message"))
-
-        options = value.get("options") or []
-
-        if not options:
-            continue
-
-        print("\nOptions:")
-
-        for i, option in enumerate(options, 1):
-            if isinstance(option, str):
-                print(f"{i}. {option}")
-                continue
-
-            if isinstance(option, dict):
-                name = option.get("pfz_name", option.get("name", "Unknown PFZ"))
-                times = option.get("times") or []
-
-                if times and isinstance(times[0], dict):
-                    t = times[0]
-                    print(
-                        f"{i}. {name} | "
-                        f"Risk: {t.get('risk_score')} | "
-                        f"Level: {t.get('risk_level')} | "
-                        f"Time: {t.get('time')}"
-                    )
-                else:
-                    print(f"{i}. {name}")
-                continue
-
-            print(f"{i}. {option}")
-
-
-def print_state(state):
-    separator("CURRENT STATE")
-
-    print("\n--- WORKFLOW ---")
-    print("workflow_status :", state.get("workflow_status"))
-    print("pending_action  :", state.get("pending_action"))
-    print("query_type      :", state.get("query_type"))
-    print("route_required  :", state.get("route_required"))
-
-    print("\n--- LOCATION ---")
-    print("location        :", state.get("location"))
-    print("distance_km     :", state.get("distance_km"))
-
-    print("\n--- TIME ---")
-    time_context = state.get("time_context")
-    print("time_context    :", time_context)
-
-    if time_context:
-        print("timezone        :", getattr(time_context, "timezone", None))
-        print("slots           :", getattr(time_context, "slots", None))
-
-    print("\n--- PFZ ---")
-    candidates = state.get("pfz_candidates", {})
-    print(
-        "PFZ count       :",
-        len(candidates) if isinstance(candidates, (dict, list)) else 0,
-    )
-    print("selected_pfz_name:", state.get("selected_pfz_name"))
-    print("selected_pfz     :", state.get("selected_pfz"))
-
-    print("\n--- DATA ---")
-    agent_data = state.get("agent_data", {})
-    print(
-        "agent_data count:",
-        len(agent_data) if isinstance(agent_data, dict) else 0,
-    )
-    if isinstance(agent_data, dict):
-        print("agent_data keys  :", list(agent_data.keys())[:20])
-
-    print("\n--- RISK ---")
-    print(state.get("risk_result"))
-
-    print("\n--- ROUTE ---")
-    print(state.get("route_result"))
-
-    print("\n--- RESPONSE ---")
-    print(state.get("response"))
-
-    print("\n--- ERROR ---")
-    print("error_message   :", state.get("error_message"))
-    print("cancellation    :", state.get("cancellation_reason"))
-
-
-async def main():
-
-    # ========================================================
-    # STEP 1 - INITIAL REQUEST
-    # ========================================================
-
-    separator("STEP 1 - INITIAL REQUEST")
-
-    prompt = "Plan a fishing trip with route"
-    print("User:", prompt)
-
-    result = await app_graph.ainvoke(
-        {
-            "thread_id": THREAD_ID,
+        state = {
             "prompt": prompt,
             "conversation_summary": "",
-        },
-        config=config,
-    )
+            "workflow_status": "IN_PROGRESS",
+        }
 
-    print_interrupts(result)
+        try:
 
-    # ========================================================
-    # STEP 2 - LOCATION
-    # ========================================================
+            result = await orchestrate(state)
 
-    separator("STEP 2 - PROVIDE LOCATION")
+            print("\nRESULT:")
+            print(
+                json.dumps(
+                    result,
+                    indent=4,
+                    default=str,
+                )
+            )
 
-    location = {
-        "latitude": 13.0827,
-        "longitude": 80.2707,
-    }
+            print("\nSTATUS: ✅ PASSED")
 
-    print("User:", location)
+        except Exception as exc:
 
-    result = await app_graph.ainvoke(
-        Command(resume=location),
-        config=config,
-    )
-
-    print_interrupts(result)
-
-    # ========================================================
-    # STEP 3 - TIME
-    # ========================================================
-
-    separator("STEP 3 - PROVIDE TIME")
-
-    user_time = "tomorrow at 6 AM"
-    print("User:", user_time)
-
-    result = await app_graph.ainvoke(
-        Command(resume=user_time),
-        config=config,
-    )
-
-    print_interrupts(result)
-
-    # ========================================================
-    # STEP 4 - PFZ SELECTION
-    # ========================================================
-
-    separator("STEP 4 - SELECT PFZ")
-
-    interrupts = result.get("__interrupt__")
-
-    if not interrupts:
-        print("❌ No interrupt returned after time.")
-        print_state(result)
-        return
-
-    interrupt_value = interrupts[0].value
-    action = interrupt_value.get("action")
-
-    print("Pending action:", action)
-
-    if action != "SELECT_PFZ":
-        print("❌ Expected SELECT_PFZ.")
-        print_state(result)
-        return
-
-    options = interrupt_value.get("options") or []
-
-    if not options:
-        print("❌ No PFZ options available.")
-        print_state(result)
-        return
-
-    print("\nAvailable PFZs:")
-
-    for i, option in enumerate(options, 1):
-        if isinstance(option, dict):
-            name = option.get("pfz_name", option.get("name"))
-            print(f"{i}. {name}")
-        else:
-            print(f"{i}. {option}")
-
-    # Select the FIRST actual PFZ returned by the graph.
-    first_option = options[0]
-
-    if isinstance(first_option, dict):
-        selected_pfz = first_option.get("pfz_name")
-    else:
-        selected_pfz = first_option
-
-    if not selected_pfz:
-        print("❌ Could not determine PFZ name.")
-        print_state(result)
-        return
-
-    print("\nUser selected:", selected_pfz)
-
-    # ========================================================
-    # RESUME WITH PFZ
-    # ========================================================
-
-    result = await app_graph.ainvoke(
-        Command(resume=selected_pfz),
-        config=config,
-    )
-
-    print_interrupts(result)
-
-    # ========================================================
-    # STEP 5 - FINAL RESULT
-    # ========================================================
-
-    separator("STEP 5 - FINAL RESULT")
-    print_state(result)
-
-    # ================================================================================
-    # STEP 5 - FINAL RESULT
-    # ================================================================================
-
-    print("\n")
-    print("=" * 80)
-    print("STEP 5 - FINAL RESULT")
-    print("=" * 80)
-
-    final_state = result
-
-    # ================================================================================
-    # AI FINAL RESPONSE
-    # ================================================================================
-
-    print("\n")
-    print("=" * 80)
-    print("🤖 FINAL RESPONSE BY AI")
-    print("=" * 80)
-
-    response = final_state.get("response")
-
-    if response:
-        if hasattr(response, "model_dump"):
-            response_data = response.model_dump()
-
-            print("\n" + response_data.get("message", ""))
-
-            print("\n--- STRUCTURED RESPONSE ---")
-            print(response_data)
-
-        else:
-            print(response)
-    else:
-        print("❌ No AI response generated.")
-
-    print("=" * 80)
+            print("\nSTATUS: ❌ FAILED")
+            print(f"ERROR: {type(exc).__name__}: {exc}")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(test_orchestrator())

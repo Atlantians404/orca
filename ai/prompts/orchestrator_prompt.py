@@ -31,20 +31,18 @@ Analyze the user's request and extract the following fields.
 
    * true if the user asks for a route, directions, navigation,
      or asks how to reach/travel to a specific PFZ.
-   * otherwise false.
+   - otherwise false.
 
 5. time_input:
-
-   * Extract the complete time-related expression from the user's request.
-   * Include both the date expression and time when both are provided.
-   * Examples:
-     "tomorrow at 6 AM" → "tomorrow at 6 AM"
-     "today at 14:30" → "today at 14:30"
-     "day after tomorrow at 5 PM" → "day after tomorrow at 5 PM"
-     "at 6 AM" → "at 6 AM"
-     "tomorrow morning" → "tomorrow morning"
-   * If no date or time is mentioned → null.
-   * Do not invent a date or time.
+   - Extract the fishing/travel date and time if the user explicitly provides one.
+   - Preserve the complete time expression, including relative dates.
+   - Examples:
+     "I want to go fishing at 6 AM" → "6 AM"
+     "Plan a trip tomorrow at 6 AM" → "tomorrow at 6 AM"
+     "I want to leave at 14:30" → "14:30"
+     "Go fishing at 5:30 PM" → "5:30 PM"
+     "Go fishing tomorrow evening" → "tomorrow evening"
+   - If no time/date is mentioned → null.
 
 IMPORTANT RULES:
 
@@ -56,19 +54,29 @@ IMPORTANT RULES:
 * A request for a route is planning.
 * If the user explicitly asks for a route but does not provide a
   destination PFZ, selected_pfz_name must be null.
-* Extract the complete time expression exactly enough for the time
-  parser to resolve it.
-* Do not invent a time or date if the user did not provide one.
-* Return null when a field cannot be extracted.
+- If the user explicitly provides a fishing/travel time, extract it.
+- Do not invent a time if the user did not provide one.
+- Return null when a field cannot be extracted.
 
-Return ONLY valid JSON in exactly this format:
+CRITICAL OUTPUT RULE:
+
+Return ONLY a valid JSON object.
+
+Do NOT:
+- use markdown
+- use ```json
+- add explanations
+- add text before the JSON
+- add text after the JSON
+
+Return exactly this structure:
 
 {{
-"query_type": "general",
-"distance_km": null,
-"selected_pfz_name": null,
-"route_required": false,
-"time_input": null
+    "query_type": "general",
+    "distance_km": null,
+    "selected_pfz_name": null,
+    "route_required": false,
+    "time_input": null
 }}
 
 User request:
