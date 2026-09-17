@@ -191,45 +191,74 @@ Text + Map + Route
 ```
 ORCA/
 │
-├── app/
-│   ├── auth/
-│   │   ├── routes.py
-│   │   ├── schemas.py
-│   │   └── service.py
-│   ├── sessions/
-│   │   ├── routes.py
-│   │   ├── schemas.py
-│   │   └── service.py
-│   ├── chat/
-│   │   ├── routes.py
-│   │   ├── schemas.py
-│   │   └── service.py
-│   ├── profile/
-│   │   ├── routes.py
-│   │   └── service.py
-│   ├── maps/
-│   │   ├── routes.py
-│   │   ├── schemas.py
-│   │   └── service.py
-│   ├── agents/
-│   │   ├── orchestrator.py
-│   │   ├── safety_agent.py
-│   │   ├── planning_agent.py
-│   │   ├── data_collection_agent.py
-│   │   └── risk_engine.py
-│   ├── models/
+├── backend/                     # FastAPI application (REST API layer)
+│   ├── routes/                  # auth, session, chat, profile, maps
+│   ├── schemas/                 # Pydantic request/response models
+│   ├── services/                # business logic per domain
+│   ├── models/                  # SQLAlchemy ORM models
 │   ├── database/
-│   │   └── database.py
+│   │   └── database.py          # async Postgres engine/session
 │   ├── core/
-│   │   └── config.py
-│   └── main.py
+│   │   └── exceptions.py
+│   ├── config/
+│   │   └── logging.py
+│   ├── utils/
+│   │   └── auth_util.py         # JWT creation/verification
+│   ├── requirements.txt
+│   └── main.py                  # FastAPI app entrypoint
 │
-├── alembic/
-│   └── versions/
-├── tests/
-├── requirements.txt
-├── alembic.ini
-└── .env
+├── ai/                           # LangGraph multi-agent reasoning core
+│   ├── orchestrator.py          # routes requests to GENERAL/SAFETY/PLANNING
+│   ├── agent_state.py
+│   ├── graph/                   # graph.py, nodes.py, routing.py
+│   ├── agents/
+│   │   └── general_agent/
+│   ├── engines/
+│   │   ├── data_collection_engine/
+│   │   ├── risk_engine/         # engine.py, scoring.py, validator.py
+│   │   └── route_engine/        # pathfinding.py, geometry.py, graph.py
+│   ├── prompts/                 # orchestrator, time, summary prompts
+│   ├── schemas/                 # agent_response, location, time
+│   ├── services/
+│   │   └── conversation_summary.py
+│   ├── tools/                   # geo_tools, marine_tools, weather_tools, risk_helper
+│   └── configs/
+│       └── config.py
+│
+├── api/                          # thin wrappers over external data providers
+│   ├── marine/marine.py
+│   └── weather/weather.py
+│
+├── services/                     # shared/support services used by ai + backend
+│   ├── location/                 # marine_zones, pfz_to_coordinate, place_to_coordinate
+│   ├── time/time_parser.py
+│   ├── risk_engine_service/      # location_service, marine_batch, weather_batch
+│   ├── marine_data.py
+│   ├── marine_data_sources.py    # MongoDB-backed PFZ storage
+│   └── weather_data.py
+│
+├── data/
+│   └── restricted_zones/restricted_zones.json
+│
+├── frontend/                     # React 19 + Vite + Tailwind SPA
+│   ├── src/
+│   │   ├── features/             # auth, chat, landing, maps
+│   │   ├── pages/                # login, register, ProfilePage, MapsPage
+│   │   ├── components/           # chat, common, layout
+│   │   ├── services/              # api.js, authApi.js, mapsApi.js
+│   │   └── utils/risk.js
+│   ├── package.json
+│   └── vite.config.js
+│
+├── test/                         # pytest suites mirroring ai/ and services/
+│   ├── agent_test/ graph_test/ integration_test/ orchestrator_test/
+│   ├── risk_engine_test/ risk_helper_test/ route_engine_test/
+│   └── test_pfz*.py, test_marine_agent.py, test_data_collection.py
+│
+├── Dockerfile                    # backend image (uvicorn + Postgres client)
+├── docker-compose.yml            # backend + Postgres services
+├── .env.example
+└── package.json
 ```
 
 ---
