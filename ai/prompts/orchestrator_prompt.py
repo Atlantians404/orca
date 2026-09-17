@@ -29,18 +29,16 @@ Analyze the user's request and extract the following fields.
      or asks how to reach/travel to a specific PFZ.
    - otherwise false.
 
-IMPORTANT:
-5. fishing_time:
-   - Extract the fishing/travel time if the user explicitly provides one.
-   - Preserve the user's intended time in a clear 24-hour HH:MM format.
+5. time_input:
+   - Extract the fishing/travel date and time if the user explicitly provides one.
+   - Preserve the complete time expression, including relative dates.
    - Examples:
-     "I want to go fishing at 6 AM" → "06:00"
-     "Plan a trip tomorrow at 6 AM" → "06:00"
+     "I want to go fishing at 6 AM" → "6 AM"
+     "Plan a trip tomorrow at 6 AM" → "tomorrow at 6 AM"
      "I want to leave at 14:30" → "14:30"
-     "Go fishing at 5:30 PM" → "17:30"
-   - If the user provides a relative date and time such as
-     "tomorrow at 6 AM", extract the time portion as "06:00".
-   - If no time is mentioned → null.
+     "Go fishing at 5:30 PM" → "5:30 PM"
+     "Go fishing tomorrow evening" → "tomorrow evening"
+   - If no time/date is mentioned → null.
 
 IMPORTANT RULES:
 
@@ -54,22 +52,29 @@ IMPORTANT RULES:
   destination PFZ, selected_pfz_name must be null.
 - If the user explicitly provides a fishing/travel time, extract it.
 - Do not invent a time if the user did not provide one.
-- "6 AM", "06:00", and "6 in the morning" should all become "06:00".
-- "6 PM", "18:00", and "6 in the evening" should all become "18:00".
 - Return null when a field cannot be extracted.
 
-Return ONLY valid JSON in exactly this format:
+CRITICAL OUTPUT RULE:
+
+Return ONLY a valid JSON object.
+
+Do NOT:
+- use markdown
+- use ```json
+- add explanations
+- add text before the JSON
+- add text after the JSON
+
+Return exactly this structure:
 
 {{
     "query_type": "general",
     "distance_km": null,
     "selected_pfz_name": null,
-    "route_required": false
     "route_required": false,
-    "fishing_time": null
+    "time_input": null
 }}
 
 User request:
 {prompt}
 """
-
