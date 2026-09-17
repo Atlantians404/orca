@@ -1,3 +1,5 @@
+
+
 /* ============================================================
    ORCA auth popups (login + signup)
    Assumes .font-display (Space Grotesk 500/600/700) and
@@ -47,6 +49,14 @@
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55);
   padding: 40px 36px 32px;
   animation: auth-rise-in 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Hide the scrollbar but keep the content scrollable */
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge / IE */
+}
+
+.auth-card::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, new Edge */
 }
 
 .auth-card-wide {
@@ -194,9 +204,9 @@
 .auth-input:focus,
 .auth-select:focus {
   outline: none;
-  border-color: var(--orca-accent);
+  border-color: rgba(255, 255, 255, 0.45);
   background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 0 3px var(--orca-accent-soft);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.16);
 }
 
 .auth-input-error {
@@ -289,7 +299,7 @@
 .auth-link-inline {
   font-size: 12px;
   font-weight: 500;
-  color: var(--orca-accent);
+  color: #ffffff;
   background: none;
   border: none;
   padding: 0;
@@ -305,17 +315,17 @@
   width: 100%;
   font-size: 14px;
   font-weight: 600;
-  color: #06231d;
-  background: var(--orca-accent);
+  color: #000000;
+  background: #ffffff;
   border: none;
   border-radius: 10px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
 .auth-submit:hover:not(:disabled) {
-  filter: brightness(1.08);
+  background: #e6e6e6;
 }
 
 .auth-submit:active:not(:disabled) {
@@ -328,7 +338,7 @@
 }
 
 .auth-submit:focus-visible {
-  outline: 2px solid var(--orca-accent);
+  outline: 2px solid #ffffff;
   outline-offset: 2px;
 }
 
@@ -342,7 +352,7 @@
 .auth-link {
   font-size: 13px;
   font-weight: 600;
-  color: var(--orca-accent);
+  color: #ffffff;
   background: none;
   border: none;
   padding: 0;
@@ -351,12 +361,6 @@
 
 .auth-link:hover {
   text-decoration: underline;
-}
-
-/* Used only in the login popup: same links, but white instead of teal. */
-.auth-link-inline.auth-link-neutral,
-.auth-link.auth-link-neutral {
-  color: #ffffff;
 }
 
 /* ---------- Motion + responsiveness ---------- */

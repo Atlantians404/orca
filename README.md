@@ -1,53 +1,97 @@
-# ORCA 🌊🌊
+<div align="center">
 
-### Marine EcOsystem Reasoning with Collaborative Agents
+# 🌊 ORCA
 
-## Problem
+**Marine EcOsystem Reasoning with Collaborative Agents**
 
-Marine information is available from many different sources, including weather forecasts, ocean conditions, Potential Fishing Zones (PFZ), satellite observations, and marine warnings.
+*Conversational Marine Intelligence — Weather · Fishing Zones · Safety · Routing*
 
-However, users often need to search through different platforms and understand different types of information separately. This makes it difficult to quickly answer important questions such as:
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.136-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-PostGIS-336791?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Motor-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![LangChain](https://img.shields.io/badge/LangChain-AI-1C3C3C?style=for-the-badge&logo=chainlink&logoColor=white)](https://langchain.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agents-1C3C3C?style=for-the-badge)](https://langchain-ai.github.io/langgraph/)
+[![JWT](https://img.shields.io/badge/Auth-JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white)](https://jwt.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
 
-- Where is the nearest Potential Fishing Zone today?
-- Is it safe to go to sea tomorrow morning?
-- What are the weather, wind, and wave conditions near my location?
-- Which areas have favourable marine conditions?
-- Which areas should be avoided?
-- What is a safer route to a selected fishing location?
+[API Docs](#) · [Report Bug](issues) · [Request Feature](issues)
 
-The challenge is not simply the lack of marine data.
-
-**The challenge is understanding, combining, and reasoning over the available information.**
-
----
-
-## Our Solution
-
-**ORCA is a conversational Marine Intelligence Assistant that helps users understand complex marine information through natural language.**
-
-Instead of searching through multiple sources, users can simply ask ORCA questions about marine conditions, fishing zones, safety, and routes.
-
-For example:
-
-> **"Can I safely go to the nearest fishing zone tomorrow morning?"**
-
-ORCA can:
-
-1. Identify what information is required.
-2. Find the relevant fishing zone.
-3. Check weather and sea conditions.
-4. Check wind and wave conditions.
-5. Check available marine warnings.
-6. Analyze the overall risk.
-7. Recommend whether the location is suitable.
-8. Generate a safer route when required.
-9. Explain the recommendation clearly.
+</div>
 
 ---
 
-## How ORCA Works
+## 📌 Overview
 
-```text
+**ORCA** is a conversational Marine Intelligence Assistant that helps users understand complex marine information — weather, ocean conditions, Potential Fishing Zones (PFZ), satellite observations, and marine warnings — through natural language, instead of searching across multiple platforms.
+
+Ask ORCA a question like:
+
+> "Can I safely go to the nearest fishing zone tomorrow morning?"
+
+...and a network of collaborative agents identifies what's needed, gathers the relevant marine data, analyzes risk, and returns a clear recommendation — complete with a map and a safer route when required.
+
+> Built as a multi-agent, LLM-powered platform demonstrating end-to-end product engineering — REST APIs, async databases, geospatial reasoning, LangGraph agent orchestration, and human-in-the-loop decision flows.
+
+---
+
+## ✨ Features
+
+<details>
+<summary><b>🧭 Marine Intelligence Chat</b></summary>
+
+- Natural language questions about weather, sea state, and safety
+- Session-based conversations with history, pinning, and archiving
+- Context-aware follow-ups within a session
+- Human-in-the-loop confirmation before committing to a plan
+
+</details>
+
+<details>
+<summary><b>🎣 Fishing Zone & Safety Analysis</b></summary>
+
+- Identifies candidate Potential Fishing Zones (PFZ) near a location
+- Combines weather, wind, and wave data per zone
+- Runs each candidate through a risk engine
+- Returns a ranked Top 5 list of safe, favourable zones
+
+</details>
+
+<details>
+<summary><b>🗺️ Routing & Maps</b></summary>
+
+- Generates a safer route to a selected fishing zone
+- Marine zone lookups via geospatial queries
+- Save, list, retrieve, and delete personal maps
+- Route and zone data ready for map rendering on the frontend
+
+</details>
+
+<details>
+<summary><b>🔐 Authentication</b></summary>
+
+- JWT-based register, login, and logout
+- Secure password hashing (bcrypt / passlib)
+- `GET /auth/me` for current-user context
+- Bearer-token protected routes throughout the API
+
+</details>
+
+<details>
+<summary><b>👤 Profile & Sessions</b></summary>
+
+- User profile retrieval and updates
+- Full session lifecycle: create, list, update, delete
+- Pin and archive sessions for quick access later
+
+</details>
+
+---
+
+## 🧠 How ORCA Works
+
+```
 User Question
       ↓
 Understand the Request
@@ -61,4 +105,332 @@ Risk / Route Analysis
 Generate Recommendation
       ↓
 Text + Map + Route
+```
 
+### Agent Architecture
+
+```
+                         USER
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │  Chat API   │
+                    │  FastAPI    │
+                    └──────┬──────┘
+                           │
+                     session_id
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │ Agent State │
+                    └──────┬──────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │Orchestrator │
+                    └──────┬──────┘
+                           │
+             ┌─────────────┼─────────────┐
+             ▼             ▼             ▼
+         GENERAL        SAFETY        PLANNING
+             │             │             │
+             │             └──────┬──────┘
+             │                    │
+             │             Time + Location
+             │                    │
+             │                    ▼
+             │             PFZ Candidates
+             │                    │
+             │                    ▼
+             │         DATA COLLECTION AGENT
+             │                    │
+             │          Marine / Weather /
+             │          Geospatial functions
+             │                    │
+             │                    ▼
+             │               agent_data
+             │                    │
+             │                    ▼
+             │              RISK ENGINE
+             │                    │
+             │              risk_result
+             │                    │
+             │                    ▼
+             │                 TOP 5
+             │                    │
+             │                    ▼
+             │             HUMAN-IN-THE-LOOP
+             │                    │
+             │             selected_pfz
+             │                    │
+             │                    ▼
+             │              ROUTE ENGINE
+             │                    │
+             │              route_result
+             │                    │
+             └────────────────────┤
+                                  ▼
+                           FINAL RESPONSE
+                                  │
+                                  ▼
+                               FRONTEND
+                                  │
+                                  ▼
+                              MAP / PLAN
+                                  │
+                         User Accepts / Saves
+                                  │
+                                  ▼
+                              DATABASE
+```
+
+---
+
+## 🗂 Project Structure
+
+```
+ORCA/
+│
+├── app/
+│   ├── auth/
+│   │   ├── routes.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── sessions/
+│   │   ├── routes.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── chat/
+│   │   ├── routes.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── profile/
+│   │   ├── routes.py
+│   │   └── service.py
+│   ├── maps/
+│   │   ├── routes.py
+│   │   ├── schemas.py
+│   │   └── service.py
+│   ├── agents/
+│   │   ├── orchestrator.py
+│   │   ├── safety_agent.py
+│   │   ├── planning_agent.py
+│   │   ├── data_collection_agent.py
+│   │   └── risk_engine.py
+│   ├── models/
+│   ├── database/
+│   │   └── database.py
+│   ├── core/
+│   │   └── config.py
+│   └── main.py
+│
+├── alembic/
+│   └── versions/
+├── tests/
+├── requirements.txt
+├── alembic.ini
+└── .env
+```
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL with PostGIS (geospatial queries)
+- MongoDB instance (accessed via `motor`)
+- A Groq API key (for `langchain-groq`)
+
+---
+
+### Installation
+
+```bash
+# 1. Clone the repository
+git clone <repository-url>
+cd orca
+
+# 2. Create virtual environment
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# macOS / Linux
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment variables
+cp .env.example .env
+# Edit .env with your values
+
+# 5. Run database migrations
+alembic upgrade head
+
+# 6. Run the application
+uvicorn app.main:app --reload
+```
+
+The API will be available at `http://localhost:8000`, with interactive docs at `http://localhost:8000/docs`.
+
+---
+
+## 🔑 Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
+# PostgreSQL (PostGIS-enabled)
+DATABASE_URL=postgresql+asyncpg://username:password@localhost:5432/orca_db
+
+# MongoDB
+MONGO_URL=mongodb://localhost:27017
+MONGO_DB_NAME=orca
+
+# Auth
+SECRET_KEY=your_super_secret_key_here
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# AI / LLM
+GROQ_API_KEY=your_groq_api_key
+
+# External marine/weather data sources
+MARINE_DATA_API_KEY=your_provider_api_key
+WEATHER_API_KEY=your_provider_api_key
+```
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | ✅ | Async PostgreSQL/PostGIS connection string |
+| `MONGO_URL` | ✅ | MongoDB connection URI |
+| `SECRET_KEY` | ✅ | JWT signing secret |
+| `ALGORITHM` | ✅ | JWT algorithm — typically `HS256` |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | ✅ | Token TTL in minutes |
+| `GROQ_API_KEY` | 🤖 | Groq LLM API key for agent reasoning |
+| `MARINE_DATA_API_KEY` | 🌊 | Marine conditions / PFZ data provider |
+| `WEATHER_API_KEY` | ⛅ | Weather forecast data provider |
+
+---
+
+## 📡 API Reference
+
+Full interactive docs available at `/docs` after running the backend.
+
+### Auth
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/auth/register` | Register a new user |
+| POST | `/auth/login` | Log in and receive an access token |
+| GET | `/auth/me` | Get the current authenticated user |
+| POST | `/auth/logout` | Log out the current user |
+
+### Sessions
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/sessions` | Create a new session |
+| GET | `/sessions` | List sessions |
+| GET | `/sessions/pinned` | List pinned sessions |
+| POST | `/sessions/{session_id}/pin` | Pin a session |
+| DELETE | `/sessions/{session_id}/pin` | Unpin a session |
+| GET | `/sessions/archived` | List archived sessions |
+| POST | `/sessions/{session_id}/archive` | Archive a session |
+| DELETE | `/sessions/{session_id}/archive` | Unarchive a session |
+| GET | `/sessions/{session_id}` | Get a session by ID |
+| PATCH | `/sessions/{session_id}` | Update a session |
+| DELETE | `/sessions/{session_id}` | Delete a session |
+
+### Chat
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/chat` | Send a message to the assistant |
+| POST | `/chat/{session_id}/resume` | Resume a chat session |
+| GET | `/chat/{session_id}/history` | Get chat history for a session |
+
+### Profile
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/profile` | Get the current user's profile |
+| PATCH | `/profile` | Update the current user's profile |
+
+### Maps
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/api/routes/generate` | Generate a route to a selected location |
+| GET | `/api/marine-zones` | Get marine zone data |
+| POST | `/api/maps` | Create a saved map |
+| GET | `/api/maps` | List saved maps |
+| GET | `/api/maps/{map_id}` | Get a saved map by ID |
+| DELETE | `/api/maps/{map_id}` | Delete a saved map |
+
+---
+
+## 🤖 AI / Agent Pipeline
+
+ORCA's reasoning is handled by a set of collaborative **LangGraph** agents coordinated by an orchestrator:
+
+- **Orchestrator** — routes each request to `GENERAL`, `SAFETY`, or `PLANNING` handling
+- **Safety Agent** — assesses whether current/forecast conditions are safe for a given time and location
+- **Planning Agent** — resolves time + location into a set of PFZ candidates
+- **Data Collection Agent** — gathers marine, weather, and geospatial data per candidate
+- **Risk Engine** — scores each candidate and returns a ranked Top 5
+- **Human-in-the-Loop** — user selects a PFZ from the ranked list
+- **Route Engine** — generates a safer route to the selected zone
+
+---
+
+## 🔒 Security
+
+| Feature | Implementation |
+|---|---|
+| Password hashing | `bcrypt` via `passlib` |
+| Token auth | JWT (HS256) with expiry |
+| SQL injection | Prevented via SQLAlchemy ORM |
+| Input validation | Pydantic schemas on every request |
+
+---
+
+## 🔮 Future Improvements
+
+- [ ] 📱 Mobile-friendly client
+- [ ] 🔔 Real-time marine warning alerts
+- [ ] 🛰️ Direct satellite observation ingestion
+- [ ] 🌍 Multi-language support for coastal communities
+- [ ] 📊 Historical trend dashboard for a given zone
+- [ ] 🧭 Offline-capable route caching
+
+---
+
+## 🤝 Contributing
+
+Contributions, issues, and feature requests are welcome!
+
+```bash
+# Fork the repo, then:
+git checkout -b feature/your-feature-name
+git commit -m "feat: add your feature"
+git push origin feature/your-feature-name
+# Open a Pull Request
+```
+
+Please follow the existing code style and add relevant tests where applicable.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
+
+---
+
+<div align="center">
+
+Built by the ORCA Team
+
+**[⬆ Back to top](#-orca)**
+
+</div>

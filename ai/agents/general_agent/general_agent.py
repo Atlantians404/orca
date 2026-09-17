@@ -47,16 +47,11 @@ from services.location.pfz_to_coordinate import (
 )
 
 
-# =========================================================
-# LOCATION TOOLS
-# =========================================================
-
 @tool
 async def coordinates_tool(place: str) -> dict:
     """
     Convert a place name into latitude and longitude coordinates.
     """
-
     return await get_coordinates(place)
 
 
@@ -65,26 +60,12 @@ async def pfz_coordinates_tool(pfz_name: str) -> dict:
     """
     Get the latitude and longitude of a PFZ using its name.
     """
-
     return await get_pfz_coordinates(pfz_name)
 
 
-# =========================================================
-# GENERAL TOOLS
-# =========================================================
-
 GENERAL_TOOLS = [
-
-    # =====================================================
-    # LOCATION
-    # =====================================================
-
     coordinates_tool,
     pfz_coordinates_tool,
-
-    # =====================================================
-    # WEATHER
-    # =====================================================
 
     temperature_tool,
     wind_speed_tool,
@@ -96,55 +77,32 @@ GENERAL_TOOLS = [
     weather_condition_tool,
     thunderstorm_tool,
 
-    # =====================================================
-    # MARINE
-    # =====================================================
-
     wave_height_tool,
     wave_direction_tool,
     wave_period_tool,
-
     swell_wave_height_tool,
     swell_wave_direction_tool,
     swell_wave_period_tool,
-
     ocean_current_velocity_tool,
     ocean_current_direction_tool,
-
     sea_surface_temperature_tool,
     sea_level_height_tool,
-
-    # =====================================================
-    # MARINE WARNINGS
-    # =====================================================
 
     marine_warning_tool,
     high_wave_alert_tool,
     high_wave_warning_message_tool,
     high_wave_warning_color_tool,
 
-    # =====================================================
-    # MARINE ZONES
-    # =====================================================
-
     protected_zone_tool,
     restricted_zone_tool,
 ]
 
-
-# =========================================================
-# TOOL LOOKUP
-# =========================================================
 
 TOOL_MAP = {
     tool.name: tool
     for tool in GENERAL_TOOLS
 }
 
-
-# =========================================================
-# SYSTEM PROMPT
-# =========================================================
 
 SYSTEM_PROMPT = """
 You are ORCA's General Marine and Fishing Assistant.
@@ -196,130 +154,97 @@ RULES:
    provide one clear final answer.
 
 10. Do not expose internal tool calls.
+
+11. When a RESOLVED TIME CONTEXT is provided below,
+    it is authoritative.
+
+12. When calling a weather tool, ALWAYS use the date and time
+    from the RESOLVED TIME CONTEXT.
+
+13. NEVER invent a year, date, or time for a weather tool call.
+
+14. If the user says "tomorrow", "today", or another relative
+    date, use the already-resolved date supplied in the
+    RESOLVED TIME CONTEXT.
+
+15. Do not use dates from your own knowledge or assumptions.
 """
 
-
-# =========================================================
-# BIND TOOLS
-# =========================================================
 
 llm_with_tools = llm.bind_tools(
     GENERAL_TOOLS
 )
 
 
-# =========================================================
-# GENERAL AGENT
-# =========================================================
+async def general_agent(messages, time_context=None):
+    resolved_time = ""
 
-async def general_agent(messages):
+    if time_context is not None:
+        resolved_time = f"""
+
+RESOLVED TIME CONTEXT:
+{time_context}
+
+This time context has already been resolved by ORCA.
+Use it as the authoritative date and time for all weather
+tool calls. Do not generate another date or time.
+"""
 
     current_messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT,
+            "content": SYSTEM_PROMPT + resolved_time,
         },
         *messages,
     ]
 
     while True:
-
-        # =================================================
-        # ASK LLM
-        # =================================================
-
         response = await llm_with_tools.ainvoke(
             current_messages
         )
 
         current_messages.append(response)
 
-        # =================================================
-        # NO TOOL CALL
-        # =================================================
-
         if not response.tool_calls:
-
-            # ---------------------------------------------
-            # Valid final response
-            # ---------------------------------------------
-
-            if (
-                response.content
-                and response.content.strip()
-            ):
+            if response.content and response.content.strip():
                 return {
                     "messages": current_messages
                 }
 
-            # ---------------------------------------------
-            # Empty response
-            # Ask LLM to continue
-            # ---------------------------------------------
-
-            current_messages.append({
-                "role": "user",
-                "content": (
-                    "Continue. Check whether any requested "
-                    "information is still missing. If information "
-                    "is missing, call the required tool. Otherwise "
-                    "provide the final answer."
-                ),
-            })
+            current_messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "Continue. Check whether any requested "
+                        "information is still missing. If information "
+                        "is missing, call the required tool. Otherwise "
+                        "provide the final answer."
+                    ),
+                }
+            )
 
             continue
 
-        # =================================================
-        # TOOL CALLS
-        # =================================================
-
         for tool_call in response.tool_calls:
-
             tool_name = tool_call["name"]
-
             tool_args = tool_call["args"]
-
             tool_call_id = tool_call["id"]
 
-            # ---------------------------------------------
-            # Find tool
-            # ---------------------------------------------
-
-            selected_tool = TOOL_MAP.get(
-                tool_name
-            )
-
-            # ---------------------------------------------
-            # Tool not found
-            # ---------------------------------------------
+            selected_tool = TOOL_MAP.get(tool_name)
 
             if selected_tool is None:
-
                 tool_result = (
                     f"Tool '{tool_name}' is not available."
                 )
-
-            # ---------------------------------------------
-            # Execute tool
-            # ---------------------------------------------
-
             else:
-
                 try:
-
                     tool_result = await selected_tool.ainvoke(
                         tool_args
                     )
-
                 except Exception as e:
-
                     tool_result = (
                         f"Tool execution failed: {str(e)}"
                     )
-
-            # ---------------------------------------------
-            # Send result back to LLM
-            # ---------------------------------------------
 
             current_messages.append(
                 ToolMessage(
@@ -327,3 +252,4 @@ async def general_agent(messages):
                     tool_call_id=tool_call_id,
                 )
             )
+
