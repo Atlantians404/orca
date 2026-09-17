@@ -182,20 +182,24 @@ export default function LocationPicker({ onConfirm, onClose }) {
     }
   };
 
+  const [submitting, setSubmitting] = useState(false);
+
   // --------------------------------------------------------
   // CONFIRM
   // --------------------------------------------------------
 
   const handleConfirm = () => {
-  if (!coords) return;
+    if (!coords || submitting) return;
 
-  const location = {
-    latitude: Number(coords[0].toFixed(6)),
-    longitude: Number(coords[1].toFixed(6)),
+    setSubmitting(true);
+
+    const location = {
+      latitude: Number(coords[0].toFixed(6)),
+      longitude: Number(coords[1].toFixed(6)),
+    };
+
+    onConfirm(location);
   };
-
-  onConfirm(location);
-};
 
   return (
     <div
@@ -364,7 +368,7 @@ export default function LocationPicker({ onConfirm, onClose }) {
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={!coords}
+            disabled={!coords || submitting}
             className="rounded-lg bg-[#3DA7B7] px-5 py-2 text-xs font-semibold text-black transition hover:bg-[#52b8c8] disabled:opacity-50"
           >
             Confirm Location
