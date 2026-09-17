@@ -14,6 +14,67 @@ from ai.schemas.time import TimeContext
 TIMEZONE = "Asia/Kolkata"
 
 
+def _parse_json_response(content: str) -> dict:
+    """
+    Safely extract a JSON object from an LLM response.
+
+    Handles:
+    - normal JSON
+    - ```json ... ```
+    - ``` ... ```
+    - extra text before/after JSON
+    """
+
+    content = content.strip()
+
+    # Remove markdown fences
+    if content.startswith("```"):
+        lines = content.splitlines()
+
+        if lines and lines[0].strip().startswith("```"):
+            lines = lines[1:]
+
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+
+        content = "\n".join(lines).strip()
+
+    # First try normal JSON
+    try:
+        result = json.loads(content)
+
+        if isinstance(result, dict):
+            return result
+
+    except json.JSONDecodeError:
+        pass
+
+    # Try extracting JSON object from surrounding text
+    start = content.find("{")
+    end = content.rfind("}")
+
+    if start != -1 and end != -1 and end > start:
+        json_content = content[start:end + 1]
+
+        try:
+            result = json.loads(json_content)
+
+            if isinstance(result, dict):
+                return result
+
+        except json.JSONDecodeError:
+            pass
+
+    # Log the actual LLM response for debugging
+    print("\n========== INVALID LLM JSON ==========")
+    print(content)
+    print("======================================\n")
+
+    raise ValueError(
+        "LLM returned invalid JSON."
+    )
+
+
 async def _parse_time_input(
     time_input: str | None,
     current_date: str,
@@ -42,24 +103,7 @@ async def _parse_time_input(
 
     content = response.content.strip()
 
-    # Handle accidental markdown fences
-    if content.startswith("```"):
-
-        content = content.replace(
-            "```json",
-            "",
-            1,
-        )
-
-        content = content.replace(
-            "```",
-            "",
-            1,
-        )
-
-        content = content.strip()
-
-    result = json.loads(
+    result = _parse_json_response(
         content
     )
 
@@ -88,9 +132,6 @@ async def _parse_time_input(
             "time"
         )
 
-        # Date is optional.
-        # If date is None, time_parser will
-        # automatically use today's date.
         if not time:
             return None
 
@@ -119,9 +160,6 @@ async def _parse_time_input(
             "period"
         )
 
-        # Date is optional.
-        # If date is None, time_parser will
-        # automatically use today's date.
         if not period:
             return None
 
@@ -178,28 +216,11 @@ async def orchestrate(
 
     content = response.content.strip()
 
-    # Handle accidental markdown fences
-    if content.startswith("```"):
-
-        content = content.replace(
-            "```json",
-            "",
-            1,
-        )
-
-        content = content.replace(
-            "```",
-            "",
-            1,
-        )
-
-        content = content.strip()
-
     # ========================================================
     # PARSE ORCHESTRATOR JSON
     # ========================================================
 
-    result = json.loads(
+    result = _parse_json_response(
         content
     )
 
