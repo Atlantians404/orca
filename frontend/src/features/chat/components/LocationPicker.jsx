@@ -187,11 +187,15 @@ export default function LocationPicker({ onConfirm, onClose }) {
   // --------------------------------------------------------
 
   const handleConfirm = () => {
-    if (coords) {
-      const coordString = `${coords[0].toFixed(6)}, ${coords[1].toFixed(6)}`;
-      onConfirm(coordString);
-    }
+  if (!coords) return;
+
+  const location = {
+    latitude: Number(coords[0].toFixed(6)),
+    longitude: Number(coords[1].toFixed(6)),
   };
+
+  onConfirm(location);
+};
 
   return (
     <div

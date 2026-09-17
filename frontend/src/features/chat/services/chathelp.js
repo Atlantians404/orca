@@ -224,9 +224,7 @@ export async function resumeChat(sessionId, value) {
     throw new Error("No active conversation selected.");
   }
 
-  const trimmedValue = String(value ?? "").trim();
-
-  if (!trimmedValue) {
+  if (value == null || (typeof value === "string" && !value.trim())) {
     throw new Error("Please enter a value.");
   }
 
@@ -234,7 +232,7 @@ export async function resumeChat(sessionId, value) {
     const response = await api.post(
       `/chat/${sessionId}/resume`,
       {
-        value: trimmedValue,
+        value,
       }
     );
 

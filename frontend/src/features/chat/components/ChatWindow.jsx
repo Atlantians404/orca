@@ -174,6 +174,30 @@ export default function ChatWindow({ session }) {
 // Backend options are NOT displayed as buttons.
 // ============================================================
 
+function parseLocationInput(text) {
+  if (!text || typeof text !== "string") return null;
+  const trimmed = text.trim();
+  const match = trimmed.match(/^(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)$/);
+  if (match) {
+    const lat = parseFloat(match[1]);
+    const lon = parseFloat(match[2]);
+    if (
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      lat >= -90 &&
+      lat <= 90 &&
+      lon >= -180 &&
+      lon <= 180
+    ) {
+      return {
+        latitude: Number(lat.toFixed(6)),
+        longitude: Number(lon.toFixed(6)),
+      };
+    }
+  }
+  return null;
+}
+
 const lastMessage = messages[messages.length - 1];
 
 const pendingTurn =
@@ -193,6 +217,22 @@ const pendingTurn =
     if (!trimmed) return;
 
     setError(null);
+
+    let valueToSend = trimmed;
+    if (pendingTurn && pendingTurn.pending_action === "location") {
+      const parsed = parseLocationInput(trimmed);
+      if (parsed) {
+        valueToSend = parsed;
+      } else if (/^[\d.\s,-]+$/.test(trimmed)) {
+        setError({
+          message:
+            "Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).",
+          action: null,
+        });
+        return;
+      }
+    }
+
     setInputValue("");
     setSending(true);
 
@@ -210,10 +250,10 @@ const pendingTurn =
 
       if (pendingTurn) {
         // ORCA is waiting for an answer.
-        // Send the user's typed value through /resume.
+        // Send the user's value through /resume.
         assistantMessage = await resumeChat(
           sessionId,
-          trimmed
+          valueToSend
         );
       } else {
         // Normal conversation.
@@ -249,7 +289,7 @@ const pendingTurn =
           "ORCA couldn't complete that request.",
         action: {
           type: pendingTurn ? "resume" : "send",
-          payload: trimmed,
+          payload: valueToSend,
         },
       });
     } finally {
@@ -262,21 +302,30 @@ const pendingTurn =
   // ============================================================
   // LOCATION CONFIRMED
   //
-  // When the user confirms their GPS position in the LocationPicker,
-  // this sends the coordinate string through /resume.
+  // When the user confirms their position in the LocationPicker,
+  // this passes the location object { latitude, longitude } to /resume.
   // ============================================================
 
   const handleLocationConfirm = useCallback(
-    async (coordString) => {
+    async (location) => {
       setShowLocationPicker(false);
 
       if (!sessionId || sending) return;
+
+      const displayContent =
+        typeof location === "object" &&
+        location?.latitude != null &&
+        location?.longitude != null
+          ? `${Number(location.latitude).toFixed(6)}, ${Number(
+              location.longitude
+            ).toFixed(6)}`
+          : String(location);
 
       if (pendingTurn) {
         setError(null);
         setSending(true);
 
-        const userMessage = makeUserMessage(coordString);
+        const userMessage = makeUserMessage(displayContent);
         const pendingAssistant = makePendingAssistantMessage();
 
         setMessages((previous) => [
@@ -288,7 +337,7 @@ const pendingTurn =
         try {
           const assistantMessage = await resumeChat(
             sessionId,
-            coordString
+            location
           );
 
           setMessages((previous) => {
@@ -310,14 +359,14 @@ const pendingTurn =
               "ORCA couldn't complete that request.",
             action: {
               type: "resume",
-              payload: coordString,
+              payload: location,
             },
           });
         } finally {
           setSending(false);
         }
       } else {
-        handleSend(coordString);
+        handleSend(displayContent);
       }
     },
     [sessionId, sending, pendingTurn, handleSend]

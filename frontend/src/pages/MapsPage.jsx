@@ -77,8 +77,19 @@ export default function MapsPage() {
   );
 
   const innerMap = selectedMap?.route_data || selectedMap;
-  const safeRoute = innerMap?.safe_route || innerMap?.safeRoute || innerMap;
-  const candidateRoutes = innerMap?.candidate_routes || innerMap?.candidateRoutes || [];
+  const rawRouteResult = innerMap?.route_result || innerMap;
+  const safeRoute =
+    rawRouteResult?.safe_route ||
+    rawRouteResult?.safeRoute ||
+    innerMap?.safe_route ||
+    innerMap?.safeRoute ||
+    rawRouteResult;
+  const candidateRoutes =
+    rawRouteResult?.candidate_routes ||
+    rawRouteResult?.candidateRoutes ||
+    innerMap?.candidate_routes ||
+    innerMap?.candidateRoutes ||
+    [];
   const displayedMarineZones =
     innerMap?.marine_zones && innerMap?.marine_zones.length > 0
       ? innerMap.marine_zones
