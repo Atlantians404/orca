@@ -37,7 +37,7 @@ from ai.schemas.agent_response import (
 
 
 DEFAULT_RADIUS_KM = 50.0
-MAX_PFZ_CANDIDATES = 20
+MAX_PFZ_CANDIDATES = 8
 
 
 # ============================================================

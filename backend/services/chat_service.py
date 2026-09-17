@@ -7,6 +7,10 @@ from langgraph.types import Command
 
 from ai.graph.graph import app_graph
 
+from ai.services.conversation_summary import (
+    update_conversation_summary,
+)
+
 from backend.models.sessions import Session
 from backend.models.messages import Message
 
@@ -226,14 +230,26 @@ async def send_message(
     # =====================================================
     # CONVERSATION SUMMARY
     # =====================================================
-    #
-    # TEMPORARILY DISABLED
-    #
-    # This makes another Groq call after every message.
-    # We are disabling it for deployment/demo stability.
-    #
-    # Later we can summarize every N messages instead.
-    #
+
+    try:
+
+        new_summary = await update_conversation_summary(
+            existing_summary=session.summary,
+            user_message=message,
+            assistant_response=response["message"],
+        )
+
+        if new_summary:
+            session.summary = new_summary
+
+    except Exception as exc:
+
+        print(
+            f"[CHAT] Conversation summary update failed: {exc}"
+        )
+
+    # =====================================================
+    # COMMIT
     # =====================================================
 
     await db.commit()
@@ -272,7 +288,7 @@ async def resume_chat(
     # IMPORTANT
     # =====================================================
     #
-    # We need to resume the interrupted graph.
+    # Resume the interrupted graph.
     #
     # The checkpoint already contains the original state,
     # including "prompt".
@@ -320,9 +336,14 @@ async def resume_chat(
     # CONVERSATION SUMMARY
     # =====================================================
     #
-    # TEMPORARILY DISABLED
+    # IMPORTANT:
+    # We intentionally do NOT update the summary here.
     #
-    # Do not make another Groq call during HITL resume.
+    # This avoids an additional Groq call during every
+    # HITL resume.
+    #
+    # The normal send_message() call handles summary
+    # generation.
     #
     # =====================================================
 
@@ -368,4 +389,3 @@ async def get_chat_history(
     return list(
         result.scalars().all()
     )
-
