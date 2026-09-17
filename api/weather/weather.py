@@ -11,11 +11,10 @@ WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 # Configuration
 # ---------------------------------------------------------
 
-MAX_RETRIES = 4
-DEFAULT_RETRY_DELAY = 5
+MAX_RETRIES = 2
+DEFAULT_RETRY_DELAY = 3
 
 # Cache weather results for 10 minutes.
-# Same location + same time will not trigger another API call.
 CACHE_TTL = 60 * 10
 
 
@@ -30,32 +29,45 @@ _weather_cache: dict[
 # ---------------------------------------------------------
 
 def weather_condition_from_code(weather_code):
+
     conditions = {
+
         0: "Clear sky",
+
         1: "Mainly clear",
         2: "Partly cloudy",
         3: "Overcast",
+
         45: "Fog",
         48: "Depositing rime fog",
+
         51: "Light drizzle",
         53: "Moderate drizzle",
         55: "Dense drizzle",
+
         56: "Light freezing drizzle",
         57: "Dense freezing drizzle",
+
         61: "Slight rain",
         63: "Moderate rain",
         65: "Heavy rain",
+
         66: "Light freezing rain",
         67: "Heavy freezing rain",
+
         71: "Slight snowfall",
         73: "Moderate snowfall",
         75: "Heavy snowfall",
+
         77: "Snow grains",
+
         80: "Slight rain showers",
         81: "Moderate rain showers",
         82: "Violent rain showers",
+
         85: "Slight snow showers",
         86: "Heavy snow showers",
+
         95: "Thunderstorm",
         96: "Thunderstorm with slight hail",
         99: "Thunderstorm with heavy hail",
@@ -68,7 +80,58 @@ def weather_condition_from_code(weather_code):
 
 
 def is_thunderstorm(weather_code):
+
     return weather_code in [95, 96, 99]
+
+
+# ---------------------------------------------------------
+# Time helper
+# ---------------------------------------------------------
+
+def normalize_weather_time(value):
+    """
+    Open-Meteo with timezone=auto should receive
+    local time without a trailing Z.
+
+    Example:
+
+        2026-09-17T06:00:00Z
+        ->
+        2026-09-17T06:00
+
+        2026-09-17T06:00:00
+        ->
+        2026-09-17T06:00
+    """
+
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    # Remove UTC suffix.
+    value = value.replace("Z", "")
+
+    # Remove timezone offset if present.
+    # Example:
+    # 2026-09-17T06:00:00+00:00
+    if "+" in value:
+
+        value = value.split("+")[0]
+
+    # Keep only YYYY-MM-DDTHH:MM
+    if "T" in value:
+
+        date_part, time_part = value.split(
+            "T",
+            1
+        )
+
+        time_part = time_part[:5]
+
+        return f"{date_part}T{time_part}"
+
+    return value
 
 
 # ---------------------------------------------------------
@@ -78,12 +141,13 @@ def is_thunderstorm(weather_code):
 def _cache_key(
     latitude: float,
     longitude: float,
-    time: str | None
+    weather_time: str | None
 ):
+
     return (
         round(float(latitude), 4),
         round(float(longitude), 4),
-        time
+        weather_time
     )
 
 
@@ -96,26 +160,27 @@ def _get_cached_weather(key):
 
     cached_time, data = cached
 
-    if time_module_now() - cached_time > CACHE_TTL:
+    if time.time() - cached_time > CACHE_TTL:
+
         _weather_cache.pop(
             key,
             None
         )
+
         return None
 
     return data
 
 
-def _set_cached_weather(key, data):
+def _set_cached_weather(
+    key,
+    data
+):
 
     _weather_cache[key] = (
-        time_module_now(),
+        time.time(),
         data
     )
-
-
-def time_module_now():
-    return time.time()
 
 
 # ---------------------------------------------------------
@@ -125,13 +190,21 @@ def time_module_now():
 async def get_open_meteo_data(
     latitude: float,
     longitude: float,
-    time: str | None = None
+    weather_time: str | None = None
 ) -> dict:
+
+    # -----------------------------------------------------
+    # Normalize time
+    # -----------------------------------------------------
+
+    normalized_time = normalize_weather_time(
+        weather_time
+    )
 
     key = _cache_key(
         latitude,
         longitude,
-        time
+        normalized_time
     )
 
     # -----------------------------------------------------
@@ -141,20 +214,29 @@ async def get_open_meteo_data(
     cached = _get_cached_weather(key)
 
     if cached is not None:
+
         print(
             f"[OPEN-METEO] CACHE HIT "
-            f"{latitude}, {longitude}, {time}"
+            f"{latitude}, {longitude}, "
+            f"{normalized_time}"
         )
 
         return cached
 
     print(
         f"[OPEN-METEO] API REQUEST "
-        f"{latitude}, {longitude}, {time}"
+        f"{latitude}, {longitude}, "
+        f"{normalized_time}"
     )
 
+    # -----------------------------------------------------
+    # PARAMETERS
+    # -----------------------------------------------------
+
     weather_params = {
+
         "latitude": latitude,
+
         "longitude": longitude,
 
         "hourly": [
@@ -170,20 +252,42 @@ async def get_open_meteo_data(
         "timezone": "auto",
     }
 
-    if time is not None:
+    # -----------------------------------------------------
+    # IMPORTANT
+    # -----------------------------------------------------
+    # Use normalized local time.
+    #
+    # DO NOT send:
+    #
+    # 2026-09-17T00:00:00Z
+    #
+    # Send:
+    #
+    # 2026-09-17T00:00
+    #
+    # -----------------------------------------------------
 
-        weather_params["start_hour"] = time
-        weather_params["end_hour"] = time
+    if normalized_time is not None:
+
+        weather_params[
+            "start_hour"
+        ] = normalized_time
+
+        weather_params[
+            "end_hour"
+        ] = normalized_time
 
     # -----------------------------------------------------
-    # RETRY LOOP
+    # HTTP CLIENT
     # -----------------------------------------------------
 
     async with httpx.AsyncClient(
         timeout=15
     ) as client:
 
-        for attempt in range(MAX_RETRIES):
+        for attempt in range(
+            MAX_RETRIES
+        ):
 
             try:
 
@@ -192,9 +296,9 @@ async def get_open_meteo_data(
                     params=weather_params
                 )
 
-                # -----------------------------------------
+                # -------------------------------------------------
                 # RATE LIMIT
-                # -----------------------------------------
+                # -------------------------------------------------
 
                 if response.status_code == 429:
 
@@ -205,15 +309,18 @@ async def get_open_meteo_data(
                             "429 - retries exhausted"
                         )
 
-                        response.raise_for_status()
+                        return {}
 
-                    retry_after = response.headers.get(
-                        "Retry-After"
+                    retry_after = (
+                        response.headers.get(
+                            "Retry-After"
+                        )
                     )
 
                     if retry_after:
 
                         try:
+
                             wait_time = float(
                                 retry_after
                             )
@@ -226,17 +333,17 @@ async def get_open_meteo_data(
 
                     else:
 
-                        # 5, 10, 20, 40 seconds
                         wait_time = min(
                             DEFAULT_RETRY_DELAY
                             * (2 ** attempt),
-                            60
+                            15
                         )
 
                     print(
                         f"[OPEN-METEO] 429 - "
                         f"waiting {wait_time}s "
-                        f"(attempt {attempt + 1}/"
+                        f"(attempt "
+                        f"{attempt + 1}/"
                         f"{MAX_RETRIES})"
                     )
 
@@ -246,15 +353,26 @@ async def get_open_meteo_data(
 
                     continue
 
-                # -----------------------------------------
+                # -------------------------------------------------
                 # OTHER HTTP ERRORS
-                # -----------------------------------------
+                # -------------------------------------------------
 
-                response.raise_for_status()
+                if response.status_code != 200:
 
-                # -----------------------------------------
+                    print(
+                        f"[OPEN-METEO] "
+                        f"HTTP {response.status_code}"
+                    )
+
+                    print(
+                        response.text[:500]
+                    )
+
+                    return {}
+
+                # -------------------------------------------------
                 # SUCCESS
-                # -----------------------------------------
+                # -------------------------------------------------
 
                 data = response.json()
 
@@ -263,19 +381,28 @@ async def get_open_meteo_data(
                     {}
                 )
 
+                # -------------------------------------------------
+                # Extract weather code
+                # -------------------------------------------------
+
                 weather_code = hourly.get(
                     "weather_code",
                     [None]
                 )[0]
 
+                # -------------------------------------------------
+                # SAME WEATHER RESPONSE FORMAT
+                # -------------------------------------------------
+
                 result = {
+
                     "latitude": latitude,
 
                     "longitude": longitude,
 
                     "time": hourly.get(
                         "time",
-                        [time]
+                        [normalized_time]
                     )[0],
 
                     "timezone": data.get(
@@ -325,9 +452,9 @@ async def get_open_meteo_data(
                         ),
                 }
 
-                # -----------------------------------------
-                # SAVE TO CACHE
-                # -----------------------------------------
+                # -------------------------------------------------
+                # CACHE
+                # -------------------------------------------------
 
                 _set_cached_weather(
                     key,
@@ -336,7 +463,9 @@ async def get_open_meteo_data(
 
                 print(
                     f"[OPEN-METEO] SUCCESS "
-                    f"{latitude}, {longitude}, {time}"
+                    f"{latitude}, "
+                    f"{longitude}, "
+                    f"{normalized_time}"
                 )
 
                 return result
@@ -344,12 +473,18 @@ async def get_open_meteo_data(
             except httpx.RequestError as exc:
 
                 if attempt == MAX_RETRIES - 1:
-                    raise
+
+                    print(
+                        f"[OPEN-METEO] "
+                        f"Network error: {exc}"
+                    )
+
+                    return {}
 
                 wait_time = min(
                     DEFAULT_RETRY_DELAY
                     * (2 ** attempt),
-                    60
+                    15
                 )
 
                 print(
@@ -362,9 +497,7 @@ async def get_open_meteo_data(
                     wait_time
                 )
 
-    raise RuntimeError(
-        "Open-Meteo API failed after retries"
-    )
+    return {}
 
 
 # ---------------------------------------------------------
@@ -383,7 +516,9 @@ async def get_temperature(
         time
     )
 
-    return data["temperature"]
+    return data.get(
+        "temperature"
+    )
 
 
 async def get_wind_speed(
@@ -398,7 +533,9 @@ async def get_wind_speed(
         time
     )
 
-    return data["wind_speed"]
+    return data.get(
+        "wind_speed"
+    )
 
 
 async def get_wind_direction(
@@ -413,7 +550,9 @@ async def get_wind_direction(
         time
     )
 
-    return data["wind_direction"]
+    return data.get(
+        "wind_direction"
+    )
 
 
 async def get_wind_gust(
@@ -428,7 +567,9 @@ async def get_wind_gust(
         time
     )
 
-    return data["wind_gust"]
+    return data.get(
+        "wind_gust"
+    )
 
 
 async def get_visibility(
@@ -443,7 +584,9 @@ async def get_visibility(
         time
     )
 
-    return data["visibility"]
+    return data.get(
+        "visibility"
+    )
 
 
 async def get_precipitation(
@@ -458,7 +601,9 @@ async def get_precipitation(
         time
     )
 
-    return data["precipitation"]
+    return data.get(
+        "precipitation"
+    )
 
 
 async def get_weather_code(
@@ -473,7 +618,9 @@ async def get_weather_code(
         time
     )
 
-    return data["weather_code"]
+    return data.get(
+        "weather_code"
+    )
 
 
 async def get_weather_condition(
@@ -488,7 +635,9 @@ async def get_weather_condition(
         time
     )
 
-    return data["weather_condition"]
+    return data.get(
+        "weather_condition"
+    )
 
 
 async def get_thunderstorm(
@@ -503,4 +652,6 @@ async def get_thunderstorm(
         time
     )
 
-    return data["thunderstorm"]
+    return data.get(
+        "thunderstorm"
+    )

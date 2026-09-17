@@ -1,300 +1,118 @@
 import asyncio
-import httpx
 
 from api.weather.weather import (
-    WEATHER_URL,
+    get_open_meteo_data,
     weather_condition_from_code,
-    is_thunderstorm
+    is_thunderstorm,
 )
 
+WEATHER_CONCURRENCY = 2
+WEATHER_DELAY = 0.5
 
-BATCH_SIZE = 100
-BATCH_DELAY = 2
-MAX_RETRIES = 6
+_weather_semaphore = asyncio.Semaphore(WEATHER_CONCURRENCY)
 
 
 def coordinate_key(node):
     return (
         round(float(node["latitude"]), 4),
-        round(float(node["longitude"]), 4)
+        round(float(node["longitude"]), 4),
     )
 
 
-async def get_weather_data_batch(nodes, time):
-    if nodes:
-        print("First node:", nodes[0])
+async def fetch_weather_limited(node, time):
+    async with _weather_semaphore:
+        await asyncio.sleep(WEATHER_DELAY)
 
+        return await get_open_meteo_data(
+            latitude=node["latitude"],
+            longitude=node["longitude"],
+            weather_time=time,
+        )
+
+
+async def get_weather_data_batch(nodes, time):
     if not nodes:
         return {}
 
     results = {}
 
-    # -----------------------------------------------------
     # Remove duplicate coordinates
-    # -----------------------------------------------------
-
     unique_nodes = {}
 
     for node in nodes:
-
         key = coordinate_key(node)
 
         if key not in unique_nodes:
             unique_nodes[key] = node
 
-    unique_nodes = list(
-        unique_nodes.values()
+    unique_nodes = list(unique_nodes.values())
+
+    print(
+        f"[WEATHER BATCH] Fetching "
+        f"{len(unique_nodes)} coordinates "
+        f"(concurrency={WEATHER_CONCURRENCY})"
     )
 
-    # -----------------------------------------------------
-    # HTTP CLIENT
-    # -----------------------------------------------------
+    tasks = [
+        fetch_weather_limited(node, time)
+        for node in unique_nodes
+    ]
 
-    async with httpx.AsyncClient(
-        timeout=30,
-        limits=httpx.Limits(
-            max_connections=1,
-            max_keepalive_connections=1
+    weather_responses = await asyncio.gather(
+        *tasks,
+        return_exceptions=True,
+    )
+
+    for node, weather_data in zip(unique_nodes, weather_responses):
+
+        key = coordinate_key(node)
+
+        if isinstance(weather_data, Exception):
+            print(
+                f"[WEATHER BATCH] FAILED "
+                f"{node['node_id']} -> {weather_data}"
+            )
+            results[key] = {}
+            continue
+
+        if not weather_data:
+            print(
+                f"[WEATHER BATCH] EMPTY "
+                f"{node['node_id']}"
+            )
+            results[key] = {}
+            continue
+
+        weather_code = weather_data.get("weather_code")
+
+        results[key] = {
+            "wind_speed": weather_data.get("wind_speed"),
+            "wind_direction": weather_data.get("wind_direction"),
+            "visibility": weather_data.get("visibility"),
+            "precipitation": weather_data.get("precipitation"),
+            "condition": weather_condition_from_code(weather_code),
+            "lightning": is_thunderstorm(weather_code),
+        }
+
+        print(
+            f"[WEATHER BATCH] SUCCESS "
+            f"{node['node_id']} -> {results[key]}"
         )
-    ) as client:
-
-        # -------------------------------------------------
-        # Process batches
-        # -------------------------------------------------
-
-        for start in range(
-            0,
-            len(unique_nodes),
-            BATCH_SIZE
-        ):
-
-            batch = unique_nodes[
-                start:start + BATCH_SIZE
-            ]
-
-            # ---------------------------------------------
-            # Build coordinates
-            # ---------------------------------------------
-
-            latitudes = ",".join(
-                str(node["latitude"])
-                for node in batch
-            )
-
-            longitudes = ",".join(
-                str(node["longitude"])
-                for node in batch
-            )
-
-            # ---------------------------------------------
-            # Open-Meteo parameters
-            # ---------------------------------------------
-
-            params = {
-                "latitude": latitudes,
-                "longitude": longitudes,
-
-                "hourly": ",".join([
-                    "wind_speed_10m",
-                    "wind_direction_10m",
-                    "visibility",
-                    "precipitation",
-                    "weather_code"
-                ]),
-
-                "timezone": "auto",
-
-                "start_hour": time,
-                "end_hour": time
-            }
-
-            # ---------------------------------------------
-            # Retry loop
-            # ---------------------------------------------
-
-            for attempt in range(MAX_RETRIES):
-
-                try:
-
-                    response = await client.get(
-                        WEATHER_URL,
-                        params=params
-                    )
-
-                    # -------------------------------------
-                    # Rate limit
-                    # -------------------------------------
-
-                    if response.status_code == 429:
-
-                        retry_after = response.headers.get(
-                            "Retry-After"
-                        )
-
-                        if retry_after:
-
-                            try:
-                                wait_time = float(
-                                    retry_after
-                                )
-
-                            except ValueError:
-
-                                wait_time = min(
-                                    5 * (2 ** attempt),
-                                    60
-                                )
-
-                        else:
-
-                            wait_time = min(
-                                5 * (2 ** attempt),
-                                60
-                            )
-
-                        print(
-                            f"[WEATHER BATCH] 429 - "
-                            f"waiting {wait_time}s "
-                            f"(attempt {attempt + 1}/"
-                            f"{MAX_RETRIES})"
-                        )
-
-                        await asyncio.sleep(
-                            wait_time
-                        )
-
-                        continue
-
-                    # -------------------------------------
-                    # Other HTTP errors
-                    # -------------------------------------
-
-                    response.raise_for_status()
-
-                    # -------------------------------------
-                    # Parse response
-                    # -------------------------------------
-
-                    data = response.json()
-
-                    if isinstance(data, dict):
-                        data = [data]
-
-                    # -------------------------------------
-                    # Process each PFZ
-                    # -------------------------------------
-
-                    for index, node in enumerate(batch):
-
-                        if index >= len(data):
-                            continue
-
-                        hourly = data[index].get(
-                            "hourly",
-                            {}
-                        )
-
-                        weather_code = hourly.get(
-                            "weather_code",
-                            [None]
-                        )[0]
-
-                        results[
-                            coordinate_key(node)
-                        ] = {
-
-                            "wind_speed": hourly.get(
-                                "wind_speed_10m",
-                                [None]
-                            )[0],
-
-                            "wind_direction": hourly.get(
-                                "wind_direction_10m",
-                                [None]
-                            )[0],
-
-                            "visibility": hourly.get(
-                                "visibility",
-                                [None]
-                            )[0],
-
-                            "precipitation": hourly.get(
-                                "precipitation",
-                                [None]
-                            )[0],
-
-                            # IMPORTANT:
-                            # weather_code is already available
-                            # from the batch API response.
-                            "condition":
-                                weather_condition_from_code(
-                                    weather_code
-                                ),
-
-                            "lightning":
-                                is_thunderstorm(
-                                    weather_code
-                                )
-                        }
-
-                    # Successful request
-                    break
-
-                except httpx.RequestError as exc:
-
-                    if attempt == MAX_RETRIES - 1:
-                        raise
-
-                    wait_time = min(
-                        5 * (2 ** attempt),
-                        60
-                    )
-
-                    print(
-                        f"[WEATHER BATCH] "
-                        f"Network error: {exc}. "
-                        f"Retrying in {wait_time}s"
-                    )
-
-                    await asyncio.sleep(
-                        wait_time
-                    )
-
-            else:
-
-                raise RuntimeError(
-                    f"Weather API failed after retries "
-                    f"for batch {start}"
-                )
-
-            # ---------------------------------------------
-            # Control request rate
-            # ---------------------------------------------
-
-            if (
-                start + BATCH_SIZE
-                < len(unique_nodes)
-            ):
-
-                await asyncio.sleep(
-                    BATCH_DELAY
-                )
-
-    # -----------------------------------------------------
-    # Map results back to ALL original nodes
-    # -----------------------------------------------------
 
     final_results = {}
 
     for node in nodes:
-
         key = coordinate_key(node)
+        final_results[node["node_id"]] = results.get(key, {})
 
-        final_results[
-            node["node_id"]
-        ] = results.get(
-            key,
-            {}
-        )
+    successful = sum(
+        bool(value)
+        for value in final_results.values()
+    )
+
+    print(
+        f"[WEATHER BATCH] Completed "
+        f"{successful}/{len(final_results)}"
+    )
 
     return final_results
