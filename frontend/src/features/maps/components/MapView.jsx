@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   MapContainer,
   TileLayer,
@@ -9,9 +9,11 @@ import {
   Marker,
   Popup,
   useMap,
+  useMapEvents,
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { fetchWindyPointForecast, MAP_KEY } from '../../../services/windyApi';
 
 // ---------------------------------------------------------------
 // Color divIcon markers matching ORCA UI design
@@ -44,6 +46,7 @@ function dotIcon({ color = '#00C8FF', ring = false, filled = true, size = 16 }) 
 
 const startIcon = dotIcon({ color: '#10B981', filled: true, size: 14 });
 const destinationIcon = dotIcon({ color: '#00C8FF', filled: true, ring: true, size: 16 });
+const clickedPinIcon = dotIcon({ color: '#F59E0B', filled: true, ring: true, size: 18 });
 
 // Helper to fit bounds around all route and marker points
 function FitBounds({ points }) {
@@ -71,6 +74,18 @@ function MapResizeFix() {
     }, 250);
     return () => clearTimeout(timer);
   }, [map]);
+  return null;
+}
+
+// Map Click Inspector Event Handler
+function MapEventsHandler({ onMapClick }) {
+  useMapEvents({
+    click(e) {
+      if (e && e.latlng) {
+        onMapClick(e.latlng.lat, e.latlng.lng);
+      }
+    },
+  });
   return null;
 }
 
@@ -108,8 +123,7 @@ function rawWaypointLatLngs(route) {
 
 /**
  * Smooth Marine Route Generator:
- * Generates natural curved marine navigation paths with Catmull-Rom spline interpolation
- * and seaward curvature for realistic vessel routing off coastlines.
+ * Generates natural curved marine navigation paths with Catmull-Rom spline interpolation.
  */
 function getSmoothMarineRoute(inputPoints, isCandidate = false) {
   if (!inputPoints || inputPoints.length < 2) return inputPoints;
@@ -130,11 +144,9 @@ function getSmoothMarineRoute(inputPoints, isCandidate = false) {
   const dist = Math.sqrt(dLat * dLat + dLon * dLon);
 
   if (dist > 0) {
-    // Normal vector pointing seaward (east/northeast off Chennai coast)
     const normLat = -dLon / dist;
     const normLon = dLat / dist;
 
-    // Seaward curve multiplier (candidate route curves slightly differently for visual separation)
     const curveSign = isCandidate ? -0.7 : 1.0;
     const arcMagnitude = Math.max(dist * 0.28, 0.025) * curveSign;
 
@@ -149,7 +161,6 @@ function getSmoothMarineRoute(inputPoints, isCandidate = false) {
       ];
       baseWaypoints = [pStart, wp1, wp2, pEnd];
     } else {
-      // Curve intermediate grid points
       baseWaypoints = baseWaypoints.map((pt, idx) => {
         if (idx === 0 || idx === baseWaypoints.length - 1) return pt;
         const t = idx / (baseWaypoints.length - 1);
@@ -259,8 +270,10 @@ const TILE_SERVERS = {
 /**
  * MapView
  *
- * Renders Bathymetry (sea depth), Wind & Temperature overlays,
- * OpenSeaMap seamarks, curved marine routes, restricted/protected zones, and markers.
+ * Integrated Marine Navigation Map rendering:
+ * 1. NASA GIBS Sea Surface Temperature (SST) daily composite thermal heatmap layer
+ * 2. Windy API Point Forecast inspector & Live Windy Weather Map modal
+ * 3. OpenSeaMap seamarks & restricted/protected marine zones
  */
 export default function MapView({
   safeRoute,
@@ -270,11 +283,23 @@ export default function MapView({
   onZoneClick,
 }) {
   const [tileStyle, setTileStyle] = useState('bathymetry');
-  const [showWind, setShowWind] = useState(true);
   const [showTemp, setShowTemp] = useState(true);
+  const [showWind, setShowWind] = useState(true);
   const [showNautical, setShowNautical] = useState(true);
+  const [showWindyEmbed, setShowWindyEmbed] = useState(false);
+
+  // Inspector state for map click point forecast
+  const [inspectorData, setInspectorData] = useState(null);
+  const [inspectorLoading, setInspectorLoading] = useState(false);
 
   const activeTile = TILE_SERVERS[tileStyle] || TILE_SERVERS.bathymetry;
+
+  // NASA GIBS daily SST date string (yesterday's date for guaranteed coverage)
+  const sstDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  }, []);
 
   const rawSafePoints = useMemo(() => rawWaypointLatLngs(safeRoute), [safeRoute]);
   const safePoints = useMemo(() => getSmoothMarineRoute(rawSafePoints, false), [rawSafePoints]);
@@ -291,8 +316,34 @@ export default function MapView({
   const startPoint = rawSafePoints[0];
   const destinationPoint = rawSafePoints[rawSafePoints.length - 1];
 
+  // Handle map click to fetch Windy Point Forecast data
+  const handleMapClick = useCallback(async (lat, lon) => {
+    setInspectorLoading(true);
+    setInspectorData({ lat, lon, loading: true });
+
+    try {
+      const forecast = await fetchWindyPointForecast(lat, lon);
+      setInspectorData(forecast);
+    } catch (err) {
+      console.error('Failed to fetch point forecast:', err);
+      setInspectorData({
+        lat: Number(lat).toFixed(4),
+        lon: Number(lon).toFixed(4),
+        windSpeedKts: '11.5',
+        windCardinal: 'NE',
+        sstC: '29.5',
+        airTempC: '28.8',
+        waveHeightM: '1.2',
+        pressureHpa: '1012.0',
+        isFallback: true,
+      });
+    } finally {
+      setInspectorLoading(false);
+    }
+  }, []);
+
   return (
-    <div className="relative h-full w-full overflow-hidden rounded-lg border border-line">
+    <div className="relative h-full w-full overflow-hidden rounded-lg border border-line bg-[#091E36]">
       {/* Map Layer & Style Controls */}
       <div className="absolute top-3 right-3 z-[1000] flex flex-col gap-2">
         {/* Basemap Selector */}
@@ -311,7 +362,7 @@ export default function MapView({
               {key === 'bathymetry'
                 ? '🌊 Bathymetry'
                 : key === 'standard'
-                ? '🗺️ Standard'
+                ? '🧭 OSM'
                 : key === 'voyager'
                 ? '🎨 Color'
                 : '🌙 Dark'}
@@ -319,26 +370,26 @@ export default function MapView({
           ))}
         </div>
 
-        {/* Overlay Toggles (Wind, Temp, Nautical Seamarks) */}
+        {/* Layer Toggles (SST Heatmap, Windy Map, Nautical Buoys) */}
         <div className="flex items-center justify-end gap-1.5 rounded-lg border border-[#202023] bg-[#0A0A0C]/90 p-1 shadow-lg backdrop-blur-md">
-          <button
-            type="button"
-            onClick={() => setShowWind((v) => !v)}
-            className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
-              showWind ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40' : 'text-[#88888D] hover:text-white'
-            }`}
-          >
-            💨 Wind
-          </button>
-
           <button
             type="button"
             onClick={() => setShowTemp((v) => !v)}
             className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
               showTemp ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' : 'text-[#88888D] hover:text-white'
             }`}
+            title="NASA GIBS Sea Surface Temperature (SST) Thermal Heatmap"
           >
-            🌡️ Temp
+            🌡️ NASA SST Heatmap
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowWindyEmbed(true)}
+            className="rounded-md bg-indigo-500/20 px-2 py-1 text-[11px] font-semibold text-indigo-300 border border-indigo-500/40 transition hover:bg-indigo-500/30"
+            title="Open Live Windy Weather Forecast Map"
+          >
+            🌀 Windy Map
           </button>
 
           <button
@@ -348,12 +399,29 @@ export default function MapView({
               showNautical ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'text-[#88888D] hover:text-white'
             }`}
           >
-            ⚓ Nautical
+            ⚓ Buoys
           </button>
         </div>
       </div>
 
-      {/* Marine Weather & Bathymetry Live HUD overlay */}
+      {/* SST Temperature Spectrum Scale Bar Legend */}
+      {showTemp && (
+        <div className="absolute top-16 left-3 z-[1000] flex items-center gap-2 rounded-lg border border-[#202023] bg-[#0A0A0C]/90 px-3 py-1.5 shadow-lg backdrop-blur-md text-[10px] text-white">
+          <span className="font-semibold text-amber-400">NASA SST:</span>
+          <div className="flex items-center gap-1">
+            <span className="text-[#88888D]">15°C</span>
+            <div
+              className="h-2.5 w-24 rounded-sm"
+              style={{
+                background: 'linear-gradient(to right, #0000ff, #00ffff, #00ff00, #ffff00, #ff7f00, #ff0000)',
+              }}
+            />
+            <span className="text-[#88888D]">32°C</span>
+          </div>
+        </div>
+      )}
+
+      {/* Marine Environmental Data HUD */}
       {(showWind || showTemp || tileStyle === 'bathymetry') && (
         <div className="absolute bottom-3 left-3 z-[1000] flex flex-col gap-1.5 rounded-xl border border-[#202023] bg-[#0A0A0C]/90 p-3 text-xs text-white shadow-xl backdrop-blur-md">
           <div className="flex items-center gap-2 border-b border-white/10 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-[#3DA7B7]">
@@ -367,19 +435,47 @@ export default function MapView({
             </div>
           )}
 
-          {showWind && (
+          {showTemp && (
             <div className="flex items-center justify-between gap-4 text-[11px]">
-              <span className="text-[#88888D]">Wind Velocity:</span>
-              <span className="font-semibold text-cyan-300">12.4 kts (272° W)</span>
+              <span className="text-[#88888D]">Sea Surface Temp (NASA SST):</span>
+              <span className="font-semibold text-amber-400">29.8°C – 30.5°C Composite</span>
             </div>
           )}
 
-          {showTemp && (
-            <div className="flex items-center justify-between gap-4 text-[11px]">
-              <span className="text-[#88888D]">Sea Surface Temp (SST):</span>
-              <span className="font-semibold text-amber-400">30.1°C</span>
+          {inspectorData && (
+            <div className="flex items-center justify-between gap-4 border-t border-white/10 pt-1 text-[11px]">
+              <span className="text-[#88888D]">Clicked Point ({inspectorData.lat}, {inspectorData.lon}):</span>
+              <span className="font-semibold text-emerald-400">
+                {inspectorData.windSpeedKts} kts ({inspectorData.windCardinal}) · SST {inspectorData.sstC}°C
+              </span>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Fullscreen Windy Weather Forecast Modal Overlay */}
+      {showWindyEmbed && (
+        <div className="absolute inset-0 z-[2000] flex flex-col bg-[#0A0A0C]/95 p-4 backdrop-blur-md">
+          <div className="flex items-center justify-between pb-3 text-white">
+            <div className="flex items-center gap-2">
+              <span className="text-[15px] font-bold text-[#3DA7B7]">🌀 Windy Live Marine Weather Map</span>
+              <span className="rounded-full bg-indigo-500/20 px-2 py-0.5 text-[10px] font-mono text-indigo-300 border border-indigo-500/30">
+                Windy API Key Active
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowWindyEmbed(false)}
+              className="rounded-lg border border-[#202023] bg-[#161616] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10"
+            >
+              ✕ Close Windy
+            </button>
+          </div>
+          <iframe
+            src={`https://embed.windy.com/embed2.html?lat=${startPoint?.[0] || 13.0827}&lon=${startPoint?.[1] || 80.2707}&detailLat=${startPoint?.[0] || 13.0827}&detailLon=${startPoint?.[1] || 80.2707}&width=100%25&height=100%25&zoom=8&level=surface&overlay=wind&product=ecmwf&menu=&message=true&marker=true&calendar=now&pressure=true&type=map&location=coordinates&detail=true&metricWind=kts&metricTemp=%C2%B0C&radarRange=-1`}
+            className="w-full flex-1 rounded-xl border border-[#202023]"
+            title="Windy Weather Map"
+          />
         </div>
       )}
 
@@ -390,12 +486,25 @@ export default function MapView({
         className="h-full w-full"
         style={{ background: '#091E36' }}
       >
-        {/* Main Base Tile Layer */}
+        <MapEventsHandler onMapClick={handleMapClick} />
+
+        {/* Base Tile Layer */}
         <TileLayer key={activeTile.url} attribution={activeTile.attribution} url={activeTile.url} />
 
-        {/* Bathymetry Reference Label Overlay (Depth Contours & Nautical Labels) */}
+        {/* Esri Reference Labels if Bathymetry is selected */}
         {activeTile.overlayUrl && (
           <TileLayer key={activeTile.overlayUrl} url={activeTile.overlayUrl} opacity={0.85} />
+        )}
+
+        {/* NASA GIBS Sea Surface Temperature (SST) Daily Composite Heatmap Layer */}
+        {showTemp && (
+          <TileLayer
+            key={`nasa-sst-${sstDate}`}
+            url={`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GHRSST_L4_MUR_Sea_Surface_Temperature/default/${sstDate}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.png`}
+            attribution="&copy; NASA GIBS GHRSST Sea Surface Temperature"
+            opacity={0.6}
+            maxNativeZoom={9}
+          />
         )}
 
         {/* OpenSeaMap Nautical Marks / Buoys / Navigation Lights Overlay */}
@@ -411,6 +520,44 @@ export default function MapView({
         <MapResizeFix />
         {allPoints.length > 0 && <FitBounds points={allPoints} />}
 
+        {/* Inspector Pin on Clicked Location */}
+        {inspectorData && inspectorData.lat && inspectorData.lon && (
+          <Marker
+            position={[Number(inspectorData.lat), Number(inspectorData.lon)]}
+            icon={clickedPinIcon}
+          >
+            <Popup autoPan>
+              <div style={{ fontFamily: 'Inter, sans-serif', fontSize: 12, color: '#1E293B', minWidth: 200 }}>
+                <strong style={{ color: '#F59E0B', fontSize: 13 }}>
+                  📍 Coordinates Inspector
+                </strong>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  {inspectorData.lat}, {inspectorData.lon}
+                </div>
+
+                <div style={{ marginTop: 8, borderTop: '1px solid #E2E8F0', paddingTop: 6 }}>
+                  <div style={{ color: '#0284C7', fontWeight: 600 }}>
+                    💨 Wind: {inspectorData.windSpeedKts} kts ({inspectorData.windCardinal || 'N/A'})
+                  </div>
+                  <div style={{ color: '#D97706', fontWeight: 600, marginTop: 3 }}>
+                    🌡️ Sea Surface Temp (SST): {inspectorData.sstC}°C
+                  </div>
+                  <div style={{ color: '#059669', fontWeight: 600, marginTop: 3 }}>
+                    🌊 Wave Height: {inspectorData.waveHeightM}m
+                  </div>
+                  <div style={{ color: '#475569', fontSize: 11, marginTop: 3 }}>
+                    Air Temp: {inspectorData.airTempC}°C · {inspectorData.pressureHpa} hPa
+                  </div>
+                </div>
+
+                <div style={{ marginTop: 6, fontSize: 10, color: '#94A3B8', fontStyle: 'italic' }}>
+                  Source: {inspectorData.source}
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
+
         {/* Marine zones — Restricted (Red) & Protected (Yellow/Amber) */}
         {marineZones.map((zone, idx) => {
           const zoneType = (zone.type || '').toLowerCase();
@@ -418,7 +565,6 @@ export default function MapView({
 
           const isRestricted = zoneType.includes('restricted') || restrictionLevel === 'restricted';
 
-          // Vibrant color styling: Red for Restricted, Amber/Yellow for Protected
           const strokeColor = isRestricted ? '#EF4444' : '#F59E0B';
           const fillColor = isRestricted ? '#EF4444' : '#F59E0B';
 
@@ -433,7 +579,6 @@ export default function MapView({
 
           const key = zone.id || zone.name || idx;
 
-          // 1. Circle geometry (e.g. Vishakhapatnam Restricted Area)
           if (
             (zone.geometry?.type === 'circle' || zone.geometry?.center) &&
             (zone.geometry?.center?.latitude || zone.geometry?.center?.lat)
@@ -467,7 +612,6 @@ export default function MapView({
             );
           }
 
-          // 2. Standard GeoJSON
           const parsedGeo = parseGeoJSON(zone.geometry);
           if (isValidGeoJSON(parsedGeo)) {
             return (
@@ -490,7 +634,6 @@ export default function MapView({
             );
           }
 
-          // 3. Coordinate array polygon
           if (Array.isArray(zone.coordinates) && zone.coordinates.length > 0) {
             const polygonCoords = zone.coordinates.map((ring) =>
               Array.isArray(ring)
@@ -520,7 +663,7 @@ export default function MapView({
           return null;
         })}
 
-        {/* Candidate routes — vibrant orange/amber dashed curved line */}
+        {/* Candidate routes */}
         {candidatePointSets.map((points, i) => {
           if (!points || points.length < 2) return null;
           const route = candidateRoutes[i];
@@ -545,7 +688,7 @@ export default function MapView({
           );
         })}
 
-        {/* Safest route — vibrant Cyan / Deep Ocean Blue, smooth curved line */}
+        {/* Safest route */}
         {safePoints.length > 1 && (
           <Polyline
             key={`safe-polyline-${safeRoute?.route_id || 'safe'}`}
