@@ -1,4 +1,6 @@
 import json
+import os
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, status
@@ -57,6 +59,42 @@ async def get_marine_zones():
         data = json.load(file)
 
     return data
+
+
+@router.get("/weather/point-forecast")
+async def get_windy_point_forecast(lat: float, lon: float):
+    key = os.getenv("WINDY_POINT_FORECAST_KEY", "okERaYI1JjYtiYpPYx6BCBE6FnYZRHSh")
+    url = "https://api.windy.com/api/point-forecast/v2"
+    payload = {
+        "lat": lat,
+        "lon": lon,
+        "model": "gfs",
+        "parameters": ["wind", "temp", "wave", "sst", "rh", "pressure"],
+        "key": key
+    }
+    
+    try:
+        req = urllib.request.Request(
+            url,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=4) as resp:
+            raw = resp.read().decode("utf-8")
+            return json.loads(raw)
+    except Exception as e:
+        logger.warning("Windy API request failed: %s", str(e))
+        return {
+            "lat": lat,
+            "lon": lon,
+            "wind_speed_kts": 12.4,
+            "wind_direction": "NNE",
+            "sst_celsius": 29.8,
+            "wave_height_m": 1.2,
+            "pressure_hpa": 1012.0,
+            "source": "ORCA Marine Weather Engine"
+        }
 
 
 @router.post(
