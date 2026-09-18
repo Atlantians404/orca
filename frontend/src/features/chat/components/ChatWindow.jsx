@@ -73,20 +73,33 @@ export default function ChatWindow({ session }) {
 
   const bottomRef = useRef(null);
   const requestRef = useRef(0);
-  const isSendingRef = useRef(false);
+
+  // Synchronous lock: `sending` state is async (batched by React), so
+  // two invocations of handleSend/handleLocationConfirm triggered in
+  // the same tick (e.g. Enter + a queued click) could both read
+  // `sending === false` before either commit. This ref is set/cleared
+  // synchronously and is checked FIRST in both handlers, guaranteeing
+  // one user action produces exactly one request. `sending` state is
+  // kept as-is purely for rendering (disabling the composer, etc.).
+  const sendingRef = useRef(false);
 
   // ============================================================
   // RESET INPUT / ERROR WHEN SESSION CHANGES
+  //
+  // BUG FIX: this used to mutate state during render —
+  //   if (sessionId !== prevSessionId) { setPrevSessionId(...); ... }
+  // — which is a React anti-pattern (relies on render being re-run
+  // synchronously after a state update triggered mid-render). It
+  // happened to work today because the resets are idempotent, but it
+  // is not a safe pattern to build on. Moved to a real effect, keyed
+  // on sessionId, with no API calls inside it.
   // ============================================================
 
-  const [prevSessionId, setPrevSessionId] = useState(sessionId);
-
-  if (sessionId !== prevSessionId) {
-    setPrevSessionId(sessionId);
+  useEffect(() => {
     setError(null);
     setInputValue("");
-    isSendingRef.current = false;
-  }
+    setShowLocationPicker(false);
+  }, [sessionId]);
 
   // ============================================================
   // LOAD CHAT HISTORY
@@ -151,8 +164,30 @@ export default function ChatWindow({ session }) {
   //
   // IMPORTANT:
   // Every user response is treated as a normal chat message.
-  // Synchronous isSendingRef guard enforces ONE user action = ONE request.
+  //
+  // Example:
+  //
+  // ORCA:
+  // "Please provide your current fishing location."
+  //
+  // User:
+  // "Chennai"
+  //
+  // -> POST /chat
+  // {
+  //   session_id: 1,
+  //   message: "Chennai"
+  // }
+  //
+  // We DO NOT turn backend `options` into clickable buttons.
   // ============================================================
+
+  // ============================================================
+// PENDING WORKFLOW
+// If ORCA is waiting for additional information, the next
+// message typed by the user is sent through /resume.
+// Backend options are NOT displayed as buttons.
+// ============================================================
 
 function parseLocationInput(text) {
   if (!text || typeof text !== "string") return null;
@@ -189,100 +224,100 @@ const pendingTurn =
     : null;
 
   const handleSend = useCallback(
-    async (text) => {
-      if (!sessionId || isSendingRef.current) return;
-      if (typeof text !== "string") return;
+  async (text) => {
+    if (!sessionId || sendingRef.current) return;
 
-      const trimmed = text.trim();
+    const trimmed = text.trim();
 
-      if (!trimmed) return;
+    if (!trimmed) return;
 
-      isSendingRef.current = true;
-      setSending(true);
-      setError(null);
+    setError(null);
 
-      let valueToSend = trimmed;
-      if (pendingTurn && pendingTurn.pending_action === "location") {
-        const parsed = parseLocationInput(trimmed);
-        if (parsed) {
-          valueToSend = parsed;
-        } else if (/^[\d.\s,-]+$/.test(trimmed)) {
-          setError({
-            message:
-              "Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).",
-            action: null,
-          });
-          isSendingRef.current = false;
-          setSending(false);
-          return;
-        }
+    let valueToSend = trimmed;
+    if (pendingTurn && pendingTurn.pending_action === "location") {
+      const parsed = parseLocationInput(trimmed);
+      if (parsed) {
+        valueToSend = parsed;
+      } else if (/^[\d.\s,-]+$/.test(trimmed)) {
+        setError({
+          message:
+            "Please enter valid coordinates (Latitude: -90 to 90, Longitude: -180 to 180).",
+          action: null,
+        });
+        return;
+      }
+    }
+
+    // Lock acquired here — after every early-return validation path,
+    // right before we actually commit to making a request.
+    sendingRef.current = true;
+
+    setInputValue("");
+    setSending(true);
+
+    const userMessage = makeUserMessage(trimmed);
+    const pendingAssistant = makePendingAssistantMessage();
+
+    setMessages((previous) => [
+      ...previous,
+      userMessage,
+      pendingAssistant,
+    ]);
+
+    try {
+      let assistantMessage;
+
+      if (pendingTurn) {
+        // ORCA is waiting for an answer.
+        // Send the user's value through /resume.
+        assistantMessage = await resumeChat(
+          sessionId,
+          valueToSend
+        );
+      } else {
+        // Normal conversation.
+        assistantMessage = await sendMessage(
+          sessionId,
+          trimmed
+        );
       }
 
-      setInputValue("");
-
-      const userMessage = makeUserMessage(trimmed);
-      const pendingAssistant = makePendingAssistantMessage();
-
-      setMessages((previous) => [
-        ...previous,
-        userMessage,
-        pendingAssistant,
-      ]);
-
-      try {
-        let assistantMessage;
-
-        if (pendingTurn) {
-          // ORCA is waiting for an answer.
-          // Send the user's value through /resume.
-          assistantMessage = await resumeChat(
-            sessionId,
-            valueToSend
-          );
-        } else {
-          // Normal conversation.
-          assistantMessage = await sendMessage(
-            sessionId,
-            trimmed
-          );
-        }
-
-        setMessages((previous) => {
-          const withoutPlaceholder =
-            previous.filter(
-              (message) =>
-                message.id !== pendingAssistant.id
-            );
-
-          return [
-            ...withoutPlaceholder,
-            assistantMessage,
-          ];
-        });
-      } catch (err) {
-        setMessages((previous) =>
+      setMessages((previous) => {
+        const withoutPlaceholder =
           previous.filter(
             (message) =>
               message.id !== pendingAssistant.id
-          )
-        );
+          );
 
-        setError({
-          message:
-            err?.message ||
-            "ORCA couldn't complete that request.",
-          action: {
-            type: pendingTurn ? "resume" : "send",
-            payload: valueToSend,
-          },
-        });
-      } finally {
-        isSendingRef.current = false;
-        setSending(false);
-      }
-    },
-    [sessionId, pendingTurn]
-  );
+        return [
+          ...withoutPlaceholder,
+          assistantMessage,
+        ];
+      });
+    } catch (err) {
+      setMessages((previous) =>
+        previous.filter(
+          (message) =>
+            message.id !== pendingAssistant.id
+        )
+      );
+
+      setError({
+        message:
+          err?.message ||
+          "ORCA couldn't complete that request.",
+        action: {
+          type: pendingTurn ? "resume" : "send",
+          payload: valueToSend,
+        },
+      });
+    } finally {
+      sendingRef.current = false;
+      setSending(false);
+    }
+  },
+  [sessionId, pendingTurn]
+);
 
   // ============================================================
   // LOCATION CONFIRMED
@@ -295,7 +330,7 @@ const pendingTurn =
     async (location) => {
       setShowLocationPicker(false);
 
-      if (!sessionId || isSendingRef.current) return;
+      if (!sessionId || sendingRef.current) return;
 
       const displayContent =
         typeof location === "object" &&
@@ -307,9 +342,9 @@ const pendingTurn =
           : String(location);
 
       if (pendingTurn) {
-        isSendingRef.current = true;
-        setSending(true);
+        sendingRef.current = true;
         setError(null);
+        setSending(true);
 
         const userMessage = makeUserMessage(displayContent);
         const pendingAssistant = makePendingAssistantMessage();
@@ -349,7 +384,7 @@ const pendingTurn =
             },
           });
         } finally {
-          isSendingRef.current = false;
+          sendingRef.current = false;
           setSending(false);
         }
       } else {
@@ -358,63 +393,19 @@ const pendingTurn =
     },
     [sessionId, pendingTurn, handleSend]
   );
-
   // ============================================================
   // RETRY
   // ============================================================
 
-  const handleRetry = useCallback(async () => {
-    if (!error?.action || !sessionId || isSendingRef.current) return;
+  const handleRetry = useCallback(() => {
+    if (!error?.action) return;
 
-    const { type, payload } = error.action;
+    const { payload } = error.action;
+
     setError(null);
 
-    if (type === "resume") {
-      isSendingRef.current = true;
-      setSending(true);
-
-      const displayContent =
-        typeof payload === "object" && payload?.latitude != null
-          ? `${Number(payload.latitude).toFixed(6)}, ${Number(
-              payload.longitude
-            ).toFixed(6)}`
-          : String(payload);
-
-      const userMessage = makeUserMessage(displayContent);
-      const pendingAssistant = makePendingAssistantMessage();
-
-      setMessages((previous) => [...previous, userMessage, pendingAssistant]);
-
-      try {
-        const assistantMessage = await resumeChat(sessionId, payload);
-
-        setMessages((previous) => {
-          const withoutPlaceholder = previous.filter(
-            (message) => message.id !== pendingAssistant.id
-          );
-          return [...withoutPlaceholder, assistantMessage];
-        });
-      } catch (err) {
-        setMessages((previous) =>
-          previous.filter((message) => message.id !== pendingAssistant.id)
-        );
-
-        setError({
-          message:
-            err?.message || "ORCA couldn't complete that request.",
-          action: {
-            type: "resume",
-            payload,
-          },
-        });
-      } finally {
-        isSendingRef.current = false;
-        setSending(false);
-      }
-    } else {
-      handleSend(typeof payload === "string" ? payload : String(payload));
-    }
-  }, [error, sessionId, handleSend]);
+    handleSend(payload);
+  }, [error, handleSend]);
 
   // ============================================================
   // SUGGESTION CLICK

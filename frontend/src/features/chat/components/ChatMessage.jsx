@@ -167,6 +167,11 @@ function AssistantTurn({ message, isLatest, onRequestLocation }) {
               </p>
             )}
 
+            {/* PFZ CANDIDATES & RISK ASSESSMENT OPTIONS */}
+            {message.options && message.options.length > 0 && (
+              <PfzOptionsPanel options={message.options} />
+            )}
+
             {/* STRUCTURED BACKEND DATA & MAP INTEGRATION */}
             {message.response_data && (
               <ResponseDataPanel
@@ -177,21 +182,14 @@ function AssistantTurn({ message, isLatest, onRequestLocation }) {
 
             {/* WORKFLOW STATUS */}
             {message.workflow_status &&
-              message.workflow_status !== "COMPLETED" && (
-                <div className="mt-3">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-[#5C5C5C]">
+              message.workflow_status !== "COMPLETED" &&
+              message.workflow_status !== "IN_PROGRESS" && (
+                <div className="mt-2">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-[#3DA7B7]">
                     {formatWorkflowStatus(message.workflow_status)}
                   </span>
                 </div>
               )}
-
-            {message.workflow_status === "COMPLETED" && (
-              <div className="mt-3">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-[#5C5C5C]">
-                  COMPLETED
-                </span>
-              </div>
-            )}
 
             {/* TIMESTAMP */}
             {message.created_at && (
@@ -306,7 +304,6 @@ function InteractiveRouteMap({ responseData }) {
   const [fetchedZones, setFetchedZones] = useState([]);
   const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved | error | dismissed
   const [saveError, setSaveError] = useState("");
-  const hasFetchedZonesRef = useRef(false);
 
   const normalized = useMemo(
     () => normalizeRouteData(responseData),
@@ -317,16 +314,12 @@ function InteractiveRouteMap({ responseData }) {
     if (!normalized) return;
     if (normalized.marineZones && normalized.marineZones.length > 0) {
       setFetchedZones(normalized.marineZones);
-      hasFetchedZonesRef.current = true;
-    } else if (!hasFetchedZonesRef.current) {
-      hasFetchedZonesRef.current = true;
+    } else {
       getMarineZones()
         .then((data) =>
           setFetchedZones(Array.isArray(data) ? data : data?.zones || [])
         )
-        .catch(() => {
-          hasFetchedZonesRef.current = false;
-        });
+        .catch(() => {});
     }
   }, [normalized]);
 
@@ -483,6 +476,107 @@ function InteractiveRouteMap({ responseData }) {
 }
 
 // ============================================================
+// PFZ / OPTIONS PANEL (RISK ASSESSMENT LIST)
+// ============================================================
+
+function PfzOptionsPanel({ options }) {
+  if (!Array.isArray(options) || options.length === 0) return null;
+
+  const getRiskBadge = (level) => {
+    if (!level) return null;
+    const l = String(level).toUpperCase();
+    if (l.includes("LOW") || l.includes("SAFE")) {
+      return (
+        <span className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+          LOW RISK
+        </span>
+      );
+    }
+    if (l.includes("MED") || l.includes("MODERATE") || l.includes("CAUTION")) {
+      return (
+        <span className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+          MODERATE RISK
+        </span>
+      );
+    }
+    return (
+      <span className="rounded-md border border-rose-500/30 bg-rose-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-400">
+        HIGH RISK
+      </span>
+    );
+  };
+
+  return (
+    <div className="mt-3 flex w-full max-w-[620px] flex-col gap-2.5 rounded-2xl border border-[#202023] bg-[#0F0F0F] p-4">
+      <div className="flex items-center gap-2 border-b border-[#202023] pb-2.5 text-xs font-semibold uppercase tracking-wider text-[#3DA7B7]">
+        <ShieldAlert size={15} className="shrink-0 text-[#3DA7B7]" />
+        <span>PFZ Risk Assessment & Options</span>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        {options.map((opt, idx) => {
+          const name =
+            typeof opt === "string"
+              ? opt
+              : opt.pfz_name || opt.name || `Option ${idx + 1}`;
+          const times = Array.isArray(opt.times) ? opt.times : [];
+          const topRiskLevel =
+            opt.risk_level || (times.length > 0 ? times[0].risk_level : null);
+
+          return (
+            <div
+              key={idx}
+              className="flex flex-col gap-2 rounded-xl border border-[#202023] bg-[#0A0A0A] p-3 transition hover:border-[#3DA7B7]/30"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#3DA7B7]/15 text-xs font-bold text-[#3DA7B7]">
+                    {idx + 1}
+                  </span>
+                  <div className="min-w-0">
+                    <span className="text-sm font-semibold text-white">
+                      {name}
+                    </span>
+                  </div>
+                </div>
+                {getRiskBadge(topRiskLevel)}
+              </div>
+
+              {times.length > 0 && (
+                <div className="mt-1 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+                  {times.map((t, tIdx) => (
+                    <div
+                      key={tIdx}
+                      className="flex flex-col gap-0.5 rounded-lg border border-[#1A1A1D] bg-[#121215] px-3 py-2 text-xs text-[#A0A0A5]"
+                    >
+                      <div className="flex items-center justify-between text-white font-medium">
+                        <span className="text-xs">
+                          🕒 {t.time || t.start_time || `Time ${tIdx + 1}`}
+                        </span>
+                        {t.risk_score != null && (
+                          <span className="text-[11px] font-semibold text-[#3DA7B7]">
+                            Score: {t.risk_score}
+                          </span>
+                        )}
+                      </div>
+                      {t.risk_level && (
+                        <div className="mt-0.5 text-[11px] text-[#88888D]">
+                          Risk: <span className="text-white font-medium">{t.risk_level}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
 // RESPONSE DATA PANEL
 // ============================================================
 
@@ -544,7 +638,7 @@ function ResponseDataPanel({ data, showMessage = false }) {
       {hasInteractiveRoute && <InteractiveRouteMap responseData={data} />}
 
       {/* PFZ */}
-      {hasPfz && (
+      {hasPfz && !hasInteractiveRoute && (
         <div className="flex items-start gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
           <MapPin
             size={15}
@@ -575,7 +669,7 @@ function ResponseDataPanel({ data, showMessage = false }) {
       )}
 
       {/* RISK */}
-      {hasRisk && (
+      {hasRisk && !hasInteractiveRoute && (
         <div className="flex items-center gap-2.5 rounded-xl border border-[#202023] bg-[#0F0F0F] px-4 py-3">
           <ShieldAlert
             size={15}

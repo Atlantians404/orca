@@ -83,49 +83,12 @@ export const unarchiveSession = async (sessionId) => {
 };
 
 // =====================================================
-// CHAT APIs — YOUR ACTUAL 3 ENDPOINTS
+// NOTE
 // =====================================================
-
-/**
- * GET /chat/{session_id}/history
- *
- * Loads the complete conversation for a session.
- */
-export const getChatHistory = async (sessionId) => {
-  const response = await api.get(`/chat/${sessionId}/history`);
-  return response.data;
-};
-
-/**
- * POST /chat
- *
- * Request:
- * {
- *   session_id: number,
- *   message: string
- * }
- */
-export const sendChatMessage = async (sessionId, message) => {
-  const response = await api.post("/chat", {
-    session_id: sessionId,
-    message,
-  });
-
-  return response.data;
-};
-
-/**
- * POST /chat/{session_id}/resume
- *
- * Request:
- * {
- *   value: string
- * }
- */
-export const resumeChat = async (sessionId, value) => {
-  const response = await api.post(`/chat/${sessionId}/resume`, {
-    value,
-  });
-
-  return response.data;
-};
+// getChatHistory / sendChatMessage / resumeChat used to be duplicated
+// here as well as in chathelp.js. Grepping every import in the
+// codebase confirmed nothing used this file's copies — ChatWindow.jsx
+// only ever imports from "../services/chathelp". Removed to avoid two
+// implementations of the same three endpoints silently drifting apart.
+// If you need chat operations from this file in the future, import
+// them from chathelp.js instead of re-adding them here.

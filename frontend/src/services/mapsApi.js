@@ -37,7 +37,29 @@ export async function generateRoute(payload) {
   return data;
 }
 
-export async function getMarineZones() {
-  const { data } = await api.get('/api/marine-zones');
-  return data;
+// Marine zones are effectively static reference data. Every
+// InteractiveRouteMap instance (one per chat message with a route) and
+// MapsPage previously called this independently, meaning a session with
+// several route responses made the same GET repeatedly for identical
+// data. Cache the in-flight/resolved promise so concurrent and
+// subsequent callers share one request; call resetMarineZonesCache()
+// if you ever need to force a refetch (e.g. an admin action).
+let marineZonesPromise = null;
+
+export function getMarineZones() {
+  if (!marineZonesPromise) {
+    marineZonesPromise = api
+      .get('/api/marine-zones')
+      .then(({ data }) => data)
+      .catch((err) => {
+        // Don't cache a failure — let the next caller retry.
+        marineZonesPromise = null;
+        throw err;
+      });
+  }
+  return marineZonesPromise;
+}
+
+export function resetMarineZonesCache() {
+  marineZonesPromise = null;
 }
